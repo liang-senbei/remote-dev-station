@@ -64,6 +64,13 @@ cloudattach() {
   echo "会话 '$name' 既不在跑、也无可恢复登记(可能已删)。用 cloudgo 选别的或新建。"; return 1
 }
 cloudforget() { cloud-forget "$@"; }
+# 临时会话:开后即用,关标签即销毁(destroy-unattached),不进登记/恢复系统/看板(名字 cc-tmp-* 被 cc-state 跳过);
+#           claude 的对话存档(.jsonl)仍保留,日后可 cloud_resume 找回。
+cloudtmp() {
+  local dir="${1:-/opt/workspace}" name="cc-tmp-$(date +%H%M%S)-$RANDOM"
+  exec env -u TMUX tmux new-session -s "$name" \
+    "tmux set-option destroy-unattached on 2>/dev/null; cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions"
+}
 # fzf 两步：① 选目录(顶层 + 各项目子目录) ② 在该目录下「选已有会话 或 新开一个」
 # （一个目录可有多个会话：cc-<名> / cc-<名>-2 / -3 ...）
 cloudgo() {

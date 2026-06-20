@@ -32,6 +32,10 @@ ev = data.get("hook_event_name") or (sys.argv[1] if len(sys.argv) > 1 else "")
 key = tmux_session() or data.get("session_id", "") or "unknown"
 safe = re.sub(r"[^\w.\-]", "_", key)
 
+# 临时会话(cc-tmp-*):不写状态、不登记 → 不进看板/恢复系统(对话 jsonl 仍由 claude 自己保留)
+if key.startswith("cc-tmp-"):
+    sys.exit(0)
+
 MAP = {
     "UserPromptSubmit": ("work", "开始处理"),
     "PreToolUse":       ("work", "运行中"),
