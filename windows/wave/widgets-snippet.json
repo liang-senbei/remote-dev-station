@@ -1,0 +1,35 @@
+{
+  "__comment__": "把下面两个 widget 合并进 Wave 的 widgets.json(%USERPROFILE%\\.config\\waveterm\\widgets.json)。cmd 里的 <USERPROFILE> 换成真实路径,如 C:\\Users\\you。display:order 越小越靠上。安装脚本 install.ps1 会自动按动态路径写入、并保证无 BOM。",
+
+  "cc-launch": {
+    "display:order": -3,
+    "icon": "plus",
+    "label": "新会话",
+    "color": "#9ece6a",
+    "description": "在本标签页新建命名的、可恢复的 Claude 会话(cc-new 钉死 session-id,归恢复本页管)",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\cc-launch.ps1",
+        "cmd:interactive": true
+      }
+    }
+  },
+
+  "cc-restore-tab": {
+    "display:order": -2,
+    "icon": "rotate",
+    "label": "恢复本页",
+    "color": "#ea9a97",
+    "description": "一键复活服务器所有登记会话,并在本标签页弹出属于本页的全部终端(各自接回内容)",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\cc-restore-tab.ps1",
+        "cmd:interactive": true
+      }
+    }
+  }
+}
