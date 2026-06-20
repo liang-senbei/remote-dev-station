@@ -70,7 +70,9 @@ cloudgo() {
   # 自学习一步到位:此标签(WAVETERM_BLOCKID,由 cloudconn 传入)上次选过哪个会话就记住;
   # 重开/意外退出重进 → 直接进那个会话、不弹菜单。绑的会话真没了,才回落到选择器。
   local bid="${WAVETERM_BLOCKID:-}" bdir="$HOME/.cloud-blockbind"
+  [ -d "$bdir" ] && find "$bdir" -type f -mtime +30 -delete 2>/dev/null   # 自动清掉 30 天没用过的死标签绑定
   if [ -n "$bid" ] && [ -s "$bdir/$bid" ]; then
+    touch "$bdir/$bid"                                                     # 标记此标签近期在用(防被误清)
     cloudattach "$(cat "$bdir/$bid")"   # 可进则 exec 进入(不返回);会话没了才继续往下弹菜单
   fi
   command -v fzf >/dev/null || { tmux list-sessions 2>/dev/null || echo "(无会话)"; return; }
