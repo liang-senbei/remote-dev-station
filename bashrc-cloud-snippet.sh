@@ -67,11 +67,17 @@ cloudforget() { cloud-forget "$@"; }
 # fzf 两步：① 选目录(顶层 + 各项目子目录) ② 在该目录下「选已有会话 或 新开一个」
 # （一个目录可有多个会话：cc-<名> / cc-<名>-2 / -3 ...）
 cloudgo() {
+  # 自学习一步到位:此标签(WAVETERM_BLOCKID,由 cloudconn 传入)上次选过哪个会话就记住;
+  # 重开/意外退出重进 → 直接进那个会话、不弹菜单。绑的会话真没了,才回落到选择器。
+  local bid="${WAVETERM_BLOCKID:-}" bdir="$HOME/.cloud-blockbind"
+  if [ -n "$bid" ] && [ -s "$bdir/$bid" ]; then
+    cloudattach "$(cat "$bdir/$bid")"   # 可进则 exec 进入(不返回);会话没了才继续往下弹菜单
+  fi
   command -v fzf >/dev/null || { tmux list-sessions 2>/dev/null || echo "(无会话)"; return; }
   local choice key
   choice=$( cloud-sessmenu \
     | fzf --prompt="❯ 会话  " --height=80% --header-first --delimiter=$'\t' --with-nth=2 \
-          --header=" ↵ 进入    Ctrl-X 删除(保留底层对话) " \
+          --header=" ↵ 进入(自动记住此标签)    Ctrl-X 删除(留对话) " \
           --preview 'cloud-sesspreview {1}' \
           --preview-window='right,56%,wrap,border-left' --preview-label=' 预览 ' \
           --bind 'ctrl-x:execute-silent(cloud-forget {1} >/dev/null 2>&1)+reload(cloud-sessmenu)') || return 0
@@ -80,7 +86,8 @@ cloudgo() {
     "➕") cloudnewat ;;
     "⟳") cloud_resume ;;
     "")  return 0 ;;
-    *)   cloudattach "$key" ;;
+    *)   [ -n "$bid" ] && { mkdir -p "$bdir"; printf '%s' "$key" > "$bdir/$bid"; }  # 记住:此标签 ↔ 此会话
+         cloudattach "$key" ;;
   esac
 }
 # 像文件管理器一样逐层进出地浏览/选择/新建目录，再新开会话
