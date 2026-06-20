@@ -1,0 +1,4 @@
+#!/bin/bash
+# 看 Mac 某目录最近文件： macls [目录，默认 ~/Downloads]
+MAC=${MAC:-mac}
+ssh "$MAC" "ls -lt ${1:-~/Downloads} | head -20"

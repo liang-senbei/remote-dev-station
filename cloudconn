@@ -1,0 +1,11 @@
+#!/bin/bash
+# 韧性连接 Wave 会话:mosh 到云服务器跑指定命令;服务器重启/断线后自动重连(Ctrl-C 取消)
+TARGET="${*:-cloudgo}"
+HOST="root@100.109.254.125"
+MOSH="/opt/homebrew/bin/mosh"
+while true; do
+  "$MOSH" "$HOST" -- bash -ic "$TARGET"
+  ec=$?
+  printf "\n\033[33m── 连接断开 (退出码 %s)。5 秒后自动重连… 按 Ctrl-C 取消 ──\033[0m\n" "$ec"
+  sleep 5 || break
+done

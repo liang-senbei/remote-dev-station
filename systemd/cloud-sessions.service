@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore Claude Code tmux sessions on boot
+After=network-online.target tailscaled.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=HOME=/root
+ExecStart=/usr/local/bin/cloud-boot.sh
+[Install]
+WantedBy=multi-user.target

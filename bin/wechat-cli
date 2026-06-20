@@ -1,0 +1,8 @@
+#!/bin/bash
+# wechat-cli 转发器 —— 微信数据在 Mac 本机,所有调用回到 Mac 执行
+cmd="export PATH=/opt/homebrew/bin:\$PATH; wechat-cli"
+for a in "$@"; do
+  esc=$(printf '%s' "$a" | sed "s/'/'\\\\''/g")
+  cmd="$cmd '$esc'"
+done
+exec ssh mac "$cmd"

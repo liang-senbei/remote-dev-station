@@ -1,0 +1,6 @@
+#!/bin/bash
+# 从 Mac 取任意文件： macget <Mac路径> [目标目录，默认 ~/inbox]
+MAC=${MAC:-mac}
+src="$1"; dst="${2:-$HOME/inbox}"
+[ -z "$src" ] && { echo "用法: macget <Mac路径> [目标目录]" >&2; exit 1; }
+mkdir -p "$dst"; scp -q "$MAC":"$src" "$dst"/ && echo "$dst/$(basename "$src")"

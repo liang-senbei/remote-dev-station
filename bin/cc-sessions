@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+# cc-sessions — 可恢复会话注册表读写工具。
+# 真相源 = ~/.cloud-sessions/<safe-name>.json(每会话一个文件,cc-state hook 自动写,零锁竞争)。
+# 每条 {"name","dir","uuid","ts"}。但 dir 会因 agent 中途 cd 而漂移,所以:
+#   · 对话定位以 uuid 全局 glob 为准(uuid 全局唯一);
+#   · 真实启动目录由 jsonl 所在「编码目录名」反解(文件系统贪婪匹配,目录名含 '-' 也能消歧)。
+# 子命令: list | resolve <name> | forget <name> | recoverable | resumable | prune
+import sys, os, json, time, glob, re, subprocess
+
+REG  = os.path.expanduser("~/.cloud-sessions")
+PROJ = os.path.expanduser("~/.claude/projects")
+
+def safe(name): return re.sub(r"[^\w.\-]", "_", name)
+
+def records():
+    out = []
+    for p in sorted(glob.glob(os.path.join(REG, "*.json"))):
+        try:
+            r = json.load(open(p))
+            if isinstance(r, dict) and r.get("name"):
+                r["_path"] = p; out.append(r)
+        except Exception:
+            pass
+    return out
+
+def jsonl_by_uuid(uuid):
+    if not uuid: return ""
+    hits = glob.glob(os.path.join(PROJ, "*", uuid + ".jsonl"))
+    return hits[0] if hits else ""
+
+def decode_dir(encoded):
+    # "-opt-workspace-myproject" -> "/opt/workspace/myproject"
+    # '-' 既可能是路径分隔也可能是目录名里的字符 → 用文件系统贪婪匹配「最长真实目录」消歧
+    toks = encoded.split("-"); idx = 1 if toks and toks[0] == "" else 0; path = ""
+    while idx < len(toks):
+        best = None; cand = ""; j = idx
+        while j < len(toks):
+            cand = cand + ("-" if cand else "") + toks[j]
+            trial = (path + "/" + cand) if path else "/" + cand
+            if os.path.isdir(trial): best = (j, trial)
+            j += 1
+        if best is None:
+            rest = "/".join(toks[idx:]); return (path + "/" + rest) if path else "/" + rest
+        idx = best[0] + 1; path = best[1]
+    return path or "/"
+
+def resolve(r):
+    # -> (name, realdir, uuid) 若对话存档还在;否则 None
+    uuid = r.get("uuid", ""); jl = jsonl_by_uuid(uuid)
+    if not jl: return None
+    return (r["name"], decode_dir(os.path.basename(os.path.dirname(jl))), uuid)
+
+def live():
+    try:
+        out = subprocess.check_output(["tmux", "list-sessions", "-F", "#{session_name}"],
+                                      text=True, stderr=subprocess.DEVNULL)
+        return set(l.strip() for l in out.splitlines() if l.strip())
+    except Exception:
+        return set()
+
+def is_canon(name): return re.search(r"-r\d+$", name) is None   # 非 -rN = 「正名」,去重时优先
+
+def dedupe(rows):   # rows: (name,realdir,uuid,ts) → 每个 uuid 只留一个(优先正名,其次 ts 新)
+    best = {}
+    for name, realdir, uuid, ts in rows:
+        rank = (1 if is_canon(name) else 0, ts)
+        cur = best.get(uuid)
+        if cur is None or rank > cur[0]:
+            best[uuid] = (rank, (name, realdir, uuid, ts))
+    return [v[1] for v in best.values()]
+
+def rel(a):
+    a = int(a)
+    if a < 60:    return "刚刚"
+    if a < 3600:  return "%d分前" % (a // 60)
+    if a < 86400: return "%d时前" % (a // 3600)
+    return "%d天前" % (a // 86400)
+
+cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+
+if cmd == "list":
+    print(json.dumps([{k: v for k, v in r.items() if k != "_path"} for r in records()],
+                     ensure_ascii=False, indent=2))
+
+elif cmd == "resolve" and len(sys.argv) >= 3:
+    for r in records():
+        if r["name"] == sys.argv[2]:
+            res = resolve(r)
+            if res: print("%s\t%s" % (res[1], res[2]))
+            break
+
+elif cmd == "forget" and len(sys.argv) >= 3:
+    p = os.path.join(REG, safe(sys.argv[2]) + ".json")
+    try:
+        os.remove(p); print("已忘记登记: %s (对话存档保留,可日后 claude --resume 找回)" % sys.argv[2])
+    except FileNotFoundError:
+        print("无此登记: %s" % sys.argv[2])
+
+elif cmd in ("resumable", "recoverable"):
+    L = live()
+    # 该对话已在某个活会话里跑着的 uuid 集合 → 绝不再 resume 到第二个会话名(防双开抖动/对话冲突)
+    live_uuids = {r.get("uuid", "") for r in records() if r["name"] in L and r.get("uuid")}
+    now = time.time(); rows = []
+    for r in records():
+        if r.get("ended"): continue          # 主动退出(SessionEnd)的不自动恢复,但仍可手动 resolve/resume
+        if r["name"] in L: continue
+        if r.get("uuid") in live_uuids: continue   # 这个对话已在别的会话名下活着 → 跳过,不双开
+        res = resolve(r)
+        if not res: continue
+        rows.append((res[0], res[1], res[2], r.get("ts", 0)))
+    for name, realdir, uuid, ts in dedupe(rows):
+        if cmd == "resumable":
+            print("%s\t%s\t%s" % (name, realdir, uuid))
+        else:
+            print("%s\t%s\t%s\t%s" % (name, realdir, uuid, rel(now - ts)))
+
+elif cmd == "prune":
+    n = 0
+    for r in records():
+        if resolve(r) is None:
+            try: os.remove(r["_path"]); n += 1
+            except Exception: pass
+    print("清理死登记 %d 条" % n)
+
+else:
+    sys.stderr.write("用法: cc-sessions list|resolve <name>|forget <name>|recoverable|resumable|prune\n")
+    sys.exit(1)

@@ -1,0 +1,10 @@
+[Unit]
+Description=Cloud outbox file server (Tailscale-only) for rich media
+After=tailscaled.service network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 8088 --bind 100.109.254.125 --directory /root/inbox
+Restart=on-failure
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
