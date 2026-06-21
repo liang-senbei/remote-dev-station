@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+# cloudstatus-server — elegant always-on web dashboard for all cc-* Claude sessions.
+# Serves a clean auto-refreshing card UI at / and JSON at /api/sessions.
+# Bind: Tailscale IP only (consistent with the outbox/VNC services).
+import http.server, socketserver, json, threading, time, subprocess, re, html, os
+
+STATE_DIR = os.path.expanduser("~/.cloud-status")
+READ_FILE = os.path.join(STATE_DIR, "_read.json")
+_rlock = threading.Lock()
+def load_read():
+    try:
+        with open(READ_FILE) as f: return json.load(f)
+    except Exception: return {}
+def save_read(d):
+    with _rlock:
+        try:
+            with open(READ_FILE + ".tmp", "w") as f: json.dump(d, f, ensure_ascii=False)
+            os.replace(READ_FILE + ".tmp", READ_FILE)
+        except Exception: pass
+def mark(key, seen=None, toread=None):
+    d = load_read(); m = d.get(key, {})
+    if seen is not None: m["seen"] = seen
+    if toread is not None: m["toread"] = toread
+    d[key] = m; save_read(d)
+def read_hook(name):
+    try:
+        safe = re.sub(r"[^\w.\-]", "_", name)
+        with open(os.path.join(STATE_DIR, safe + ".json")) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+HOST = "100.109.254.125"
+PORT = 8722
+
+WORK = re.compile(r"esc to interrupt", re.I)
+# agent-teams / background work markers (no "esc to interrupt" line in this mode)
+WORKMARK = re.compile(r"esc to interrupt|[◯⊙◐◑◒◓]|\b\d+\s+shells?\b|\d+\s*/\s*\d+\s*agents?\s+done|running…|working…|thinking…", re.I)
+INPUT = re.compile(r"❯\s*\d+\.|\bDo you want\b|\(y/n\)|│\s*\d+\.\s|Yes, (and|proceed)|No, and tell|press enter to continue|Continue\?|to approve", re.I)
+DONE = re.compile(r"[✻✽✺✶✷✸✹·*]\s*([A-Za-z][\w’'\- ]*?ed)\s+for\s+([0-9hms\. ]+)")
+WORKLINE = re.compile(r"[✻✽✺✶✷✸✹·*◯⊙].*(esc to interrupt|agents?\s+done|background task)", re.I)
+CHANGE_WINDOW = 8.0  # pane content moved within N seconds -> actively working
+
+prev = {}; lastchange = {}; lasthash = {}; done_at = {}
+SNAP = {"sessions": [], "ts": 0}
+
+def sh(args):
+    try: return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL)
+    except Exception: return ""
+
+VOLATILE = re.compile(r"💰|🪟|⏳|⏵⏵|Opus 4|Sonnet 4|\(1M context\)|bypass permissions|for agents|shift\+tab|^[─-]+$|^❯\s*$")
+def stable(c):
+    # drop volatile status-chrome lines so an idle pane hashes constant (ignore ticking timers/cost)
+    return "\n".join(l for l in c.splitlines() if not VOLATILE.search(l))
+
+def classify(c, changed):
+    tail = "\n".join([l for l in c.splitlines() if l.strip()][-45:])
+    if INPUT.search(tail): return "input"
+    if WORKMARK.search(tail): return "work"          # precise running markers
+    if DONE.search(tail): return "idle"              # "✻ Xed for ..." = just completed
+    if changed: return "work"                         # fallback: pane still moving, no done line
+    return "idle"
+
+def detail(c, st):
+    lines = c.splitlines()
+    if st == "work":
+        for l in reversed(lines):
+            if WORKLINE.search(l): return re.sub(r"\s+", " ", l.strip())[:80]
+    if st == "input":
+        for l in reversed(lines):
+            if INPUT.search(l): return re.sub(r"\s+", " ", l.strip())[:80]
+    for l in reversed(lines):
+        if DONE.search(l): return re.sub(r"\s+", " ", l.strip())[:80]
+    ne = [l for l in lines if l.strip()]
+    return re.sub(r"\s+", " ", ne[-1].strip())[:80] if ne else ""
+
+def scan():
+    out = sh(["tmux", "list-sessions", "-F", "#{session_name}"])
+    names = [s for s in out.splitlines() if s.startswith("cc-")]
+    now = time.time()
+    rd = load_read()
+    import hashlib
+    rows = []
+    for s in names:
+        hook = read_hook(s)
+        if hook and hook.get("state"):
+            # 有 hook 权威状态 -> 不抓屏(省下 capture-pane 子进程)
+            hst = hook["state"]
+            st = "idle" if hst in ("done", "idle") else ("input" if hst == "input" else "work")
+            det = hook.get("detail", ""); ts_for = hook.get("ts", now); src = "hook"
+        else:
+            # 无 hook 数据的会话才回退到抓屏启发式
+            c = sh(["tmux", "capture-pane", "-p", "-t", s])
+            h = hashlib.md5(stable(c).encode("utf-8", "ignore")).hexdigest()
+            if lasthash.get(s) != h:
+                lasthash[s] = h; lastchange[s] = now
+            changed = (now - lastchange.get(s, now)) < CHANGE_WINDOW
+            st = classify(c, changed); det = detail(c, st); ts_for = lastchange.get(s, now); src = "term"
+        if prev.get(s) == "work" and st == "idle":
+            done_at[s] = now
+        prev[s] = st
+        meta = rd.get(s, {})
+        seen = meta.get("seen", 0); toread = bool(meta.get("toread"))
+        unread = (st == "idle") and (ts_for > seen + 0.5)
+        rows.append({
+            "key": s,
+            "name": s[3:] if s.startswith("cc-") else s,
+            "state": st,
+            "detail": det,
+            "idle": int(now - ts_for),
+            "src": src,
+            "unread": unread,
+            "toread": toread,
+            "justDone": bool(done_at.get(s) and (now - done_at[s]) < 45),
+        })
+    def rk(r):
+        if r["toread"]: return 0
+        if r["state"] == "input": return 1
+        if r["state"] == "work": return 2
+        if r["unread"]: return 3
+        return 4
+    rows.sort(key=lambda r: (rk(r), r["idle"]))
+    SNAP["sessions"] = rows; SNAP["ts"] = now
+
+def loop():
+    while True:
+        try: scan()
+        except Exception: pass
+        time.sleep(2)
+
+PAGE = """<!doctype html><html lang="zh" data-theme="graphite"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会话状态看板</title>
+<style>
+:root,[data-theme=graphite]{--bg:#0e1116;--card:#181d26;--card2:#1f2632;--fg:#e8edf4;--dim:#8a96a8;--line:#27303c;--work:#5b9bff;--input:#f5b041;--idle:#3ddc84}
+[data-theme=midnight]{--bg:#0a0e1f;--card:#131b33;--card2:#1a2342;--fg:#e9eefc;--dim:#8b99c2;--line:#222f56;--work:#6aa3ff;--input:#ffc857;--idle:#56e39f}
+[data-theme=nord]{--bg:#2e3440;--card:#3b4252;--card2:#434c5e;--fg:#eceff4;--dim:#a7b1c2;--line:#4c566a;--work:#88c0d0;--input:#ebcb8b;--idle:#a3be8c}
+[data-theme=rosepine]{--bg:#191724;--card:#1f1d2e;--card2:#26233a;--fg:#e0def4;--dim:#908caa;--line:#2a2740;--work:#9ccfd8;--input:#f6c177;--idle:#3e8fb0}
+[data-theme=light]{--bg:#f3f6fb;--card:#ffffff;--card2:#eef2f8;--fg:#1b2430;--dim:#5d6b80;--line:#dde4ee;--work:#2f6bff;--input:#cf8a00;--idle:#16a34a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"PingFang SC",system-ui,sans-serif}
+header{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(8px);
+padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;z-index:5}
+h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.5px}
+.counts{display:flex;gap:8px;font-size:12px}
+.pill{padding:2px 9px;border-radius:99px;font-weight:600}
+.pill.w{background:color-mix(in srgb,var(--work) 20%,transparent);color:var(--work)}.pill.i{background:color-mix(in srgb,var(--input) 22%,transparent);color:var(--input)}.pill.d{background:color-mix(in srgb,var(--idle) 20%,transparent);color:var(--idle)}
+.clock{color:var(--dim);font-variant-numeric:tabular-nums;font-size:12px}
+.right{margin-left:auto;display:flex;align-items:center;gap:10px}
+select.theme{background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12px;cursor:pointer}
+.wctl{display:none;gap:5px;align-items:center}.wctl.on{display:inline-flex;flex-wrap:wrap}
+.pctl{display:inline-flex;gap:5px;align-items:center}
+.wbtn{background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:7px;cursor:pointer;font-size:11.5px;padding:2px 9px}
+.wbtn:hover{color:var(--fg);border-color:var(--dim)}
+body.compact .grid{gap:6px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));padding:10px}
+body.compact .card{padding:7px 11px;border-radius:9px}
+body.compact .detail,body.compact .meta{display:none}
+body.compact .name{font-size:13px}body.compact .row1{margin-bottom:0}
+.grid{padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:11px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 14px;
+border-left:4px solid var(--line);transition:transform .12s,box-shadow .2s,background .25s;position:relative;overflow:hidden;cursor:pointer}
+.card:hover{transform:translateY(-1px);box-shadow:0 6px 18px #0005}
+.card.work{border-left-color:var(--work)}.card.input{border-left-color:var(--input);background:color-mix(in srgb,var(--input) 8%,var(--card))}
+.card.idle{border-left-color:var(--idle)}
+.card.just{box-shadow:0 0 0 1px var(--idle),0 0 16px color-mix(in srgb,var(--idle) 40%,transparent)}
+.card.unread{box-shadow:0 0 0 1px color-mix(in srgb,var(--input) 45%,transparent)}
+.card.toread{border-left-color:var(--input);background:color-mix(in srgb,var(--input) 12%,var(--card))}
+.row1{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.name{font-weight:700;font-size:14.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.badge.work{background:color-mix(in srgb,var(--work) 20%,transparent);color:var(--work)}.badge.input{background:color-mix(in srgb,var(--input) 22%,transparent);color:var(--input)}
+.badge.idle{background:color-mix(in srgb,var(--idle) 18%,transparent);color:var(--idle)}
+.detail{color:var(--dim);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{margin-top:6px;font-size:11.5px;color:color-mix(in srgb,var(--dim) 85%,transparent);display:flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums}
+.dot{width:7px;height:7px;border-radius:99px;display:inline-block;flex-shrink:0}
+.dot.work{background:var(--work);animation:pulse 1.1s infinite}
+.dot.input{background:var(--input);animation:pulse 1.1s infinite}.dot.idle{background:var(--idle)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.empty{color:var(--dim);padding:40px;text-align:center}
+.fresh{color:var(--idle);font-weight:700}
+.rt{color:var(--work);opacity:.75;margin-left:auto}
+.tag{font-size:10.5px;font-weight:700;padding:1px 8px;border-radius:99px}
+.tag.nr{background:color-mix(in srgb,var(--input) 22%,transparent);color:var(--input)}.tag.pin{background:color-mix(in srgb,var(--input) 28%,transparent);color:var(--input)}
+.pinbtn{margin-left:4px;background:none;border:1px solid var(--line);color:var(--dim);border-radius:7px;cursor:pointer;font-size:12px;padding:1px 7px;flex-shrink:0}
+.pinbtn:hover{color:var(--fg);border-color:var(--dim)}
+</style></head><body>
+<header><h1>🛰 会话状态看板</h1><div class="counts" id="counts"></div><div class="right"><span class="clock" id="clock"></span><span class="pctl"><button class="wbtn" onclick="setFs(-0.1)" title="字号减小">A−</button><button class="wbtn" onclick="setFs(0.1)" title="字号增大">A+</button><button class="wbtn" id="cmpbtn" onclick="toggleCompact()" title="紧凑模式">紧凑</button></span><select class="theme" id="theme" title="配色"><option value="graphite">石墨</option><option value="midnight">午夜蓝</option><option value="nord">Nord</option><option value="rosepine">玫瑰松</option><option value="light">浅色</option></select></div></header>
+<div class="grid" id="grid"></div>
+<script>
+const LBL={work:"运行中",input:"待输入",idle:"完成"};
+function dur(s){if(s<60)return s+"秒";if(s<3600)return(s/60|0)+"分";return(s/3600|0)+"时"+((s%3600)/60|0)+"分"}
+const tsel=document.getElementById('theme');
+const savedT=localStorage.getItem('cc:theme')||'graphite';
+document.documentElement.dataset.theme=savedT;tsel.value=savedT;
+tsel.onchange=()=>{document.documentElement.dataset.theme=tsel.value;localStorage.setItem('cc:theme',tsel.value)};
+let _sig='';
+let _fs=parseFloat(localStorage.getItem('cc:fs'))||1;
+function applyFs(){document.body.style.zoom=_fs}
+function setFs(d){_fs=Math.max(0.7,Math.min(1.6,Math.round((_fs+d)*10)/10));localStorage.setItem('cc:fs',_fs);applyFs()}
+applyFs();
+let _cmp=localStorage.getItem('cc:compact')==='1';
+function applyCmp(){document.body.classList.toggle('compact',_cmp);var b=document.getElementById('cmpbtn');if(b)b.style.color=_cmp?'var(--idle)':''}
+function toggleCompact(){_cmp=!_cmp;localStorage.setItem('cc:compact',_cmp?'1':'0');applyCmp()}
+applyCmp();
+async function tick(){
+ let d;try{d=await(await fetch('/api/sessions',{cache:'no-store'})).json()}catch(e){return}
+ const ss=d.sessions||[];
+ clock.textContent=new Date().toLocaleTimeString('zh-CN');
+ const sig=ss.map(s=>s.key+'|'+s.state+'|'+s.detail+'|'+s.unread+'|'+s.toread+'|'+s.justDone).join('~');
+ if(sig===_sig)return; _sig=sig;
+ const c={work:0,input:0,idle:0};ss.forEach(s=>c[s.state]++);
+ counts.innerHTML=`<span class="pill i">待输入 ${c.input}</span><span class="pill w">运行中 ${c.work}</span><span class="pill d">完成 ${c.idle}</span>`;
+ grid.innerHTML = ss.length? ss.map(s=>`
+  <div class="card ${s.state}${s.justDone?' just':''}${s.unread?' unread':''}${s.toread?' toread':''}" onclick="markRead('${s.key}')" title="点击标为已读">
+   <div class="row1"><span class="dot ${s.state}"></span>
+    <span class="name">${esc(s.name)}</span>
+    ${s.toread?'<span class="tag pin">📌 待看</span>':''}
+    ${s.unread&&!s.toread?'<span class="tag nr">● 未读</span>':''}
+    <span class="badge ${s.state}">${LBL[s.state]}</span>
+    <button class="pinbtn" title="${s.toread?'清除待看':'标为待看'}" onclick="event.stopPropagation();toggleToread('${s.key}',${s.toread})">${s.toread?'✓':'📌'}</button></div>
+   <div class="detail">${esc(s.detail||'')}</div>
+   <div class="meta">${s.state==='work'?('运行 '+dur(s.idle)):''}${s.state==='idle'?('完成于 '+dur(s.idle)+'前'):''}${s.state==='input'?'需要你处理':''}${s.justDone?'<span class="fresh">· 刚完成 ✅</span>':''}${s.src==='hook'?'<span class="rt">· 实时</span>':''}</div>
+  </div>`).join('') : '<div class="empty">无运行中的 cc-* 会话</div>';
+}
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
+async function markRead(k){try{await fetch('/api/read?s='+encodeURIComponent(k),{method:'POST'})}catch(e){}tick()}
+async function toggleToread(k,cur){try{await fetch('/api/'+(cur?'read':'toread')+'?s='+encodeURIComponent(k),{method:'POST'})}catch(e){}tick()}
+tick();setInterval(tick,2000);
+</script></body></html>"""
+
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        if self.path.startswith("/api/sessions"):
+            b = json.dumps(SNAP, ensure_ascii=False).encode("utf-8")
+            self.send_response(200); self.send_header("content-type", "application/json; charset=utf-8")
+            self.send_header("access-control-allow-origin", "*"); self.send_header("content-length", str(len(b)))
+            self.end_headers(); self.wfile.write(b)
+        else:
+            b = PAGE.encode("utf-8")
+            self.send_response(200); self.send_header("content-type", "text/html; charset=utf-8")
+            self.send_header("cache-control", "no-store, no-cache, must-revalidate")
+            self.send_header("content-length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    def do_POST(self):
+        import urllib.parse as up
+        u = up.urlparse(self.path); q = up.parse_qs(u.query)
+        key = (q.get("s") or [""])[0]
+        try: self.rfile.read(int(self.headers.get("content-length", 0) or 0))
+        except Exception: pass
+        if key and u.path == "/api/read": mark(key, seen=time.time(), toread=False)
+        elif key and u.path == "/api/toread": mark(key, toread=True)
+        elif key and u.path == "/api/unread": mark(key, seen=0, toread=False)
+        self.send_response(200); self.send_header("access-control-allow-origin", "*")
+        self.send_header("content-length", "2"); self.end_headers(); self.wfile.write(b"ok")
+
+class Srv(socketserver.ThreadingMixIn, http.server.HTTPServer): daemon_threads = True
+
+if __name__ == "__main__":
+    threading.Thread(target=loop, daemon=True).start()
+    time.sleep(0.3)
+    Srv((HOST, PORT), H).serve_forever()
