@@ -1,10 +1,20 @@
 #!/bin/bash
 # 韧性连接 Wave 会话:mosh 到云服务器跑指定命令。
 #  · 干净退出(detach / 菜单 Esc / claude 正常退出 → 退出码 0)→ 不重连,标签干净结束。
-#    (修 HIGH:以前无脑 5 秒重连,detach 会被弹回同一会话、退不出去。)
 #  · 真断线(非 0:服务器没了/连接错)→ 5 秒自动重连(Ctrl-C 取消)。
 TARGET="${*:-cloudgo}"; HOST="root@100.109.254.125"; MOSH="/opt/homebrew/bin/mosh"
-bid="${WAVETERM_BLOCKID:-}"; case "$bid" in *[!0-9a-fA-F-]*) bid= ;; esac   # M5:白名单 blockid,挡 shell 注入
+# 标签稳定 ID(自学习的键):cmd 块拿不到 WAVETERM_BLOCKID,但 WAVETERM_SWAPTOKEN(base64 JSON)里带 blockid,解出来用。
+bid="${WAVETERM_BLOCKID:-}"
+if [ -z "$bid" ] && [ -n "${WAVETERM_SWAPTOKEN:-}" ]; then
+  bid=$(printf '%s' "$WAVETERM_SWAPTOKEN" | python3 -c 'import sys,base64,json
+s=sys.stdin.read().strip()
+s+="="*(-len(s)%4)
+try:
+    print(json.loads(base64.b64decode(s)).get("rpccontext",{}).get("blockid",""))
+except Exception:
+    pass' 2>/dev/null)
+fi
+case "$bid" in *[!0-9a-fA-F-]*) bid= ;; esac   # 白名单,挡 shell 注入/路径穿越
 while true; do
   "$MOSH" "$HOST" -- bash -ic "WAVETERM_BLOCKID='$bid'; $TARGET"
   ec=$?
