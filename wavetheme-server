@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# 主题色卡网页(仅本机 127.0.0.1:8799)。读各主题真实配色 → 平铺成色卡;点「应用」即整套切换。
+import json, os, glob, subprocess, html
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import urlparse, parse_qs
+
+HOME = os.path.expanduser("~")
+TT = os.path.join(HOME, ".config/waveterm/termthemes")
+SETTINGS = os.path.join(HOME, ".config/waveterm/settings.json")
+THEMES = ["tokyo-night","nord","catppuccin-mocha","gruvbox-dark","rose-pine",
+          "one-half-dark","solarized-dark","solarized-light","catppuccin-latte"]
+ZH = {"tokyo-night":"东京夜","nord":"Nord 极地","catppuccin-mocha":"Catppuccin 摩卡",
+      "gruvbox-dark":"Gruvbox 暗","rose-pine":"玫瑰松","one-half-dark":"OneHalf 暗",
+      "solarized-dark":"Solarized 暗","solarized-light":"Solarized 亮","catppuccin-latte":"Catppuccin 拿铁"}
+ANSI = ["black","red","green","yellow","blue","magenta","cyan","white",
+        "brightBlack","brightRed","brightGreen","brightYellow","brightBlue","brightMagenta","brightCyan","brightWhite"]
+
+def palettes():
+    pal = {}
+    for f in glob.glob(os.path.join(TT, "*.json")):
+        try:
+            for k, v in json.load(open(f)).items(): pal[k] = v
+        except Exception: pass
+    return pal
+
+def current():
+    try: return json.load(open(SETTINGS)).get("term:theme", "")
+    except Exception: return ""
+
+def card(name, p, cur):
+    bg = p.get("background", "#222"); fg = p.get("foreground", "#ddd")
+    acc = p.get("selectionBackground") or p.get("cursorAccent") or "#888"
+    chips = "".join(f'<span style="background:{html.escape(str(p.get(k,"#000")))}"></span>' for k in ANSI)
+    sel = " sel" if name == cur else ""
+    badge = "● 当前主题" if name == cur else "应用此主题"
+    return f'''<div class="card{sel}" style="background:{html.escape(bg)};color:{html.escape(fg)};border-color:{html.escape(acc)}">
+  <div class="hd"><span class="nm">{html.escape(ZH.get(name,name))}</span><span class="en">{name}</span></div>
+  <div class="sample">The quick brown fox 你好 1234567890<br>def main(): return "★"</div>
+  <div class="chips">{chips}</div>
+  <a class="btn" href="/apply?theme={name}" style="background:{html.escape(acc)};color:{html.escape(bg)}">{badge}</a>
+</div>'''
+
+PAGE = '''<!doctype html><html><head><meta charset="utf-8"><title>主题色卡</title>
+<style>
+body{{margin:0;background:#15151c;color:#c8d3f5;font-family:-apple-system,system-ui,"PingFang SC",sans-serif;padding:20px}}
+h1{{font-size:16px;font-weight:600;margin:0 0 4px}}
+.sub{{font-size:12px;opacity:.55;margin:0 0 16px}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}}
+.card{{border:2px solid;border-radius:14px;padding:15px;box-shadow:0 4px 14px rgba(0,0,0,.25)}}
+.card.sel{{outline:3px solid #7aa2f7;outline-offset:3px}}
+.hd{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}}
+.nm{{font-size:15px;font-weight:700}} .en{{font-size:11px;opacity:.6;font-family:ui-monospace,monospace}}
+.sample{{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5;opacity:.95;margin-bottom:12px}}
+.chips{{display:flex;border-radius:7px;overflow:hidden;margin-bottom:12px}}
+.chips span{{flex:1;height:20px}}
+.btn{{display:block;text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none}}
+.btn:hover{{filter:brightness(1.08)}}
+</style></head><body>
+<h1>🎨 主题色卡</h1>
+<p class="sub">点任意卡片的「应用」即整套切换:终端配色 · 画框 · 边栏 · 文字 一起变。共 {n} 套(前 7 深色 / 后 2 浅色)。</p>
+<div class="grid">{cards}</div>
+</body></html>'''
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        u = urlparse(self.path)
+        if u.path == "/apply":
+            t = parse_qs(u.query).get("theme", [""])[0]
+            if t in THEMES:
+                subprocess.run([os.path.join(HOME, "bin/wavetheme"), t], capture_output=True)
+            self.send_response(303); self.send_header("Location", "/"); self.end_headers(); return
+        if u.path not in ("/", "/index.html"):
+            self.send_response(404); self.end_headers(); return
+        pal = palettes(); cur = current()
+        cards = "".join(card(n, pal.get(n, {}), cur) for n in THEMES)
+        body = PAGE.format(cards=cards, n=len(THEMES)).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store"); self.end_headers()
+        self.wfile.write(body)
+
+if __name__ == "__main__":
+    HTTPServer(("127.0.0.1", 8799), H).serve_forever()
