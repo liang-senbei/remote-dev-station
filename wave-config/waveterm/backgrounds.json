@@ -1,0 +1,56 @@
+{
+  "bg@daylight": {
+    "display:name": "Daylight 暖浅高对比",
+    "display:order": 0,
+    "bg:*": true,
+    "bg:opacity": 0.92,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(215,130,126,0.14), transparent 58%), radial-gradient(ellipse at 88% 110%, rgba(144,122,169,0.12), transparent 58%), linear-gradient(160deg, #faf4ed 0%, #f5ecdd 60%, #f0e6d4 100%)",
+    "bg:bordercolor": "rgba(42,37,32,0.16)",
+    "bg:activebordercolor": "#907aa9"
+  },
+  "bg@smoke-rose": {
+    "display:name": "烟粉蔷薇",
+    "display:order": 1,
+    "bg:*": true,
+    "bg:opacity": 0.85,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(224,186,199,0.2), transparent 58%), radial-gradient(ellipse at 85% 110%, rgba(224,186,199,0.13), transparent 58%), linear-gradient(155deg, #56433f 0%, #442F2A 55%, #372622 100%)",
+    "bg:bordercolor": "rgba(224,186,199,0.3)",
+    "bg:activebordercolor": "#E0BAC7"
+  },
+  "bg@warm-mist-tan": {
+    "display:name": "暖雾浅棕",
+    "display:order": 2,
+    "bg:*": true,
+    "bg:opacity": 0.85,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(209,180,140,0.2), transparent 58%), radial-gradient(ellipse at 85% 110%, rgba(209,180,140,0.13), transparent 58%), linear-gradient(155deg, #2b3c4b 0%, #142738 55%, #101f2d 100%)",
+    "bg:bordercolor": "rgba(209,180,140,0.3)",
+    "bg:activebordercolor": "#D1B48C"
+  },
+  "bg@honey-amber": {
+    "display:name": "暖调蜜橙",
+    "display:order": 3,
+    "bg:*": true,
+    "bg:opacity": 0.85,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(247,182,56,0.2), transparent 58%), radial-gradient(ellipse at 85% 110%, rgba(247,182,56,0.13), transparent 58%), linear-gradient(155deg, #4e4256 0%, #3B2E44 55%, #302537 100%)",
+    "bg:bordercolor": "rgba(247,182,56,0.3)",
+    "bg:activebordercolor": "#F7B638"
+  },
+  "bg@soft-amber-gold": {
+    "display:name": "柔雾橙黄",
+    "display:order": 4,
+    "bg:*": true,
+    "bg:opacity": 0.85,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(243,169,80,0.2), transparent 58%), radial-gradient(ellipse at 85% 110%, rgba(243,169,80,0.13), transparent 58%), linear-gradient(155deg, #333a44 0%, #1D2530 55%, #171e27 100%)",
+    "bg:bordercolor": "rgba(243,169,80,0.3)",
+    "bg:activebordercolor": "#F3A950"
+  },
+  "bg@mango-orange": {
+    "display:name": "鲜芒暖橙",
+    "display:order": 5,
+    "bg:*": true,
+    "bg:opacity": 0.85,
+    "bg": "radial-gradient(ellipse at 18% -8%, rgba(254,129,83,0.2), transparent 58%), radial-gradient(ellipse at 85% 110%, rgba(254,129,83,0.13), transparent 58%), linear-gradient(155deg, #394549 0%, #243135 55%, #1d282b 100%)",
+    "bg:bordercolor": "rgba(254,129,83,0.3)",
+    "bg:activebordercolor": "#FE8153"
+  }
+}

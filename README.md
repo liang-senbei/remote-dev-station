@@ -109,10 +109,15 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 
 ---
 
-## 8. 侧栏 widgets(已精简,3 个)
-- **会话**(`cloudgo`):入口(含自学习/新建/恢复/改绑/临时/删除)。
-- **服务器桌面**(noVNC `:6080`):在服务器跑 GUI(AdsPower 看评论投放等)。见 §9。
-- **服务器文件**:浏览服务器 `/opt/workspace`。
+## 8. 侧栏 widgets(6 个,图标随主题变色 + 同色标签)
+默认 terminal/files/web/sysinfo 已隐藏(`display:hidden`);6 个自定义,各取当前主题调色板里一种色(`--wicon-1..6`):
+- 🔵 **会话**(`cloudgo`):核心入口(自学习/新建/恢复/改绑/临时/分级删除)。
+- 🟣 **主题**(`wavetheme` → 本机 `:8799` 色卡网页):点色卡**一键换整套主题**(终端+画框+边栏+文字+图标联动,9 套)。
+- 🩵 **项目看板**(`:8088/` 门户):列各项目自己的看板(读 `/root/inbox/dashboards/registry.json`;`cloud-dashboards.service` 只服务该目录)。
+- 🟢 **服务器桌面**(noVNC `:6080`):服务器 GUI(AdsPower 等)。见 §9。
+- 🟡 **服务器文件**:浏览服务器 `/opt/workspace`。
+- 🔴 **临时会话**(`cloudtmp` → `cc-tmp-*`):关标签 ~60s 自动清(`mosh-server-tmout` 超时 → `destroy-unattached`);不进恢复体系,对话 jsonl 仍留。
+> 终端配色含 9 主题的 **cursor 光标色**(每主题对比背景,浅色=深光标),靠 `termthemes/*.json` 的 `cursor` 字段。
 
 ## 9. 服务器桌面(noVNC)
 - `novnc.service` → `novnc-start.sh`:`Xvfb:1` + xfce + `x11vnc` + `websockify :6080`。
@@ -135,7 +140,7 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 - **mosh**:先 SSH 握手一次(启 mosh-server+换密钥)再切 UDP。UDP 无队头阻塞 + 本地预测 = 高丢包下打字跟手。
 - **Tailscale**:WireGuard 点对点加密;优先 NAT 打洞直连,打不通回落香港中继。
 - **tmux**:扛"断开"(会话后台继续跑);不扛"杀掉"(靠 watchdog 重建)。
-- **WAVETERM_BLOCKID**:Wave 给每个块注入的稳定 uuid(`pkg/blockcontroller`),跨重启不变 → 标签自学习靠它;cloudconn 把它带到服务器,cloudgo 据此记"标签↔会话"。
+- **标签稳定 ID(自学习的键)**:`cmd` 控制器的块(跑 cloudconn 的标签)**拿不到 `WAVETERM_BLOCKID`**(它走 shell 集成的 swap-token,只 shell 块注入)→ `cloudconn` 改从 **`WAVETERM_SWAPTOKEN`**(base64 JSON 的 `.rpccontext.blockid`)解出 blockid 当键,带到服务器,cloudgo 据此记"标签↔会话"。blockid 跨 **Cmd+Q 重启不变**(但关标签开新的 = 新 id,要重选一次)。
 - **wsh / JWT**:wsh 只在 Wave 自己的块里能用(mosh 会话里没有);所以恢复/绑定全在 cloudgo/cloudconn 这层做。
 
 ## 12. 已知坑 / 注意
@@ -148,6 +153,14 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 
 ---
 
-## 附:仓库部署 / 备份
-- 新服务器一键重建:`./install.sh`
-- 备份建议:本仓库 push 到**私有** GitHub(含内网IP/路径);另定期备份 `~/.claude/projects/`(对话历史 = 会话的"灵魂",见 §7)。
+## 附:仓库部署 / 备份 / 还原
+
+**仓库结构**:`bin/`(服务器脚本)· `systemd/`(服务单元:watchdog/sessions/novnc/cloud-dashboards)· `cloudconn`/`mosh-server-tmout`(Mac/服务器辅助)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
+
+**Wave 客户端配置 `wave-config/`**:
+- `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(9 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
+- **还原**:`cp -r wave-config/waveterm/* ~/.config/waveterm/ && cp -r wave-config/waveterm-dev/* ~/.config/waveterm-dev/` → 重开 Wave 即生效(termtheme/widgets 是运行时配置,不用重编译)。
+- 主题/图标/标签的**源码**(`theme.scss`/`app.tsx`/`widgets.tsx`,需 `build:prod`+`electron-builder --dir` 编进 .app)在自建分叉 `~/build/waveterm-zh`,不在本仓库。
+- ⚠️ **不含**:Wave 数据库(`~/Library/Application Support/waveterm`,标签/块布局/历史 = 每机状态,别备份)+ GLM 密钥(`~/.config/glm-proxy/keys.txt`,**勿入库**)。
+
+**其它**:新服务器一键重建 `./install.sh`;本仓库 push 到**私有** GitHub(含内网IP/路径);另定期备份 `~/.claude/projects/`(对话历史 = 会话的"灵魂",见 §7)。
