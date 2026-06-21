@@ -1,0 +1,480 @@
+// Copyright 2024, Command Line Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+:root {
+    --wicon-1: #53b4ea; --wicon-2: #aa67ff; --wicon-3: #58c142; --wicon-4: #f2a541; --wicon-5: #2bb6c4; --wicon-6: #e5604a;
+    --main-text-color: #f0e5d6;
+    --title-font-size: 18px;
+    --window-opacity: 1;
+    --secondary-text-color: #c2ad94;
+    --grey-text-color: #8a7b6a;
+    --main-bg-color: #241c17;
+    /* 以下"外观"变量全部由本主题自己的 文字色/强调色/背景色 派生(color-mix),
+       任何主题切过来都自动联动 —— 不再有"共用暖棕、各主题边框雷同"的偷懒兜底。
+       #{"..."} 包住是为防 SASS 解析 color-mix 的 `in srgb` 语法报错。 */
+    --border-color: #{"color-mix(in srgb, var(--main-text-color) 15%, transparent)"};
+    --base-font: normal 14px / normal "Inter", sans-serif;
+    --fixed-font: normal 12px / normal "Hack", monospace;
+    --accent-color: #f2a541;
+    --panel-bg-color: #{"color-mix(in srgb, var(--main-bg-color) 78%, transparent)"};
+    --highlight-bg-color: #{"color-mix(in srgb, var(--accent-color) 20%, transparent)"};
+
+    /* frame: 标签栏 + 侧栏(可按主题切换;渐变主题会再用 mesh 覆盖) */
+    --frame-bg-top: #{"color-mix(in srgb, var(--main-text-color) 13%, var(--main-bg-color))"};
+    --frame-bg-bottom: #{"color-mix(in srgb, var(--main-text-color) 9%, var(--main-bg-color))"};
+    --frame-border: #{"color-mix(in srgb, var(--accent-color) 22%, transparent)"};
+    --markdown-font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji",
+        "Segoe UI Emoji";
+    --markdown-font-size: 14px;
+    --markdown-fixed-font-size: 12px;
+    --error-color: var(--wicon-6);
+    --warning-color: var(--wicon-4);
+    --success-color: var(--wicon-3);
+    --hover-bg-color: #{"color-mix(in srgb, var(--accent-color) 12%, transparent)"};
+    --block-bg-color: #{"color-mix(in srgb, var(--main-bg-color) 55%, transparent)"};
+    --block-bg-solid-color: #{"color-mix(in srgb, var(--main-text-color) 7%, var(--main-bg-color))"};
+    --block-border-radius: 8px;
+
+    --keybinding-color: var(--main-text-color);
+    --keybinding-bg-color: #{"color-mix(in srgb, var(--main-text-color) 12%, var(--main-bg-color))"};
+    --keybinding-border-color: #{"color-mix(in srgb, var(--main-text-color) 24%, var(--main-bg-color))"};
+
+    /* scrollbar colors */
+    --scrollbar-background-color: transparent;
+    --scrollbar-thumb-color: #{"color-mix(in srgb, var(--main-text-color) 22%, transparent)"};
+    --scrollbar-thumb-hover-color: #{"color-mix(in srgb, var(--main-text-color) 40%, transparent)"};
+    --scrollbar-thumb-active-color: #{"color-mix(in srgb, var(--accent-color) 60%, transparent)"};
+
+    --header-font: 700 11px / normal "Inter", sans-serif;
+    --header-icon-size: 14px;
+    --header-icon-width: 16px;
+    --header-height: 30px;
+
+    --tab-green: var(--accent-color);
+
+    /* z-index values */
+    --zindex-header-hover: 100;
+    --zindex-termstickers: 20;
+    --zindex-modal: 2;
+    --zindex-modal-wrapper: 500;
+    --zindex-modal-backdrop: 1;
+    --zindex-typeahead-modal: 100;
+    --zindex-typeahead-modal-backdrop: 90;
+    --zindex-elem-modal: 100;
+    --zindex-window-drag: 100;
+    --zindex-tab-name: 3;
+    --zindex-layout-display-container: 0;
+    --zindex-layout-last-magnified-node: 1;
+    --zindex-layout-last-ephemeral-node: 2;
+    --zindex-layout-resize-handle: 3;
+    --zindex-layout-placeholder-container: 4;
+    --zindex-layout-overlay-container: 5;
+    --zindex-layout-magnified-node-backdrop: 6;
+    --zindex-layout-magnified-node: 7;
+    --zindex-layout-ephemeral-node-backdrop: 8;
+    --zindex-layout-ephemeral-node: 9;
+    --zindex-block-mask-inner: 10;
+    --zindex-app-background: -1;
+    // z-indexes in xterm.css
+    // xterm-helpers: 5
+    // xterm-helper-textarea: -5
+    // composition-view: 1
+    // xterm-message: 10
+    // xterm-decoration: 6
+    // xterm-decoration-top-layer: 7
+    // xterm-decoration-overview-ruler: 8
+    // xterm-decoration-top: 2
+
+    // modal colors
+    --modal-bg-color: #{"color-mix(in srgb, var(--main-text-color) 8%, var(--main-bg-color))"};
+    --modal-header-bottom-border-color: #{"color-mix(in srgb, var(--main-text-color) 15%, transparent)"};
+    --modal-border-color: #{"color-mix(in srgb, var(--main-text-color) 14%, transparent)"}; /* toggle colors */
+    --modal-border-radius: 6px;
+    --toggle-bg-color: var(--border-color);
+    --modal-shadow-color: rgba(0, 0, 0, 0.8);
+    --modal-box-shadow: box-shadow: 0px 8px 24px 0px var(--modal-shadow-color);
+
+    --toggle-thumb-color: var(--main-text-color);
+    --toggle-checked-bg-color: var(--accent-color);
+
+    // link color
+    --link-color: var(--accent-color);
+
+    // form colors
+    --form-element-border-color: #{"color-mix(in srgb, var(--main-text-color) 15%, transparent)"};
+    --form-element-bg-color: var(--main-bg-color);
+    --form-element-text-color: var(--main-text-color);
+    --form-element-primary-text-color: var(--main-bg-color);
+    --form-element-primary-color: var(--accent-color);
+    --form-element-secondary-color: #{"color-mix(in srgb, var(--main-text-color) 20%, transparent)"};
+    --form-element-error-color: var(--error-color);
+
+    --conn-icon-color: #53b4ea;
+    --conn-icon-color-1: #53b4ea;
+    --conn-icon-color-2: #aa67ff;
+    --conn-icon-color-3: #fda7fd;
+    --conn-icon-color-4: #ef476f;
+    --conn-icon-color-5: #497bf8;
+    --conn-icon-color-6: #ffa24e;
+    --conn-icon-color-7: #dbde52;
+    --conn-icon-color-8: #58c142;
+    --conn-status-overlay-bg-color: #{"color-mix(in srgb, var(--accent-color) 20%, transparent)"};
+
+    --sysinfo-cpu-color: var(--accent-color);
+    --sysinfo-mem-color: var(--wicon-2);
+
+    --bulb-color: var(--wicon-4);
+
+    // term colors (16 + 6) form the base terminal theme
+    // for consistency these colors should be used by plugins/applications
+    --term-black: #000000;
+    --term-red: #cc0000;
+    --term-green: #4e9a06;
+    --term-yellow: #c4a000;
+    --term-blue: #3465a4;
+    --term-magenta: #bc3fbc;
+    --term-cyan: #06989a;
+    --term-white: #d0d0d0;
+    --term-bright-black: #555753;
+    --term-bright-red: #ef2929;
+    --term-bright-green: #58c142;
+    --term-bright-yellow: #fce94f;
+    --term-bright-blue: #32afff;
+    --term-bright-magenta: #ad7fa8;
+    --term-bright-cyan: #34e2e2;
+    --term-bright-white: #e7e7e7;
+
+    --term-gray: #8b918a; // not an official terminal color
+    --term-cmdtext: #f0e5d6;
+    --term-foreground: #f0e5d6;
+    --term-background: #241c17;
+    --term-selection-background: rgba(242, 165, 65, 0.28);
+    --term-cursor-accent: #241c17;
+
+    // button colors —— 全部从主题色派生
+    --button-text-color: var(--main-bg-color);
+    --button-green-bg: var(--accent-color);
+    --button-green-border-color: #{"color-mix(in srgb, var(--accent-color) 75%, white)"};
+    --button-grey-bg: #{"color-mix(in srgb, var(--main-text-color) 6%, transparent)"};
+    --button-grey-hover-bg: #{"color-mix(in srgb, var(--main-text-color) 11%, transparent)"};
+    --button-grey-border-color: #{"color-mix(in srgb, var(--main-text-color) 13%, transparent)"};
+    --button-grey-outlined-color: #{"color-mix(in srgb, var(--main-text-color) 55%, transparent)"};
+    --button-red-bg: var(--error-color);
+    --button-red-hover-bg: #{"color-mix(in srgb, var(--error-color) 75%, white)"};
+    --button-red-border-color: var(--error-color);
+    --button-red-outlined-color: var(--error-color);
+    --button-yellow-bg: var(--warning-color);
+    --button-yellow-hover-bg: #{"color-mix(in srgb, var(--warning-color) 70%, white)"};
+}
+
+/* ===== Chrome(标签栏 + widget 侧栏)——用变量,随主题联动 ===== */
+.tab-bar-wrapper {
+    background: linear-gradient(180deg, var(--frame-bg-top), var(--frame-bg-bottom)) !important;
+    backdrop-filter: none;
+    border-bottom: 1px solid var(--frame-border);
+    color: var(--main-text-color);
+}
+.tab-bar-wrapper .name { color: var(--main-text-color) !important; }
+.widget-bar {
+    background: linear-gradient(180deg, var(--frame-bg-top), var(--frame-bg-bottom));
+    border-left: 1px solid var(--frame-border);
+    color: var(--main-text-color);
+}
+/* 侧栏图标:每个 widget 用自己的颜色(widgets.json 的 color 字段,经 widgets.tsx 内联到图标);
+   这里不再强制统一色,只让 svg 跟随 currentColor + hover 提亮。未设 color 的退回主文字色。 */
+.widget-bar .widget i,
+.widget-bar .widget svg,
+.widget-bar .widget .icon { fill: currentColor; opacity: 0.95; }
+.widget-bar .widget:hover { opacity: 1; filter: brightness(1.2); }
+.widget-bar .widget .label { opacity: 0.9; }
+
+/* ===== 完整主题:term:theme 选哪套,整界面(画框/侧栏/文字/终端)一起变。
+   data-uitheme 由 app.tsx 跟随 term:theme 写到 <body> 上 ===== */
+body[data-uitheme="nord"] {
+    --wicon-1: #81a1c1; --wicon-2: #b48ead; --wicon-3: #a3be8c; --wicon-4: #ebcb8b; --wicon-5: #88c0d0; --wicon-6: #bf616a;
+    --main-bg-color: #2e3440; --main-text-color: #e5e9f0; --secondary-text-color: #c0c8d6; --grey-text-color: #7b859b;
+    --accent-color: #88c0d0; --link-color: #88c0d0; --tab-green: #88c0d0;
+    --border-color: rgba(216,222,233,0.14); --hover-bg-color: rgba(136,192,208,0.14); --highlight-bg-color: rgba(136,192,208,0.20);
+    --panel-bg-color: rgba(46,52,64,0.55); --block-bg-color: rgba(36,41,51,0.5); --block-bg-solid-color: #2b303b; --modal-bg-color: #353c4a;
+    --frame-bg-top: #3b4252; --frame-bg-bottom: #343b48; --frame-border: rgba(136,192,208,0.22);
+    --button-text-color: #2e3440; --form-element-primary-text-color: #2e3440;
+    --keybinding-bg-color: #3b4252; --keybinding-border-color: #4c566a;
+    --term-foreground: #d8dee9; --term-background: #2e3440;
+}
+body[data-uitheme="tokyo-night"] {
+    --wicon-1: #7aa2f7; --wicon-2: #bb9af7; --wicon-3: #9ece6a; --wicon-4: #e0af68; --wicon-5: #7dcfff; --wicon-6: #f7768e;
+    --main-bg-color: #1a1b26; --main-text-color: #c0caf5; --secondary-text-color: #9aa5ce; --grey-text-color: #565f89;
+    --accent-color: #7aa2f7; --link-color: #7aa2f7; --tab-green: #7aa2f7;
+    --border-color: rgba(192,202,245,0.12); --hover-bg-color: rgba(122,162,247,0.14); --highlight-bg-color: rgba(122,162,247,0.20);
+    --panel-bg-color: rgba(26,27,38,0.55); --block-bg-color: rgba(20,21,30,0.5); --block-bg-solid-color: #16161e; --modal-bg-color: #24283b;
+    --frame-bg-top: #24283b; --frame-bg-bottom: #1e2030; --frame-border: rgba(122,162,247,0.22);
+    --button-text-color: #1a1b26; --form-element-primary-text-color: #1a1b26;
+    --keybinding-bg-color: #24283b; --keybinding-border-color: #2f3549;
+    --term-foreground: #c0caf5; --term-background: #1a1b26;
+}
+body[data-uitheme="catppuccin-mocha"] {
+    --wicon-1: #89b4fa; --wicon-2: #f5c2e7; --wicon-3: #a6e3a1; --wicon-4: #f9e2af; --wicon-5: #94e2d5; --wicon-6: #f38ba8;
+    --main-bg-color: #1e1e2e; --main-text-color: #cdd6f4; --secondary-text-color: #a6adc8; --grey-text-color: #6c7086;
+    --accent-color: #89b4fa; --link-color: #89b4fa; --tab-green: #89b4fa;
+    --border-color: rgba(205,214,244,0.12); --hover-bg-color: rgba(137,180,250,0.14); --highlight-bg-color: rgba(137,180,250,0.20);
+    --panel-bg-color: rgba(30,30,46,0.55); --block-bg-color: rgba(24,24,37,0.5); --block-bg-solid-color: #181825; --modal-bg-color: #313244;
+    --frame-bg-top: #313244; --frame-bg-bottom: #292a3d; --frame-border: rgba(137,180,250,0.22);
+    --button-text-color: #1e1e2e; --form-element-primary-text-color: #1e1e2e;
+    --keybinding-bg-color: #313244; --keybinding-border-color: #45475a;
+    --term-foreground: #cdd6f4; --term-background: #1e1e2e;
+}
+body[data-uitheme="gruvbox-dark"] {
+    --wicon-1: #458588; --wicon-2: #b16286; --wicon-3: #98971a; --wicon-4: #d79921; --wicon-5: #689d6a; --wicon-6: #cc241d;
+    --main-bg-color: #282828; --main-text-color: #ebdbb2; --secondary-text-color: #d5c4a1; --grey-text-color: #928374;
+    --accent-color: #d79921; --link-color: #d79921; --tab-green: #d79921;
+    --border-color: rgba(235,219,178,0.14); --hover-bg-color: rgba(215,153,33,0.16); --highlight-bg-color: rgba(215,153,33,0.22);
+    --panel-bg-color: rgba(40,40,40,0.55); --block-bg-color: rgba(29,32,33,0.5); --block-bg-solid-color: #1d2021; --modal-bg-color: #3c3836;
+    --frame-bg-top: #3c3836; --frame-bg-bottom: #32302f; --frame-border: rgba(215,153,33,0.24);
+    --button-text-color: #282828; --form-element-primary-text-color: #282828;
+    --keybinding-bg-color: #3c3836; --keybinding-border-color: #504945;
+    --term-foreground: #ebdbb2; --term-background: #282828;
+}
+body[data-uitheme="rose-pine"] {
+    --wicon-1: #9ccfd8; --wicon-2: #c4a7e7; --wicon-3: #31748f; --wicon-4: #f6c177; --wicon-5: #ebbcba; --wicon-6: #eb6f92;
+    --main-bg-color: #191724; --main-text-color: #e0def4; --secondary-text-color: #cdc9e0; --grey-text-color: #6e6a86;
+    --accent-color: #c4a7e7; --link-color: #c4a7e7; --tab-green: #c4a7e7;
+    --border-color: rgba(224,222,244,0.12); --hover-bg-color: rgba(196,167,231,0.14); --highlight-bg-color: rgba(196,167,231,0.20);
+    --panel-bg-color: rgba(25,23,36,0.55); --block-bg-color: rgba(31,29,46,0.5); --block-bg-solid-color: #1f1d2e; --modal-bg-color: #26233a;
+    --frame-bg-top: #26233a; --frame-bg-bottom: #1f1d2e; --frame-border: rgba(196,167,231,0.22);
+    --button-text-color: #191724; --form-element-primary-text-color: #191724;
+    --keybinding-bg-color: #26233a; --keybinding-border-color: #403d52;
+    --term-foreground: #e0def4; --term-background: #191724;
+}
+body[data-uitheme="solarized-light"] {
+    --wicon-1: #268bd2; --wicon-2: #d33682; --wicon-3: #859900; --wicon-4: #b58900; --wicon-5: #2aa198; --wicon-6: #dc322f;
+    --main-bg-color: #fdf6e3; --main-text-color: #586e75; --secondary-text-color: #657b83; --grey-text-color: #93a1a1;
+    --accent-color: #268bd2; --link-color: #268bd2; --tab-green: #268bd2;
+    --border-color: rgba(101,123,131,0.18); --hover-bg-color: rgba(38,139,210,0.10); --highlight-bg-color: rgba(38,139,210,0.14);
+    --panel-bg-color: rgba(253,246,227,0.6); --block-bg-color: rgba(238,232,213,0.5); --block-bg-solid-color: #f4eeda; --modal-bg-color: #eee8d5;
+    --frame-bg-top: #eee8d5; --frame-bg-bottom: #e3dcc6; --frame-border: rgba(101,123,131,0.20);
+    --button-text-color: #fdf6e3; --form-element-primary-text-color: #fdf6e3;
+    --keybinding-bg-color: #eee8d5; --keybinding-border-color: #d9d2bd;
+    --term-foreground: #657b83; --term-background: #fdf6e3;
+}
+body[data-uitheme="catppuccin-latte"] {
+    --wicon-1: #1e66f5; --wicon-2: #ea76cb; --wicon-3: #40a02b; --wicon-4: #df8e1d; --wicon-5: #179299; --wicon-6: #d20f39;
+    --main-bg-color: #eff1f5; --main-text-color: #4c4f69; --secondary-text-color: #5c5f77; --grey-text-color: #8c8fa1;
+    --accent-color: #1e66f5; --link-color: #1e66f5; --tab-green: #1e66f5;
+    --border-color: rgba(76,79,105,0.15); --hover-bg-color: rgba(30,102,245,0.10); --highlight-bg-color: rgba(30,102,245,0.14);
+    --panel-bg-color: rgba(239,241,245,0.6); --block-bg-color: rgba(230,233,239,0.5); --block-bg-solid-color: #e6e9ef; --modal-bg-color: #e6e9ef;
+    --frame-bg-top: #e6e9ef; --frame-bg-bottom: #dce0e8; --frame-border: rgba(76,79,105,0.16);
+    --button-text-color: #eff1f5; --form-element-primary-text-color: #eff1f5;
+    --keybinding-bg-color: #e6e9ef; --keybinding-border-color: #ccd0da;
+    --term-foreground: #4c4f69; --term-background: #eff1f5;
+}
+
+/* ===== 浅色主题(2026-06 网上拉取的真实配色)===== */
+body[data-uitheme="atom-one-light"] {
+    --wicon-1: #2f5af3; --wicon-2: #950095; --wicon-3: #3f953a; --wicon-4: #c18401; --wicon-5: #0184bc; --wicon-6: #de3e35;
+    --main-bg-color: #f9f9f9; --main-text-color: #2a2c33; --secondary-text-color: #5e5f64; --grey-text-color: #929296;
+    --accent-color: #2f5af3; --link-color: #2f5af3; --tab-green: #2f5af3;
+    --border-color: rgba(42,44,51,0.16); --hover-bg-color: rgba(47,90,243,0.12); --highlight-bg-color: rgba(47,90,243,0.18);
+    --panel-bg-color: rgba(249,249,249,0.6); --block-bg-color: rgba(241,241,241,0.5); --block-bg-solid-color: #f1f1f1; --modal-bg-color: #e6e7e7;
+    --frame-bg-top: #ebebeb; --frame-bg-bottom: #e2e2e3; --frame-border: rgba(47,90,243,0.22);
+    --button-text-color: #f9f9f9; --form-element-primary-text-color: #f9f9f9;
+    --keybinding-bg-color: #ebebeb; --keybinding-border-color: #d4d4d5;
+    --term-foreground: #2a2c33; --term-background: #f9f9f9;
+}
+body[data-uitheme="ayu-light"] {
+    --wicon-1: #3199e1; --wicon-2: #9e75c7; --wicon-3: #6cbf43; --wicon-4: #eca944; --wicon-5: #46ba94; --wicon-6: #ea6c6d;
+    --main-bg-color: #f8f9fa; --main-text-color: #5c6166; --secondary-text-color: #83878b; --grey-text-color: #aaadb0;
+    --accent-color: #ff9940; --link-color: #ff9940; --tab-green: #ff9940;
+    --border-color: rgba(92,97,102,0.16); --hover-bg-color: rgba(255,153,64,0.12); --highlight-bg-color: rgba(255,153,64,0.18);
+    --panel-bg-color: rgba(248,249,250,0.6); --block-bg-color: rgba(242,243,244,0.5); --block-bg-solid-color: #f2f3f4; --modal-bg-color: #eaebed;
+    --frame-bg-top: #edeef0; --frame-bg-bottom: #e7e8ea; --frame-border: rgba(255,153,64,0.22);
+    --button-text-color: #f8f9fa; --form-element-primary-text-color: #f8f9fa;
+    --keybinding-bg-color: #edeef0; --keybinding-border-color: #dcdedf;
+    --term-foreground: #5c6166; --term-background: #f8f9fa;
+}
+body[data-uitheme="bluloco-light"] {
+    --wicon-1: #275fe4; --wicon-2: #823ff1; --wicon-3: #23974a; --wicon-4: #df631c; --wicon-5: #27618d; --wicon-6: #d52753;
+    --main-bg-color: #f9f9f9; --main-text-color: #373a41; --secondary-text-color: #686a6f; --grey-text-color: #989a9d;
+    --accent-color: #275fe4; --link-color: #275fe4; --tab-green: #275fe4;
+    --border-color: rgba(55,58,65,0.16); --hover-bg-color: rgba(39,95,228,0.12); --highlight-bg-color: rgba(39,95,228,0.18);
+    --panel-bg-color: rgba(249,249,249,0.6); --block-bg-color: rgba(241,241,242,0.5); --block-bg-solid-color: #f1f1f2; --modal-bg-color: #e8e8e8;
+    --frame-bg-top: #ebecec; --frame-bg-bottom: #e4e4e5; --frame-border: rgba(39,95,228,0.22);
+    --button-text-color: #f9f9f9; --form-element-primary-text-color: #f9f9f9;
+    --keybinding-bg-color: #ebecec; --keybinding-border-color: #d6d7d8;
+    --term-foreground: #373a41; --term-background: #f9f9f9;
+}
+body[data-uitheme="belafonte-day"] {
+    --wicon-1: #426a79; --wicon-2: #97522c; --wicon-3: #728230; --wicon-4: #d08b30; --wicon-5: #3d7b81; --wicon-6: #be100e;
+    --main-bg-color: #d5ccba; --main-text-color: #45373c; --secondary-text-color: #695c5c; --grey-text-color: #8d827b;
+    --accent-color: #97522c; --link-color: #97522c; --tab-green: #97522c;
+    --border-color: rgba(69,55,60,0.16); --hover-bg-color: rgba(151,82,44,0.12); --highlight-bg-color: rgba(151,82,44,0.18);
+    --panel-bg-color: rgba(213,204,186,0.6); --block-bg-color: rgba(207,198,181,0.5); --block-bg-solid-color: #cfc6b5; --modal-bg-color: #c8bfaf;
+    --frame-bg-top: #cbc2b1; --frame-bg-bottom: #c5bcac; --frame-border: rgba(151,82,44,0.22);
+    --button-text-color: #d5ccba; --form-element-primary-text-color: #d5ccba;
+    --keybinding-bg-color: #cbc2b1; --keybinding-border-color: #bbb1a3;
+    --term-foreground: #45373c; --term-background: #d5ccba;
+}
+body[data-uitheme="everforest-light"] {
+    --wicon-1: #3a94c5; --wicon-2: #df69ba; --wicon-3: #8da101; --wicon-4: #dfa000; --wicon-5: #35a77c; --wicon-6: #f85552;
+    --main-bg-color: #efebd4; --main-text-color: #5c6a72; --secondary-text-color: #818a8a; --grey-text-color: #a6aaa3;
+    --accent-color: #8da101; --link-color: #8da101; --tab-green: #8da101;
+    --border-color: rgba(92,106,114,0.16); --hover-bg-color: rgba(141,161,1,0.12); --highlight-bg-color: rgba(141,161,1,0.18);
+    --panel-bg-color: rgba(239,235,212,0.6); --block-bg-color: rgba(233,230,208,0.5); --block-bg-solid-color: #e9e6d0; --modal-bg-color: #e2dfcb;
+    --frame-bg-top: #e5e2cd; --frame-bg-bottom: #dfddc9; --frame-border: rgba(141,161,1,0.22);
+    --button-text-color: #efebd4; --form-element-primary-text-color: #efebd4;
+    --keybinding-bg-color: #e5e2cd; --keybinding-border-color: #d5d4c2;
+    --term-foreground: #5c6a72; --term-background: #efebd4;
+}
+body[data-uitheme="adwaita"] {
+    --wicon-1: #3584e4; --wicon-2: #a347ba; --wicon-3: #26a269; --wicon-4: #a2734c; --wicon-5: #2aa1b3; --wicon-6: #c01c28;
+    --main-bg-color: #ffffff; --main-text-color: #1d1d20; --secondary-text-color: #565658; --grey-text-color: #8e8e90;
+    --accent-color: #3584e4; --link-color: #3584e4; --tab-green: #3584e4;
+    --border-color: rgba(29,29,32,0.16); --hover-bg-color: rgba(53,132,228,0.12); --highlight-bg-color: rgba(53,132,228,0.18);
+    --panel-bg-color: rgba(255,255,255,0.6); --block-bg-color: rgba(246,246,246,0.5); --block-bg-solid-color: #f6f6f6; --modal-bg-color: #ebebeb;
+    --frame-bg-top: #efefef; --frame-bg-bottom: #e6e6e6; --frame-border: rgba(53,132,228,0.22);
+    --button-text-color: #ffffff; --form-element-primary-text-color: #ffffff;
+    --keybinding-bg-color: #efefef; --keybinding-border-color: #d6d6d7;
+    --term-foreground: #1d1d20; --term-background: #ffffff;
+}
+
+/* ============================================================================
+   2026-06 新增 15 套(小红书配色卡)。每块只设"基色"(bg/text/accent/wicon/term),
+   其余边框/按钮/表单/模态/状态全部由 :root 的 color-mix 自动派生 —— 整窗每个元素都随主题。
+   —— 3 套实色 + 12 套弥散/渐变(后者 body 设 --mesh 多层 radial,标签栏/侧栏透明 → 整窗连续渐变)
+   ============================================================================ */
+
+/* ---- 3 实色(照片配色卡)---- */
+body[data-uitheme="coral-teal"] {
+    --wicon-1: #3a7a78; --wicon-2: #9a5a8a; --wicon-3: #5e8c4a; --wicon-4: #d98a2b; --wicon-5: #2b8a8f; --wicon-6: #b92a0f;
+    --main-bg-color: #f7e4cc; --main-text-color: #2f4a49; --secondary-text-color: #4a6463; --grey-text-color: #87918f;
+    --accent-color: #b92a0f;
+    --term-foreground: #2f4a49; --term-background: #f7e4cc;
+}
+body[data-uitheme="japandi"] {
+    --wicon-1: #5b5f8d; --wicon-2: #8a6a9a; --wicon-3: #6f8a5e; --wicon-4: #c8973f; --wicon-5: #6a8a86; --wicon-6: #da6b51;
+    --main-bg-color: #f1dcba; --main-text-color: #423b43; --secondary-text-color: #6a5f63; --grey-text-color: #94897f;
+    --accent-color: #da6b51;
+    --term-foreground: #423b43; --term-background: #f1dcba;
+}
+body[data-uitheme="lemonade"] {
+    --wicon-1: #5f97b8; --wicon-2: #9a7ab0; --wicon-3: #7a9e6a; --wicon-4: #f1a805; --wicon-5: #4a9e94; --wicon-6: #e0703a;
+    --main-bg-color: #f6efe0; --main-text-color: #3f4b47; --secondary-text-color: #5f6f6a; --grey-text-color: #93a09a;
+    --accent-color: #c77b2a;
+    --term-foreground: #3f4b47; --term-background: #f6efe0;
+}
+
+/* ---- 6 弥散渐变·莫兰迪(柔)---- */
+body[data-uitheme="diffuse-rose"] {
+    --wicon-1: #6f8aa7; --wicon-2: #b08aa0; --wicon-3: #8aa090; --wicon-4: #d6a878; --wicon-5: #7fa0b0; --wicon-6: #c87a8a;
+    --main-bg-color: #f4eef0; --main-text-color: #3e4a5a; --secondary-text-color: #5f6b7a; --grey-text-color: #9aa0ab;
+    --accent-color: #6f8aa7;
+    --term-foreground: #3e4a5a; --term-background: #f4eef0;
+    --mesh: radial-gradient(at 18% 20%, #d7b3be 0px, transparent 52%), radial-gradient(at 82% 12%, #a8b5c0 0px, transparent 52%), radial-gradient(at 28% 88%, #e5cfc7 0px, transparent 55%), radial-gradient(at 90% 80%, #6f8aa7 0px, transparent 46%), #f4eef0;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="diffuse-mist"] {
+    --wicon-1: #6f9ab0; --wicon-2: #a98ab0; --wicon-3: #9ab59a; --wicon-4: #c0a877; --wicon-5: #6aa0a8; --wicon-6: #c08a86;
+    --main-bg-color: #f2f4f3; --main-text-color: #44504e; --secondary-text-color: #63706d; --grey-text-color: #9aa3a0;
+    --accent-color: #5a8298;
+    --term-foreground: #44504e; --term-background: #f2f4f3;
+    --mesh: radial-gradient(at 18% 20%, #adc4d4 0px, transparent 52%), radial-gradient(at 82% 12%, #dfd6db 0px, transparent 52%), radial-gradient(at 28% 88%, #dbcab5 0px, transparent 55%), radial-gradient(at 90% 80%, #c1d2c1 0px, transparent 48%), #f2f4f3;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="diffuse-steel"] {
+    --wicon-1: #7990a9; --wicon-2: #8e8fb0; --wicon-3: #8aa898; --wicon-4: #d0a98e; --wicon-5: #7aa0b0; --wicon-6: #c2897e;
+    --main-bg-color: #eef0f3; --main-text-color: #3f4654; --secondary-text-color: #5e6676; --grey-text-color: #969cab;
+    --accent-color: #7990a9;
+    --term-foreground: #3f4654; --term-background: #eef0f3;
+    --mesh: radial-gradient(at 18% 20%, #a3a4bc 0px, transparent 52%), radial-gradient(at 82% 12%, #7990a9 0px, transparent 48%), radial-gradient(at 28% 88%, #dabbae 0px, transparent 55%), radial-gradient(at 90% 80%, #a3b7c3 0px, transparent 50%), #eef0f3;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="diffuse-blush"] {
+    --wicon-1: #7f93b3; --wicon-2: #b083a0; --wicon-3: #94a890; --wicon-4: #d6a98a; --wicon-5: #7fa6b0; --wicon-6: #c87f86;
+    --main-bg-color: #f6eff0; --main-text-color: #4a4248; --secondary-text-color: #6e636a; --grey-text-color: #a59ba2;
+    --accent-color: #b07a86;
+    --term-foreground: #4a4248; --term-background: #f6eff0;
+    --mesh: radial-gradient(at 18% 20%, #d5aaa7 0px, transparent 52%), radial-gradient(at 82% 12%, #b9c2d2 0px, transparent 52%), radial-gradient(at 28% 88%, #ead4c1 0px, transparent 55%), radial-gradient(at 90% 80%, #eedad9 0px, transparent 50%), #f6eff0;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="diffuse-sage"] {
+    --wicon-1: #6f93a0; --wicon-2: #9a8aa8; --wicon-3: #7ca07e; --wicon-4: #c9b85e; --wicon-5: #6fa092; --wicon-6: #c08a72;
+    --main-bg-color: #f4f3e9; --main-text-color: #444a44; --secondary-text-color: #636a62; --grey-text-color: #99a098;
+    --accent-color: #6f8a74;
+    --term-foreground: #444a44; --term-background: #f4f3e9;
+    --mesh: radial-gradient(at 18% 20%, #949f97 0px, transparent 50%), radial-gradient(at 82% 12%, #ebe2aa 0px, transparent 52%), radial-gradient(at 28% 88%, #c8d5c5 0px, transparent 55%), radial-gradient(at 90% 80%, #eee9d0 0px, transparent 50%), #f4f3e9;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="diffuse-nude"] {
+    --wicon-1: #7a93a0; --wicon-2: #a587a0; --wicon-3: #93a880; --wicon-4: #cba36a; --wicon-5: #79a0a0; --wicon-6: #c0795c;
+    --main-bg-color: #f3efe9; --main-text-color: #4e453d; --secondary-text-color: #6f645a; --grey-text-color: #a59a8f;
+    --accent-color: #b07a5c;
+    --term-foreground: #4e453d; --term-background: #f3efe9;
+    --mesh: radial-gradient(at 18% 20%, #cfa996 0px, transparent 52%), radial-gradient(at 82% 12%, #d2beb2 0px, transparent 52%), radial-gradient(at 28% 88%, #d7c8b4 0px, transparent 55%), radial-gradient(at 90% 80%, #ddddd9 0px, transparent 50%), #f3efe9;
+    background: var(--mesh) !important;
+}
+
+/* ---- 6 渐变(鲜艳)---- */
+body[data-uitheme="vivid-peachpink"] {
+    --wicon-1: #6f9ad0; --wicon-2: #c86fce; --wicon-3: #6fb88a; --wicon-4: #f0a850; --wicon-5: #6fc0d0; --wicon-6: #ff5391;
+    --main-bg-color: #fdf0f4; --main-text-color: #4a2f3a; --secondary-text-color: #7a5563; --grey-text-color: #b39aa3;
+    --accent-color: #ff5391;
+    --term-foreground: #4a2f3a; --term-background: #fdf0f4;
+    --mesh: radial-gradient(at 18% 18%, #ff5391 0px, transparent 50%), radial-gradient(at 85% 15%, #ff9cda 0px, transparent 52%), radial-gradient(at 50% 92%, #ffb09c 0px, transparent 55%), #fdf0f4;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="vivid-sunset"] {
+    --wicon-1: #6f9ad0; --wicon-2: #9a6ff0; --wicon-3: #8ab86a; --wicon-4: #f0a838; --wicon-5: #6fc0c0; --wicon-6: #f07050;
+    --main-bg-color: #fdf7ec; --main-text-color: #463f2e; --secondary-text-color: #6f6650; --grey-text-color: #a89c82;
+    --accent-color: #8a5ff0;
+    --term-foreground: #463f2e; --term-background: #fdf7ec;
+    --mesh: radial-gradient(at 18% 18%, #b18dff 0px, transparent 52%), radial-gradient(at 85% 15%, #fff443 0px, transparent 52%), radial-gradient(at 50% 92%, #ffbb57 0px, transparent 55%), #fdf7ec;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="vivid-orchid"] {
+    --wicon-1: #5a6ff0; --wicon-2: #b06ff0; --wicon-3: #7ab88a; --wicon-4: #e0a85a; --wicon-5: #6fb0e0; --wicon-6: #e070b0;
+    --main-bg-color: #f7f2fe; --main-text-color: #3a3358; --secondary-text-color: #5f578a; --grey-text-color: #9a93b5;
+    --accent-color: #5240fe;
+    --term-foreground: #3a3358; --term-background: #f7f2fe;
+    --mesh: radial-gradient(at 18% 18%, #fd91ff 0px, transparent 52%), radial-gradient(at 85% 15%, #5240fe 0px, transparent 46%), radial-gradient(at 50% 92%, #ad9eff 0px, transparent 55%), #f7f2fe;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="vivid-sunrise"] {
+    --wicon-1: #3a86d8; --wicon-2: #9a7fd0; --wicon-3: #6fb086; --wicon-4: #f0a838; --wicon-5: #5fb0d8; --wicon-6: #e0795a;
+    --main-bg-color: #f1f6fd; --main-text-color: #36404e; --secondary-text-color: #586678; --grey-text-color: #93a0b0;
+    --accent-color: #3a86d8;
+    --term-foreground: #36404e; --term-background: #f1f6fd;
+    --mesh: radial-gradient(at 18% 18%, #ffc870 0px, transparent 52%), radial-gradient(at 85% 15%, #87bdff 0px, transparent 52%), radial-gradient(at 50% 92%, #dbeaff 0px, transparent 55%), #f1f6fd;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="vivid-ocean"] {
+    --wicon-1: #2f95e0; --wicon-2: #8a7fd0; --wicon-3: #5fb0a0; --wicon-4: #e0b85a; --wicon-5: #4fcfe0; --wicon-6: #e07088;
+    --main-bg-color: #eff7fd; --main-text-color: #2f4150; --secondary-text-color: #4f6373; --grey-text-color: #8ea2b2;
+    --accent-color: #2f95e0;
+    --term-foreground: #2f4150; --term-background: #eff7fd;
+    --mesh: radial-gradient(at 18% 18%, #58b8ff 0px, transparent 52%), radial-gradient(at 85% 15%, #74dfff 0px, transparent 52%), radial-gradient(at 50% 92%, #90bbff 0px, transparent 55%), #eff7fd;
+    background: var(--mesh) !important;
+}
+body[data-uitheme="vivid-citrus"] {
+    --wicon-1: #5a9ad0; --wicon-2: #9a7fc0; --wicon-3: #6aa83a; --wicon-4: #e0c84a; --wicon-5: #4fc0a0; --wicon-6: #e0794a;
+    --main-bg-color: #f6fbec; --main-text-color: #3e4a36; --secondary-text-color: #5f6b54; --grey-text-color: #99a58c;
+    --accent-color: #6aa83a;
+    --term-foreground: #3e4a36; --term-background: #f6fbec;
+    --mesh: radial-gradient(at 18% 18%, #cef595 0px, transparent 52%), radial-gradient(at 85% 15%, #b1ffec 0px, transparent 52%), radial-gradient(at 50% 92%, #ffe588 0px, transparent 55%), #f6fbec;
+    background: var(--mesh) !important;
+}
+
+/* 渐变主题:标签栏 + 侧栏透明 → 露出 body 的 --mesh,整窗连续弥散渐变(区块浮其上) */
+body[data-uitheme="diffuse-rose"] .tab-bar-wrapper, body[data-uitheme="diffuse-rose"] .widget-bar,
+body[data-uitheme="diffuse-mist"] .tab-bar-wrapper, body[data-uitheme="diffuse-mist"] .widget-bar,
+body[data-uitheme="diffuse-steel"] .tab-bar-wrapper, body[data-uitheme="diffuse-steel"] .widget-bar,
+body[data-uitheme="diffuse-blush"] .tab-bar-wrapper, body[data-uitheme="diffuse-blush"] .widget-bar,
+body[data-uitheme="diffuse-sage"] .tab-bar-wrapper, body[data-uitheme="diffuse-sage"] .widget-bar,
+body[data-uitheme="diffuse-nude"] .tab-bar-wrapper, body[data-uitheme="diffuse-nude"] .widget-bar,
+body[data-uitheme="vivid-peachpink"] .tab-bar-wrapper, body[data-uitheme="vivid-peachpink"] .widget-bar,
+body[data-uitheme="vivid-sunset"] .tab-bar-wrapper, body[data-uitheme="vivid-sunset"] .widget-bar,
+body[data-uitheme="vivid-orchid"] .tab-bar-wrapper, body[data-uitheme="vivid-orchid"] .widget-bar,
+body[data-uitheme="vivid-sunrise"] .tab-bar-wrapper, body[data-uitheme="vivid-sunrise"] .widget-bar,
+body[data-uitheme="vivid-ocean"] .tab-bar-wrapper, body[data-uitheme="vivid-ocean"] .widget-bar,
+body[data-uitheme="vivid-citrus"] .tab-bar-wrapper, body[data-uitheme="vivid-citrus"] .widget-bar {
+    background: transparent !important;
+}

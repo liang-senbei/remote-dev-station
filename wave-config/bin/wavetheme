@@ -4,7 +4,7 @@
 list_themes() {
   python3 -c "import json,os
 d={}
-for f in ('popular-themes.json','light-themes.json'):
+for f in ('popular-themes.json','light-themes.json','card-themes.json'):
     p=os.path.expanduser('~/.config/waveterm/termthemes/'+f)
     if os.path.exists(p):
         try: d.update(json.load(open(p)))

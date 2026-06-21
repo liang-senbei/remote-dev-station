@@ -8,7 +8,7 @@ from urllib.parse import urlparse, parse_qs
 HOME = os.path.expanduser("~")
 TT = os.path.join(HOME, ".config/waveterm/termthemes")
 SETTINGS = os.path.join(HOME, ".config/waveterm/settings.json")
-COHESIVE = ["popular-themes.json", "light-themes.json"]   # 有 UI 联动块的主题
+COHESIVE = ["popular-themes.json", "light-themes.json", "card-themes.json"]   # 有 UI 联动块的主题
 ANSI = ["black","red","green","yellow","blue","magenta","cyan","white",
         "brightBlack","brightRed","brightGreen","brightYellow","brightBlue","brightMagenta","brightCyan","brightWhite"]
 
