@@ -97,14 +97,15 @@ cloudgo() {
   local choice key
   choice=$( cloud-sessmenu \
     | fzf --prompt="❯ 会话  " --height=80% --header-first --delimiter=$'\t' --with-nth=2 \
-          --header=" ↵ 进入(自动记住此标签)    Ctrl-X 删除(留对话) " \
+          --header=" ↵ 进入(记住此标签)    Ctrl-X 分级删除 " \
           --preview 'cloud-sesspreview {1}' \
           --preview-window='right,56%,wrap,border-left' --preview-label=' 预览 ' \
-          --bind 'ctrl-x:execute-silent(cloud-forget {1} >/dev/null 2>&1)+reload(cloud-sessmenu)') || return 0
+          --bind 'ctrl-x:execute(cloud-delmenu {1})+reload(cloud-sessmenu)') || return 0
   key="${choice%%$'\t'*}"
   case "$key" in
     "➕") cloudnewat ;;
     "⟳") cloud_resume ;;
+    "🔓") cloudunbind; sleep 1; cloudgo ;;          # 忘记本标签绑定 → 回菜单重选(改绑逃生口)
     "")  return 0 ;;
     *)   _cloudbind "$key"          # 记住:此标签 ↔ 此会话(统一入口,含白名单)
          cloudattach "$key" ;;
