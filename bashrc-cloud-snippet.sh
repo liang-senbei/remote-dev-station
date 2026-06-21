@@ -46,9 +46,17 @@ cloud_resume() {
     fi
   fi
   cd "$dir" || return 1
-  local base="cc-$(basename "$dir")-r" name="$base" n=2
-  while tmux has-session -t "$name" 2>/dev/null; do name="$base$n"; n=$((n+1)); done
-  _cloudbind "$name"        # M4:恢复出来的会话也绑到本标签
+  local dn; read -rp "给恢复回来的会话起个名(回车=默认 $(basename "$dir")-r): " dn
+  local base n=2
+  if [ -n "$dn" ]; then
+    local slug; slug=$(printf '%s' "$dn" | tr ' ./:' '-' | tr -s '-' | sed 's/^-//;s/-$//')
+    base="cc-${slug:-$(basename "$dir")-r}"          # 用你起的名 → cc-<名>(如 cc-hub)
+  else
+    base="cc-$(basename "$dir")-r"                    # 没起名 → 默认 cc-<目录>-r
+  fi
+  local name="$base"
+  while tmux has-session -t "$name" 2>/dev/null; do name="$base-$n"; n=$((n+1)); done
+  _cloudbind "$name"        # M4:恢复出来的会话也绑到本标签(自学习,下次自动进)
   exec env -u TMUX tmux new-session -s "$name" "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --resume --dangerously-skip-permissions"
 }
 # 直接进某会话:在跑就 attach;离线就【连名带原对话】--resume 复活(同名同 uuid,绝不新建 -rN)。
