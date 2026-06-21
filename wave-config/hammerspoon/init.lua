@@ -30,6 +30,23 @@ statusWV:show(); if ontop then statusWV:bringToFront(true) end
 
 local progUntil = 0 -- 忽略我们自己移动窗口后的短暂时间,避免误判为用户拖动
 local function setF(f) progUntil = hs.timer.secondsSinceEpoch() + 0.35; statusWV:frame(f) end
+-- 丝滑滑动:按真实时间 ease-out-cubic 插值帧(~83fps,帧率无关),收起/滑出滑入都用它
+local animT = nil
+local function setFanim(target, dur)
+    dur = dur or 0.2
+    if animT then animT:stop(); animT = nil end
+    local s = statusWV and statusWV:frame()
+    if not s then if statusWV then statusWV:frame(target) end; return end
+    progUntil = hs.timer.secondsSinceEpoch() + dur + 0.15
+    local t0 = hs.timer.secondsSinceEpoch()
+    animT = hs.timer.doEvery(0.012, function()
+        local t = (hs.timer.secondsSinceEpoch() - t0) / dur
+        if t >= 1 then statusWV:frame(target); if animT then animT:stop() end; animT = nil; return end
+        local e = 1 - (1 - t) ^ 3
+        statusWV:frame({ x = s.x + (target.x - s.x) * e, y = s.y + (target.y - s.y) * e,
+                         w = s.w + (target.w - s.w) * e, h = s.h + (target.h - s.h) * e })
+    end)
+end
 local function ensure()
     if not statusWV or not statusWV:hswindow() then statusWV = build() end
     return statusWV
@@ -71,8 +88,8 @@ local function revealFrame()
     elseif dockEdge == "right" then return { x = sf.x + sf.w - dW, y = dY, w = dW, h = dH }
     else return { x = dX, y = sf.y, w = dW, h = dH } end
 end
-local function tuck() if dockEdge then setF(tuckFrame()); revealed = false end end
-local function reveal() if dockEdge then setF(revealFrame()); revealed = true; if ontop then statusWV:bringToFront(true) end end end
+local function tuck() if dockEdge then revealed = false; setFanim(tuckFrame(), 0.16) end end
+local function reveal() if dockEdge then revealed = true; if ontop then statusWV:bringToFront(true) end; setFanim(revealFrame(), 0.22) end end
 local function dock(edge)
     ensure(); local f = statusWV:frame(); local sf = scr()
     dockEdge = edge; dW = f.w; dH = f.h; dX = f.x; dY = f.y
