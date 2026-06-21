@@ -112,12 +112,12 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 ## 8. 侧栏 widgets(6 个,图标随主题变色 + 同色标签)
 默认 terminal/files/web/sysinfo 已隐藏(`display:hidden`);6 个自定义,各取当前主题调色板里一种色(`--wicon-1..6`):
 - 🔵 **会话**(`cloudgo`):核心入口(自学习/新建/恢复/改绑/临时/分级删除)。
-- 🟣 **主题**(`wavetheme` → 本机 `:8799` 色卡网页):点色卡**一键换整套主题**(终端+画框+边栏+文字+图标联动,9 套)。
+- 🟣 **主题**(`wavetheme` → 本机 `:8799` 色卡网页):点色卡**一键换整套主题**(终端+画框+边栏+文字+图标联动,13 套:8 浅 5 深,浅色在前)。
 - 🩵 **项目看板**(`:8088/` 门户):列各项目自己的看板(读 `/root/inbox/dashboards/registry.json`;`cloud-dashboards.service` 只服务该目录)。
 - 🟢 **服务器桌面**(noVNC `:6080`):服务器 GUI(AdsPower 等)。见 §9。
 - 🟡 **服务器文件**:浏览服务器 `/opt/workspace`。
 - 🔴 **临时会话**(`cloudtmp` → `cc-tmp-*`):关标签 ~60s 自动清(`mosh-server-tmout` 超时 → `destroy-unattached`);不进恢复体系,对话 jsonl 仍留。
-> 终端配色含 9 主题的 **cursor 光标色**(每主题对比背景,浅色=深光标),靠 `termthemes/*.json` 的 `cursor` 字段。
+> 终端配色含 13 主题的 **cursor 光标色**(每主题对比背景,浅色=深光标),靠 `termthemes/*.json` 的 `cursor` 字段。
 
 ## 9. 服务器桌面(noVNC)
 - `novnc.service` → `novnc-start.sh`:`Xvfb:1` + xfce + `x11vnc` + `websockify :6080`。
@@ -158,7 +158,7 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 **仓库结构**:`bin/`(服务器脚本)· `systemd/`(服务单元:watchdog/sessions/novnc/cloud-dashboards)· `cloudconn`/`mosh-server-tmout`(Mac/服务器辅助)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
 
 **Wave 客户端配置 `wave-config/`**:
-- `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(9 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
+- `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
 - **还原**:`cp -r wave-config/waveterm/* ~/.config/waveterm/ && cp -r wave-config/waveterm-dev/* ~/.config/waveterm-dev/` → 重开 Wave 即生效(termtheme/widgets 是运行时配置,不用重编译)。
 - 主题/图标/标签的**源码**(`theme.scss`/`app.tsx`/`widgets.tsx`,需 `build:prod`+`electron-builder --dir` 编进 .app)在自建分叉 `~/build/waveterm-zh`,不在本仓库。
 - ⚠️ **不含**:Wave 数据库(`~/Library/Application Support/waveterm`,标签/块布局/历史 = 每机状态,别备份)+ GLM 密钥(`~/.config/glm-proxy/keys.txt`,**勿入库**)。
