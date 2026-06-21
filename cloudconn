@@ -1,9 +1,9 @@
 #!/bin/bash
 # 韧性连接 Wave 会话:mosh 到云服务器跑指定命令。
-#  · 干净退出(detach / 菜单 Esc / claude 正常退出 → 退出码 0)→ 不重连,标签干净结束。
-#  · 真断线(非 0:服务器没了/连接错)→ 5 秒自动重连(Ctrl-C 取消)。
+#  · 干净退出(detach / 菜单 Esc / claude 正常退出 → 退出码 0)→ 不重连。
+#  · 真断线(非 0)→ 5 秒自动重连(Ctrl-C 取消)。
 TARGET="${*:-cloudgo}"; HOST="root@100.109.254.125"; MOSH="/opt/homebrew/bin/mosh"
-# 标签稳定 ID(自学习的键):cmd 块拿不到 WAVETERM_BLOCKID,但 WAVETERM_SWAPTOKEN(base64 JSON)里带 blockid,解出来用。
+# 标签稳定 ID:cmd 块拿不到 WAVETERM_BLOCKID,从 WAVETERM_SWAPTOKEN(base64 JSON)里解 blockid。
 bid="${WAVETERM_BLOCKID:-}"
 if [ -z "$bid" ] && [ -n "${WAVETERM_SWAPTOKEN:-}" ]; then
   bid=$(printf '%s' "$WAVETERM_SWAPTOKEN" | python3 -c 'import sys,base64,json
@@ -14,9 +14,12 @@ try:
 except Exception:
     pass' 2>/dev/null)
 fi
-case "$bid" in *[!0-9a-fA-F-]*) bid= ;; esac   # 白名单,挡 shell 注入/路径穿越
+case "$bid" in *[!0-9a-fA-F-]*) bid= ;; esac
+# 临时会话:用带超时的 mosh-server,客户端断开 60s 后退出 → destroy-unattached 销毁(关了不再赖着)。
+margs=()
+case "$TARGET" in *cloudtmp*) margs=(--server=/usr/local/bin/mosh-server-tmout) ;; esac
 while true; do
-  "$MOSH" "$HOST" -- bash -ic "WAVETERM_BLOCKID='$bid'; $TARGET"
+  "$MOSH" "${margs[@]}" "$HOST" -- bash -ic "WAVETERM_BLOCKID='$bid'; $TARGET"
   ec=$?
   if [ "$ec" -eq 0 ]; then
     printf "\n\033[32m── 已退出会话(此标签可关;重开会自动回到它)──\033[0m\n"; break
