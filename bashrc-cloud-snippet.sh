@@ -106,6 +106,7 @@ cloudgo() {
     "➕") cloudnewat ;;
     "⟳") cloud_resume ;;
     "🔓") cloudunbind; sleep 1; cloudgo ;;          # 忘记本标签绑定 → 回菜单重选(改绑逃生口)
+    "⏱") cloudtmp ;;                                # 临时会话(并入菜单,省一个侧栏按钮)
     "")  return 0 ;;
     *)   _cloudbind "$key"          # 记住:此标签 ↔ 此会话(统一入口,含白名单)
          cloudattach "$key" ;;

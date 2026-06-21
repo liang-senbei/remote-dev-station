@@ -4,6 +4,7 @@
 printf '%s\t%s\n' "➕" "➕ 新建会话(选目录)…"
 printf '%s\t%s\n' "⟳" "⟳ 原生选择器恢复(未登记的老对话)…"
 printf '%s\t%s\n' "🔓" "🔓 忘记本标签的会话绑定(改绑/重选)"
+printf '%s\t%s\n' "⏱" "⏱ 临时会话(用完即弃,不进恢复体系)"
 # 活会话:真名 \t 去cc-显示 · 活动时间
 cloud-sesslist 2>/dev/null | while read -r name t; do
   [ -n "$name" ] && printf '%s\t%s  · %s\n' "$name" "${name#cc-}" "$t"
