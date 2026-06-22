@@ -30,22 +30,14 @@ statusWV:show(); if ontop then statusWV:bringToFront(true) end
 
 local progUntil = 0 -- 忽略我们自己移动窗口后的短暂时间,避免误判为用户拖动
 local function setF(f) progUntil = hs.timer.secondsSinceEpoch() + 0.35; statusWV:frame(f) end
--- 丝滑滑动:按真实时间 ease-out-cubic 插值帧(~83fps,帧率无关),收起/滑出滑入都用它
-local animT = nil
+-- 丝滑滑动:用 macOS 原生窗口动画(NSWindow setFrame:animate,系统 Core Animation 合成),
+-- 不靠 Lua 逐帧设帧 → 不受定时器精度/webview 重绘限制,顺。
 local function setFanim(target, dur)
     dur = dur or 0.2
-    if animT then animT:stop(); animT = nil end
-    local s = statusWV and statusWV:frame()
-    if not s then if statusWV then statusWV:frame(target) end; return end
-    progUntil = hs.timer.secondsSinceEpoch() + dur + 0.15
-    local t0 = hs.timer.secondsSinceEpoch()
-    animT = hs.timer.doEvery(0.012, function()
-        local t = (hs.timer.secondsSinceEpoch() - t0) / dur
-        if t >= 1 then statusWV:frame(target); if animT then animT:stop() end; animT = nil; return end
-        local e = 1 - (1 - t) ^ 3
-        statusWV:frame({ x = s.x + (target.x - s.x) * e, y = s.y + (target.y - s.y) * e,
-                         w = s.w + (target.w - s.w) * e, h = s.h + (target.h - s.h) * e })
-    end)
+    local w = statusWV and statusWV:hswindow()
+    if not w then if statusWV then statusWV:frame(target) end; return end
+    progUntil = hs.timer.secondsSinceEpoch() + dur + 0.25
+    w:setFrame(hs.geometry.rect(target.x, target.y, target.w, target.h), dur)
 end
 local function ensure()
     if not statusWV or not statusWV:hswindow() then statusWV = build() end
