@@ -369,7 +369,7 @@ body[data-uitheme="diffuse-rose"] {
     --main-bg-color: #f4eef0; --main-text-color: #3e4a5a; --secondary-text-color: #5f6b7a; --grey-text-color: #9aa0ab;
     --accent-color: #6f8aa7;
     --term-foreground: #3e4a5a; --term-background: #f4eef0;
-    --mesh: radial-gradient(at 18% 20%, #d7b3be 0px, transparent 52%), radial-gradient(at 82% 12%, #a8b5c0 0px, transparent 52%), radial-gradient(at 28% 88%, #e5cfc7 0px, transparent 55%), radial-gradient(at 90% 80%, #6f8aa7 0px, transparent 46%), #f4eef0;
+    --mesh: radial-gradient(at 22% 28%, #d7b3be, transparent 70%), radial-gradient(at 82% 18%, #a8b5c0, transparent 70%), radial-gradient(at 22% 82%, #e5cfc7, transparent 72%), radial-gradient(at 85% 78%, #6f8aa7, transparent 70%), #e3d6da;
     background: var(--mesh) !important;
 }
 body[data-uitheme="diffuse-mist"] {
@@ -377,7 +377,7 @@ body[data-uitheme="diffuse-mist"] {
     --main-bg-color: #f2f4f3; --main-text-color: #44504e; --secondary-text-color: #63706d; --grey-text-color: #9aa3a0;
     --accent-color: #5a8298;
     --term-foreground: #44504e; --term-background: #f2f4f3;
-    --mesh: radial-gradient(at 18% 20%, #adc4d4 0px, transparent 52%), radial-gradient(at 82% 12%, #dfd6db 0px, transparent 52%), radial-gradient(at 28% 88%, #dbcab5 0px, transparent 55%), radial-gradient(at 90% 80%, #c1d2c1 0px, transparent 48%), #f2f4f3;
+    --mesh: radial-gradient(at 22% 28%, #adc4d4, transparent 70%), radial-gradient(at 82% 18%, #c1d2c1, transparent 70%), radial-gradient(at 22% 82%, #dbcab5, transparent 72%), radial-gradient(at 85% 78%, #b8c6d6, transparent 70%), #e2e1de;
     background: var(--mesh) !important;
 }
 body[data-uitheme="diffuse-steel"] {
@@ -385,7 +385,7 @@ body[data-uitheme="diffuse-steel"] {
     --main-bg-color: #eef0f3; --main-text-color: #3f4654; --secondary-text-color: #5e6676; --grey-text-color: #969cab;
     --accent-color: #7990a9;
     --term-foreground: #3f4654; --term-background: #eef0f3;
-    --mesh: radial-gradient(at 18% 20%, #a3a4bc 0px, transparent 52%), radial-gradient(at 82% 12%, #7990a9 0px, transparent 48%), radial-gradient(at 28% 88%, #dabbae 0px, transparent 55%), radial-gradient(at 90% 80%, #a3b7c3 0px, transparent 50%), #eef0f3;
+    --mesh: radial-gradient(at 22% 28%, #7990a9, transparent 70%), radial-gradient(at 82% 18%, #a3a4bc, transparent 70%), radial-gradient(at 22% 82%, #a3b7c3, transparent 72%), radial-gradient(at 85% 78%, #dabbae, transparent 70%), #cfc7c6;
     background: var(--mesh) !important;
 }
 body[data-uitheme="diffuse-blush"] {
@@ -393,7 +393,7 @@ body[data-uitheme="diffuse-blush"] {
     --main-bg-color: #f6eff0; --main-text-color: #4a4248; --secondary-text-color: #6e636a; --grey-text-color: #a59ba2;
     --accent-color: #b07a86;
     --term-foreground: #4a4248; --term-background: #f6eff0;
-    --mesh: radial-gradient(at 18% 20%, #d5aaa7 0px, transparent 52%), radial-gradient(at 82% 12%, #b9c2d2 0px, transparent 52%), radial-gradient(at 28% 88%, #ead4c1 0px, transparent 55%), radial-gradient(at 90% 80%, #eedad9 0px, transparent 50%), #f6eff0;
+    --mesh: radial-gradient(at 22% 28%, #d5aaa7, transparent 70%), radial-gradient(at 82% 18%, #b9c2d2, transparent 70%), radial-gradient(at 22% 82%, #ead4c1, transparent 72%), radial-gradient(at 85% 78%, #d5aaa7, transparent 70%), #ecdcdb;
     background: var(--mesh) !important;
 }
 body[data-uitheme="diffuse-sage"] {
@@ -401,7 +401,7 @@ body[data-uitheme="diffuse-sage"] {
     --main-bg-color: #f4f3e9; --main-text-color: #444a44; --secondary-text-color: #636a62; --grey-text-color: #99a098;
     --accent-color: #6f8a74;
     --term-foreground: #444a44; --term-background: #f4f3e9;
-    --mesh: radial-gradient(at 18% 20%, #949f97 0px, transparent 50%), radial-gradient(at 82% 12%, #ebe2aa 0px, transparent 52%), radial-gradient(at 28% 88%, #c8d5c5 0px, transparent 55%), radial-gradient(at 90% 80%, #eee9d0 0px, transparent 50%), #f4f3e9;
+    --mesh: radial-gradient(at 22% 28%, #949f97, transparent 70%), radial-gradient(at 82% 18%, #c8d5c5, transparent 70%), radial-gradient(at 22% 82%, #ebe2aa, transparent 72%), radial-gradient(at 85% 78%, #aebca6, transparent 70%), #e8e6d6;
     background: var(--mesh) !important;
 }
 body[data-uitheme="diffuse-nude"] {
@@ -409,7 +409,7 @@ body[data-uitheme="diffuse-nude"] {
     --main-bg-color: #f3efe9; --main-text-color: #4e453d; --secondary-text-color: #6f645a; --grey-text-color: #a59a8f;
     --accent-color: #b07a5c;
     --term-foreground: #4e453d; --term-background: #f3efe9;
-    --mesh: radial-gradient(at 18% 20%, #cfa996 0px, transparent 52%), radial-gradient(at 82% 12%, #d2beb2 0px, transparent 52%), radial-gradient(at 28% 88%, #d7c8b4 0px, transparent 55%), radial-gradient(at 90% 80%, #ddddd9 0px, transparent 50%), #f3efe9;
+    --mesh: radial-gradient(at 22% 28%, #cfa996, transparent 70%), radial-gradient(at 82% 18%, #d2beb2, transparent 70%), radial-gradient(at 22% 82%, #d7c8b4, transparent 72%), radial-gradient(at 85% 78%, #c9a892, transparent 70%), #e0d8d0;
     background: var(--mesh) !important;
 }
 
@@ -419,7 +419,7 @@ body[data-uitheme="vivid-peachpink"] {
     --main-bg-color: #fdf0f4; --main-text-color: #4a2f3a; --secondary-text-color: #7a5563; --grey-text-color: #b39aa3;
     --accent-color: #ff5391;
     --term-foreground: #4a2f3a; --term-background: #fdf0f4;
-    --mesh: radial-gradient(at 18% 18%, #ff5391 0px, transparent 50%), radial-gradient(at 85% 15%, #ff9cda 0px, transparent 52%), radial-gradient(at 50% 92%, #ffb09c 0px, transparent 55%), #fdf0f4;
+    --mesh: linear-gradient(135deg, #ff5391, #ff9cda, #ffb09c);
     background: var(--mesh) !important;
 }
 body[data-uitheme="vivid-sunset"] {
@@ -427,7 +427,7 @@ body[data-uitheme="vivid-sunset"] {
     --main-bg-color: #fdf7ec; --main-text-color: #463f2e; --secondary-text-color: #6f6650; --grey-text-color: #a89c82;
     --accent-color: #8a5ff0;
     --term-foreground: #463f2e; --term-background: #fdf7ec;
-    --mesh: radial-gradient(at 18% 18%, #b18dff 0px, transparent 52%), radial-gradient(at 85% 15%, #fff443 0px, transparent 52%), radial-gradient(at 50% 92%, #ffbb57 0px, transparent 55%), #fdf7ec;
+    --mesh: linear-gradient(135deg, #b18dff, #ffbb57, #fff443);
     background: var(--mesh) !important;
 }
 body[data-uitheme="vivid-orchid"] {
@@ -435,7 +435,7 @@ body[data-uitheme="vivid-orchid"] {
     --main-bg-color: #f7f2fe; --main-text-color: #3a3358; --secondary-text-color: #5f578a; --grey-text-color: #9a93b5;
     --accent-color: #5240fe;
     --term-foreground: #3a3358; --term-background: #f7f2fe;
-    --mesh: radial-gradient(at 18% 18%, #fd91ff 0px, transparent 52%), radial-gradient(at 85% 15%, #5240fe 0px, transparent 46%), radial-gradient(at 50% 92%, #ad9eff 0px, transparent 55%), #f7f2fe;
+    --mesh: linear-gradient(135deg, #fd91ff, #ad9eff, #5240fe);
     background: var(--mesh) !important;
 }
 body[data-uitheme="vivid-sunrise"] {
@@ -443,7 +443,7 @@ body[data-uitheme="vivid-sunrise"] {
     --main-bg-color: #f1f6fd; --main-text-color: #36404e; --secondary-text-color: #586678; --grey-text-color: #93a0b0;
     --accent-color: #3a86d8;
     --term-foreground: #36404e; --term-background: #f1f6fd;
-    --mesh: radial-gradient(at 18% 18%, #ffc870 0px, transparent 52%), radial-gradient(at 85% 15%, #87bdff 0px, transparent 52%), radial-gradient(at 50% 92%, #dbeaff 0px, transparent 55%), #f1f6fd;
+    --mesh: linear-gradient(135deg, #ffc870, #87bdff, #dbeaff);
     background: var(--mesh) !important;
 }
 body[data-uitheme="vivid-ocean"] {
@@ -451,7 +451,7 @@ body[data-uitheme="vivid-ocean"] {
     --main-bg-color: #eff7fd; --main-text-color: #2f4150; --secondary-text-color: #4f6373; --grey-text-color: #8ea2b2;
     --accent-color: #2f95e0;
     --term-foreground: #2f4150; --term-background: #eff7fd;
-    --mesh: radial-gradient(at 18% 18%, #58b8ff 0px, transparent 52%), radial-gradient(at 85% 15%, #74dfff 0px, transparent 52%), radial-gradient(at 50% 92%, #90bbff 0px, transparent 55%), #eff7fd;
+    --mesh: linear-gradient(135deg, #58b8ff, #74dfff, #90bbff);
     background: var(--mesh) !important;
 }
 body[data-uitheme="vivid-citrus"] {
@@ -459,7 +459,7 @@ body[data-uitheme="vivid-citrus"] {
     --main-bg-color: #f6fbec; --main-text-color: #3e4a36; --secondary-text-color: #5f6b54; --grey-text-color: #99a58c;
     --accent-color: #6aa83a;
     --term-foreground: #3e4a36; --term-background: #f6fbec;
-    --mesh: radial-gradient(at 18% 18%, #cef595 0px, transparent 52%), radial-gradient(at 85% 15%, #b1ffec 0px, transparent 52%), radial-gradient(at 50% 92%, #ffe588 0px, transparent 55%), #f6fbec;
+    --mesh: linear-gradient(135deg, #cef595, #b1ffec, #ffe588);
     background: var(--mesh) !important;
 }
 
