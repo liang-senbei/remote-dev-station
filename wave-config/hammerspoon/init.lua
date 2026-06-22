@@ -1,20 +1,27 @@
--- 会话状态看板 · 独立悬浮窗 (Hammerspoon) —— 菜单/按钮操作,无快捷键
--- 功能:置顶/置后、透明度、固定尺寸预设、自动隐藏停靠(推到边缘藏起,鼠标移到边缘滑出)
+-- 会话状态看板 · 独立悬浮窗 (Hammerspoon)
+-- 菜单操作:显示/隐藏、置顶/置后、固定尺寸、透明度、重载页面。直接拖标题栏移动。
+-- (自动隐藏停靠/侧吸功能已按需求移除)
 local URL = "http://100.109.254.125:8722/"
 local W, H = 380, 580
 local LV_TOP = hs.drawing.windowLevels.floating
 local LV_NORM = hs.drawing.windowLevels.normal
-local SLIVER = 6 -- 停靠后露在屏内的边宽(鼠标触发区)
 
 local alpha = hs.settings.get("cc_alpha") or 1.0
 local ontop = hs.settings.get("cc_top"); if ontop == nil then ontop = true end
+hs.settings.clear("cc_dock") -- 清掉旧的停靠状态(功能已移除)
 
 local function scr() return hs.screen.primaryScreen():frame() end
 local function savedFrame()
-    local f = hs.settings.get("cc_frame")
-    if f then return f end
     local s = scr()
-    return { x = s.x + s.w - W - 24, y = s.y + 44, w = W, h = H }
+    local f = hs.settings.get("cc_frame")
+    if not f then return { x = s.x + s.w - W - 24, y = s.y + 44, w = W, h = H } end
+    -- 夹回屏内:防止上个版本的停靠态把窗口存到了屏幕外、导致"收不回来"
+    f.w = math.min(f.w or W, s.w); f.h = math.min(f.h or H, s.h)
+    if f.x + f.w > s.x + s.w then f.x = s.x + s.w - f.w end
+    if f.x < s.x then f.x = s.x end
+    if f.y + f.h > s.y + s.h then f.y = s.y + s.h - f.h end
+    if f.y < s.y then f.y = s.y end
+    return f
 end
 
 local ucc = hs.webview.usercontent.new("cc")
@@ -28,17 +35,6 @@ end
 statusWV = build()
 statusWV:show(); if ontop then statusWV:bringToFront(true) end
 
-local progUntil = 0 -- 忽略我们自己移动窗口后的短暂时间,避免误判为用户拖动
-local function setF(f) progUntil = hs.timer.secondsSinceEpoch() + 0.35; statusWV:frame(f) end
--- 丝滑滑动:用 macOS 原生窗口动画(NSWindow setFrame:animate,系统 Core Animation 合成),
--- 不靠 Lua 逐帧设帧 → 不受定时器精度/webview 重绘限制,顺。
-local function setFanim(target, dur)
-    dur = dur or 0.2
-    local w = statusWV and statusWV:hswindow()
-    if not w then if statusWV then statusWV:frame(target) end; return end
-    progUntil = hs.timer.secondsSinceEpoch() + dur + 0.25
-    w:setFrame(hs.geometry.rect(target.x, target.y, target.w, target.h), dur)
-end
 local function ensure()
     if not statusWV or not statusWV:hswindow() then statusWV = build() end
     return statusWV
@@ -64,73 +60,13 @@ local function toggleShow()
     else ensure():show(); applyLevel() end
 end
 
--- ===== 自动隐藏停靠 =====
-local dockEdge = nil -- nil | "left" | "right" | "top"
-local dW, dH, dX, dY = W, H, nil, nil
-local revealed = false
-local function tuckFrame()
-    local sf = scr()
-    if dockEdge == "left" then return { x = sf.x - (dW - SLIVER), y = dY, w = dW, h = dH }
-    elseif dockEdge == "right" then return { x = sf.x + sf.w - SLIVER, y = dY, w = dW, h = dH }
-    else return { x = dX, y = sf.y - (dH - SLIVER), w = dW, h = dH } end
-end
-local function revealFrame()
-    local sf = scr()
-    if dockEdge == "left" then return { x = sf.x, y = dY, w = dW, h = dH }
-    elseif dockEdge == "right" then return { x = sf.x + sf.w - dW, y = dY, w = dW, h = dH }
-    else return { x = dX, y = sf.y, w = dW, h = dH } end
-end
-local function tuck() if dockEdge then revealed = false; setFanim(tuckFrame(), 0.16) end end
-local function reveal() if dockEdge then revealed = true; if ontop then statusWV:bringToFront(true) end; setFanim(revealFrame(), 0.22) end end
-local function dock(edge)
-    ensure(); local f = statusWV:frame(); local sf = scr()
-    dockEdge = edge; dW = f.w; dH = f.h; dX = f.x; dY = f.y
-    if dY < sf.y then dY = sf.y end
-    if dY + dH > sf.y + sf.h then dY = sf.y + sf.h - dH end
-    if dX < sf.x then dX = sf.x end
-    if dX + dW > sf.x + sf.w then dX = sf.x + sf.w - dW end
-    hs.settings.set("cc_dock", edge); tuck()
-    hs.alert.show("已停靠" .. ({ left = "左", right = "右", top = "上" })[edge] .. "边 · 鼠标移到该边缘自动滑出")
-end
-local function undock()
-    if not dockEdge then return end
-    dockEdge = nil; revealed = false; hs.settings.set("cc_dock", false)
-    local sf = scr(); setF({ x = sf.x + sf.w - dW - 16, y = math.max(sf.y + 40, dY or sf.y + 40), w = dW, h = dH })
-    if ontop then statusWV:bringToFront(true) end
-    hs.alert.show("已取消停靠")
-end
-
-dockWatcher = hs.timer.doEvery(0.15, function()
-    if not (statusWV and statusWV:hswindow() and statusWV:isVisible()) then return end
-    local now = hs.timer.secondsSinceEpoch()
-    if now < progUntil then return end
-    local sf = scr(); local f = statusWV:frame(); local m = hs.mouse.absolutePosition()
-    if dockEdge == nil then
-        -- 拖到屏幕边缘(窗口边到达/越过屏幕边 14px 内)→ 自动收起停靠。
-        -- 14 < 代码放置位(默认24/预设16/取消停靠16),不会误触发。
-        if f.x <= sf.x + 14 then dock("left")
-        elseif f.x + f.w >= sf.x + sf.w - 14 then dock("right")
-        elseif f.y <= sf.y + 14 then dock("top") end
-        return
-    end
-    local inY = (m.y >= dY - 8) and (m.y <= dY + dH + 8)
-    local inX = (m.x >= dX - 8) and (m.x <= dX + dW + 8)
-    local hot
-    if dockEdge == "left" then hot = (m.x <= sf.x + (revealed and dW or 12)) and inY
-    elseif dockEdge == "right" then hot = (m.x >= sf.x + sf.w - (revealed and dW or 12)) and inY
-    else hot = (m.y <= sf.y + (revealed and dH or 12)) and inX end
-    if hot and not revealed then reveal()
-    elseif (not hot) and revealed then tuck() end
-end)
-
--- 固定尺寸预设(锚定右上角;会先取消停靠)
+-- 固定尺寸预设(锚定右上角)
 local function presetSize(w, h)
-    if dockEdge then dockEdge = nil; revealed = false; hs.settings.set("cc_dock", false) end
     local sf = scr(); local f = { x = sf.x + sf.w - w - 16, y = sf.y + 40, w = w, h = h }
-    setF(f); if ontop then statusWV:bringToFront(true) end; hs.settings.set("cc_frame", f)
+    ensure():frame(f); if ontop then statusWV:bringToFront(true) end; hs.settings.set("cc_frame", f)
 end
 
--- 消息回调(窗口内按钮,如有)
+-- 窗口内按钮回调(页面里若有按钮)
 ucc:setCallback(function(msg)
     local b = msg.body or {}
     if b.a == "opacity" then setAlpha(alpha + (tonumber(b.d) or 0))
@@ -153,11 +89,6 @@ if mb then
             { title = "尺寸:中  380×580", fn = function() presetSize(380, 580) end },
             { title = "尺寸:大  440×760", fn = function() presetSize(440, 760) end },
             { title = "-" },
-            { title = (dockEdge == "left" and "✓ " or "") .. "自动隐藏:停靠左边", fn = function() dock("left") end },
-            { title = (dockEdge == "right" and "✓ " or "") .. "自动隐藏:停靠右边", fn = function() dock("right") end },
-            { title = (dockEdge == "top" and "✓ " or "") .. "自动隐藏:停靠顶部", fn = function() dock("top") end },
-            { title = "取消停靠", fn = undock },
-            { title = "-" },
             { title = "透明度 +10%", fn = function() setAlpha(alpha + 0.1) end },
             { title = "透明度 −10%", fn = function() setAlpha(alpha - 0.1) end },
             { title = "重载页面", fn = function() ensure():reload() end },
@@ -165,10 +96,6 @@ if mb then
     end)
 end
 
--- 启动时恢复上次的停靠状态
-local sd = hs.settings.get("cc_dock")
-if sd then hs.timer.doAfter(0.7, function() dock(sd) end) end
-
 -- 自动重载:以后改了 init.lua 自动生效
 configWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/init.lua", function() hs.reload() end):start()
-hs.alert.show("看板就绪 · 拖到屏幕边=自动收起(鼠标移到该边缘滑出) · 菜单栏 🛰 设尺寸/停靠")
+hs.alert.show("看板就绪 · 菜单栏 🛰 设尺寸/置顶/透明度;拖标题栏移动")
