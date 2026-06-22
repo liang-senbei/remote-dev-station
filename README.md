@@ -131,7 +131,7 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 
 **服务器 `~/.local/bin/`**:`cc-state`(登记钩子)· `cc-sessions`(解析:list/resolve/recoverable/resumable/forget/prune)· `cloud-watchdog`(自愈)· `cloud-forget`(删)· `cloud-delmenu`(分级删除)· `cloud-sessmenu`/`cloud-sesslist`/`cloud-sesspreview`(选择器)
 **服务器 `~/.bashrc` 函数**:`cloudgo`(入口+自学习)· `cloudattach`(进会话)· `cloudtmp`(临时)· `cloudunbind`(解绑)· `_cloudbind`(记绑)· `cloudnewat`/`cloudnew`/`cloud_resume`(新建/恢复)
-**服务器其它**:`/usr/local/bin/{cloud-boot.sh, novnc-start.sh}` · systemd:`cloud-watchdog.timer/.service`、`cloud-sessions.service`、`novnc.service`、`cloudstatus.service`(:8722 会话状态看板,Mac Hammerspoon 浮窗 `~/.hammerspoon/init.lua` 加载它看"哪些会话跑完/在跑";浮窗是原生小窗、不卡)、`cloud-dashboards.service`(:8088 项目看板) · 登记 `~/.cloud-sessions/` · 绑定 `~/.cloud-blockbind/` · 对话 `~/.claude/projects/.../<uuid>.jsonl` · 钩子 `~/.claude/settings.json`(cc-state + moshi-hook)· 铃铛 `~/.claude/hooks/{stop,notification}.sh`
+**服务器其它**:`/usr/local/bin/{cloud-boot.sh, novnc-start.sh}` · systemd:`cloud-watchdog.timer/.service`、`cloud-sessions.service`、`novnc.service`、`cloud-dashboards.service`(:8088 项目看板) · 登记 `~/.cloud-sessions/` · 绑定 `~/.cloud-blockbind/` · 对话 `~/.claude/projects/.../<uuid>.jsonl` · 钩子 `~/.claude/settings.json`(cc-state + moshi-hook)· 铃铛 `~/.claude/hooks/{stop,notification}.sh`
 **Mac**:`~/bin/cloudconn` · `~/.zshrc`(proxy 开关;Tailscale 网段 `100.64.0.0/10` 已加代理绕过)· `~/.config/waveterm`(打包版读)/`waveterm-dev`(dev 重建读)· `~/build/waveterm-zh`(自建源码)
 
 ---
