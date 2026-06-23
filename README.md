@@ -39,6 +39,24 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 ---
 
+## 1.5 机器舰队 + SSH 全互联(2026-06-23)
+
+上面全景图是「Mac↔服务器」会话层;整套其实有 **5 台机器**,**2026-06-23 起全部 SSH 公钥互通**(任意两台直连、各机配别名,**不必再经 Mac 中转**):
+
+| 机器(别名) | 角色 | SSH 寻址 |
+|---|---|---|
+| `ej2` echo-j2 | 中控,跑 Claude | tailscale `100.109.254.125` |
+| `air` MacBook | 本地窗口 / raas 控制面 | tailscale `100.101.160.72` |
+| `mini` Mac mini | IG 自动化(AdsPower) | tailscale `***` |
+| `hk14` | raas 投放主力 | 公网 `***` |
+| `hk13` | raas 真投 / MongoDB(***,= tailnet 节点 `***`) | 公网 `***` |
+
+- **别名**:任一机上 `ssh ej2/air/mini/hk14/hk13` 直连(已写各机 `~/.ssh/config`)。
+- **寻址坑**:Mac/echo-j2 之间走 **tailscale**;**HK13/HK14 走公网 IP**(它们 tailscale-IP 的 SSH 握手会卡死,只能公网)。
+- **密钥/密码不入库**:互信靠各机 `~/.ssh/authorized_keys`(纯公钥),密码在保险库 / Air 脚本。完整寻址坑 + 密码位置见服务器记忆 `ssh-mesh-5machines`。
+
+---
+
 ## 2. 会话入口:自学习 + 选择器(★日常你只碰这个)
 
 侧栏点 **「会话」**(= `cloudconn cloudgo`):
