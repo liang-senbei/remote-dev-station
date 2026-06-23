@@ -70,10 +70,14 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 ## 4. 手机 → 会话(Moshi)
 
 ```
-Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
-  → SSH/mosh → Moshi 内置 tmux 选择器 → 同一批 cc-* 会话(与 Mac 共享)
+Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
+  → 连上默认是【纯 shell】(Moshi 不会自动弹会话选择器)
+  → 敲 `cloudgo`(或在 Moshi 快捷按钮栏加个 `cloudgo⏎` 钮,点两下即进)
+  → fzf 会话选择器 → 选/新建 → 进 cc-* 会话(与 Mac 共享,且自动出现在 Mac 侧边栏)
 ```
-手机独有:**远程批准权限**(allow/deny);Mac 端只显示"等待输入"。**Moshi 是下阶段优化重心。**
+- **地址用 IP、别用 MagicDNS 名**:配对默认填的是 `*.ts.net`(Tailscale MagicDNS),手机常解析不了 → 报 `DNS resolution failed`。在 Moshi 里把主机地址改成 **Tailscale IP**(手机开着 Tailscale 时,更私密)或**公网 IP**(不开 Tailscale 时,服务器 22 端口已开)。
+- **手机独有:远程批准权限**(allow/deny,经 Moshi 云推送);Mac 端只显示"等待输入"。
+- ⚠️ **Wave 的「会话」侧边栏是 Wave app 专属,手机端没有**——手机靠 `cloudgo` 接入同一套 cc-* 会话(功能等价、UI 不同)。Moshi 无"连上自动执行命令"设置;也**别**在服务器端自动跑 cloudgo(echo-j2 是 SSH 网格中枢,会劫持所有入站 ssh)。
 
 ---
 
