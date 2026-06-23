@@ -1,0 +1,58 @@
+{
+  "claude-plugins-official": {
+    "source": {
+      "source": "github",
+      "repo": "anthropics/claude-plugins-official"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/claude-plugins-official",
+    "lastUpdated": "2026-06-17T04:52:25.965Z"
+  },
+  "claude-code-plugins": {
+    "source": {
+      "source": "git",
+      "url": "https://github.com/anthropics/claude-code.git"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/claude-code-plugins",
+    "lastUpdated": "2026-06-16T16:20:56.671Z"
+  },
+  "anthropic-agent-skills": {
+    "source": {
+      "source": "github",
+      "repo": "anthropics/skills"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/anthropic-agent-skills",
+    "lastUpdated": "2026-06-17T04:52:25.908Z"
+  },
+  "daymade-skills": {
+    "source": {
+      "source": "github",
+      "repo": "daymade/claude-code-skills"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/daymade-skills",
+    "lastUpdated": "2026-06-16T16:21:14.408Z"
+  },
+  "openai-codex": {
+    "source": {
+      "source": "github",
+      "repo": "openai/codex-plugin-cc"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/openai-codex",
+    "lastUpdated": "2026-06-16T16:21:17.634Z"
+  },
+  "claude-code-warp": {
+    "source": {
+      "source": "github",
+      "repo": "warpdotdev/claude-code-warp"
+    },
+    "installLocation": "/root/.claude/plugins/marketplaces/claude-code-warp",
+    "lastUpdated": "2026-06-16T16:21:21.406Z"
+  },
+  "hello2cc-local": {
+    "source": {
+      "source": "directory",
+      "path": "/root/.claude/hello2cc-local"
+    },
+    "installLocation": "/root/.claude/hello2cc-local",
+    "lastUpdated": "2026-06-16T16:21:22.021Z"
+  }
+}

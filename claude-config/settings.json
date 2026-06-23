@@ -2,6 +2,13 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
+  "permissions": {
+    "ask": [
+      "Bash(hub say *)",
+      "Bash(hub ask *)",
+      "Bash(hub all *)"
+    ]
+  },
   "hooks": {
     "PermissionRequest": [
       {
@@ -56,6 +63,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
+            "async": true
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -64,6 +80,15 @@
           {
             "type": "command",
             "command": "'/root/.local/bin/moshi-hook' claude-hook",
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
             "async": true
           }
         ]
@@ -87,6 +112,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
+            "async": true
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -95,6 +129,15 @@
           {
             "type": "command",
             "command": "'/root/.local/bin/moshi-hook' claude-hook",
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
             "async": true
           }
         ]
@@ -109,6 +152,15 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
+            "async": true
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -117,6 +169,38 @@
           {
             "type": "command",
             "command": "/root/.claude/hooks/error.sh",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /root/.claude/hooks/hub-gate.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/cc-state",
             "async": true
           }
         ]
