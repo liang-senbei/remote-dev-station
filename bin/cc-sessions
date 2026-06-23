@@ -29,7 +29,7 @@ def jsonl_by_uuid(uuid):
     return hits[0] if hits else ""
 
 def decode_dir(encoded):
-    # "-opt-workspace-myproject" -> "/opt/workspace/myproject"
+    # "-opt-workspace-***-tracker" -> "/opt/workspace/***-tracker"
     # '-' 既可能是路径分隔也可能是目录名里的字符 → 用文件系统贪婪匹配「最长真实目录」消歧
     toks = encoded.split("-"); idx = 1 if toks and toks[0] == "" else 0; path = ""
     while idx < len(toks):

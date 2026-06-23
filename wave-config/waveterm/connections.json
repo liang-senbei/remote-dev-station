@@ -1,0 +1,8 @@
+{
+  "root@cloud": {
+    "conn:wshenabled": true
+  },
+  "root@cloud-pub": {
+    "conn:wshenabled": true
+  }
+}

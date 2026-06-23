@@ -1,0 +1,27 @@
+{
+  "daylight": {
+    "display:name": "Daylight 暖浅高对比",
+    "black": "#2a2520",
+    "red": "#b4232a",
+    "green": "#3f6e1f",
+    "yellow": "#9a6700",
+    "blue": "#1f6e8c",
+    "magenta": "#8b4789",
+    "cyan": "#2a7d6f",
+    "white": "#57534e",
+    "brightBlack": "#6e6a86",
+    "brightRed": "#c8323a",
+    "brightGreen": "#4f7e2f",
+    "brightYellow": "#b07d00",
+    "brightBlue": "#2a7ea0",
+    "brightMagenta": "#9b57a0",
+    "brightCyan": "#3a8d7f",
+    "brightWhite": "#2a2520",
+    "gray": "#6e6a86",
+    "cmdtext": "#2a2520",
+    "foreground": "#2a2520",
+    "background": "#faf4ed",
+    "selectionBackground": "#e8dcc8",
+    "cursor": "#2a2520"
+  }
+}
