@@ -164,3 +164,23 @@ Moshi App(配对 ~/.config/moshi/host-pairings.json,root SSH 进服务器)
 - ⚠️ **不含**:Wave 数据库(`~/Library/Application Support/waveterm`,标签/块布局/历史 = 每机状态,别备份)+ GLM 密钥(`~/.config/glm-proxy/keys.txt`,**勿入库**)。
 
 **其它**:新服务器一键重建 `./install.sh`;本仓库 push 到**私有** GitHub(含内网IP/路径);另定期备份 `~/.claude/projects/`(对话历史 = 会话的"灵魂",见 §7)。
+
+---
+
+## 附二:通用骨架 vs 个人配置(复用 / 分享须知)
+
+本仓 = **一套可复用的「远程 Claude 工作站」骨架** + **我(Echo)的个人配置**。换人复用时:**🟢 通用层照搬,🔴 个人层替换成自己的**。
+
+**🟢 通用层(换谁都能用,是这套系统本体)**
+- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/cloud-*`+`novnc` · `install.sh` · `bashrc-*.sh`
+- 多 agent:`hub/`
+- Mac 桥接:`bin/{macget,macput,macls,pullimg}`
+- Wave 工具:`wavetheme` · `wavetheme-server` · `statusline.py` · `com.wavetheme.ui.plist`
+
+**🔴 个人层(我特定的,复用必换)**
+- `claude-config/CLAUDE.md` —— 我的业务规则(Echo 前缀、raas/公司、机器分工)。
+- `claude-config/{settings.json, hooks/, mcpServers.json, installed_plugins.json, known_marketplaces.json}` —— **我选的 6 MCP / 9 插件 / 7 市场** + 钩子接线(含 moshi/hub)。⚠️ 工具本身大多通用、可从市场重装,**但"选了哪些"这套组合是个人配置**。
+- Skills(34)+ `hello2cc-local`(我的本地市场 = `github.com/hellowind777/hello2cc`)—— **个人技能组合**(内容不入库,清单在上面 records 里;还原见 `claude-config/RESTORE.md`)。
+- `wave-config/`(我的主题/部件审美)· `hammerspoon-init.lua`(我的 Mac)· `bin/wechat-cli`(业务)· `systemd/moshi-hook.service` + moshi 配对(我的手机审批)。
+
+> 一句话:**`bin/` + `systemd/`(cloud/novnc 部分) + `hub/` + `cloudconn` + Wave 工具 = 通用骨架;`claude-config/` 整目录 + `wave-config/` + 几个 Mac/业务脚本 = 个人配置。**
