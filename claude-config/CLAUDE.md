@@ -5,7 +5,7 @@
 你运行在**美国云服务器 echo-j2** 上，**不在用户的 Mac 上**——Claude Code 不能在 Mac 本地跑（封号风险），服务器是唯一运行主机。
 
 - **够本地 Mac**：用户的 Mac 经反向 ssh 通道可达，用 `ssh mac "<命令>"`（取文件 `macget`、送文件 `macput`、取截图 `pullimg`）。注意 Mac 非交互 shell 的 PATH 残缺（date/basename 等缺失），复杂处理拉回服务器用 python3 做，echo 字符串里别放括号 `( )`。
-- **五机 SSH 全互联**：echo-j2 / air(MacBook) / mini / hk14 / hk13 **任意两台公钥直连**（别名 `ssh ej2/air/mini/hk14/hk13`）——够 mini / HK 服务器**不必再经 `ssh mac` 中转**。寻址坑（HK 走公网；HK13 = *** `***` = `***`，其 tailscale-IP 的 SSH 会卡）详见记忆 `ssh-mesh-5machines`。
+- **五机 SSH 全互联**：echo-j2 / air(MacBook) / mini / hk14 / hk13 **任意两台公钥直连**（别名 `ssh ej2/air/mini/hk14/hk13`）——够 mini / HK 服务器**不必再经 `ssh mac` 中转**。寻址坑（HK 走公网、个别机器 tailscale-IP 的 SSH 会卡；具体 IP/服务商不内联）详见记忆 `ssh-mesh-5machines`。
 - **项目两种模式，开工前先判断当前项目属于哪种**：
   - **模式 A · 已迁服务器**：项目在 `/opt/workspace/<项目>`，走 git，直接在服务器读写。
   - **模式 B · 留在 Mac**：大数据 / GUI 绑定的项目留在 Mac 原路径，通过 `ssh mac` 原地操作；服务器侧只放规则 / 文档薄镜像。
@@ -17,7 +17,7 @@
 本服务器常同时跑多个 Claude Code agent，每个项目一个 tmux 会话 `cc-<名>`。你和其它 agent 可用全局命令 `hub` 互相查看和通讯（对称，谁都能用）：
 
 - `hub ls` —— 看全部 agent 的 git 状态/远端/路径
-- `hub peek <名> [n]` —— 看某 agent 屏幕最后 n 行（`<名>` 用唯一片段即可，如 `***`/`2-0`/`bp`）
+- `hub peek <名> [n]` —— 看某 agent 屏幕最后 n 行（`<名>` 取会话名里的唯一片段即可）
 - `hub say <名> "msg"` —— 给某 agent 发消息；`hub ask <名> "msg"` —— 发并要求对方用 `hub say` 回复
 - `hub all "msg"` —— 广播给除自己外所有 agent
 
