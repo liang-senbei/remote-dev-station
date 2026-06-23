@@ -9,11 +9,11 @@
 
 Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** 里。
 
-- **Mac**:Wave(自建中文版打包 App)→ `cloudconn` → **mosh + Tailscale** → 服务器
-- **手机**:Moshi App → SSH/mosh → 服务器
-- 两者是**两个遥控器,操作同一批 tmux 会话**。
-- 每个会话靠「**会话名 `cc-<名>` + 对话 `<uuid>.jsonl`**」登记;断电/崩溃后 **watchdog** 按 uuid 自动连名带对话接回。
-- 每个 **Wave 标签会"自学习"**它常进的会话:重开/意外退出 → **直接进,不弹菜单**。
+- **Mac**:用 **Wave 终端** → `cloudconn` → **mosh + Tailscale** → 服务器
+- **手机**:用 **Moshi App** → SSH/mosh → 服务器
+- **Windows 笔电**:用 **Wave 终端** →(**反向 SSH 隧道 / WSL2-mosh**)→ 服务器,见 [`windows/`](windows/README.md)(含 Wave**「按标签页一键恢复终端」**)
+- 三者是**三个遥控器,操作同一批服务器上的 tmux 会话**。
+- 每个会话靠「**会话名 `cc-<名>` + 对话文件 `<uuid>.jsonl`**」绑定;断电/崩溃后 **watchdog** 守护进程按 uuid 把对话**原样自动接回**。
 
 ---
 

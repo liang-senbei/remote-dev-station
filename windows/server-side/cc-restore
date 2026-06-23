@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# cc-restore [slug]  服务器侧:登记过但没在跑(tmux 没了)的会话,后台 --resume 连名带对话拉回。
+#   无参 = 全部。cron / 手动 / Wave「恢复本页」均可调。
+#
+# ⚠️ 注意:这是「无脑全拉」版,会话多/内存小会 OOM 雪崩。生产请用本仓库的 cloud-watchdog
+#     (内存守卫:空闲<阈值整轮暂缓、每轮最多 1 个、崩溃退避、ended 标记不复活主动退出的)。
+#     本脚本仅供 Wave 层手动一键触发的最小参考。
+REG=/root/.claude/cc-registry.tsv
+[ -s "$REG" ] || { echo "(注册表空)"; exit 0; }
+only="$1"; r=0; a=0
+while IFS=$'\t' read -r slug name uuid proj created tab; do
+  [ -z "$slug" ] && continue
+  [ -n "$only" ] && [ "$only" != "$slug" ] && continue
+  if tmux has-session -t "cc-$slug" 2>/dev/null; then a=$((a+1)); continue; fi
+  tmux new-session -d -s "cc-$slug" "claude --resume $uuid" \
+    && { echo "↻ 恢复 cc-$slug  [$name]"; r=$((r+1)); } || echo "✗ 失败 cc-$slug"
+done < "$REG"
+echo "完成:恢复 $r,已在跑 $a。"

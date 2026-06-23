@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# cc-new <名称…>  服务器侧:按名开/续 Claude 会话。Wave「新会话」widget 调用它。
+#   · 已在跑 → attach;登记过 → --resume 同 uuid;全新 → --session-id 钉死新 uuid 并登记。
+#   · 会话名直接用你起的名字(保留中文,只清空格和 .: 引号反引号)→ tmux 名 = cc-<名>,一眼可认。
+#   · 所属 Wave 标签页经环境变量 CC_TAB 传入,记入注册表第 6 列,供「恢复本页」按页过滤。
+#
+# 注:本仓库已有更完善的 hook 驱动登记(cc-state)+ 内存守卫自愈(cloud-watchdog)。
+#     建议:把这里的"出生即 --session-id 钉死"思路并入 cc-state,登记表用 ~/.cloud-sessions/。
+#     此脚本是 Wave 层的最小自包含参考实现。
+REG=/root/.claude/cc-registry.tsv
+PROJ="${CC_PROJ:-/opt/workspace}"     # ← 改成你的项目根
+name="$*"
+[ -z "$name" ] && { echo "用法: cc-new <名称>"; exit 1; }
+slug=$(printf '%s' "$name" | tr -s '[:space:]' '-' | tr -d '.:`"'"'" | sed 's/^-*//; s/-*$//')
+[ -z "$slug" ] && slug="s$(date +%s | tail -c 6)"
+uuid=$(awk -F'\t' -v s="$slug" '$1==s{print $3; exit}' "$REG" 2>/dev/null)
+if tmux has-session -t "cc-$slug" 2>/dev/null; then
+  exec tmux attach -t "cc-$slug"
+fi
+if [ -n "$uuid" ]; then
+  exec tmux new-session -s "cc-$slug" "claude --resume $uuid"
+else
+  uuid=$(cat /proc/sys/kernel/random/uuid)
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$uuid" "$PROJ" "$(date +%s)" "${CC_TAB:-}" >> "$REG"
+  exec tmux new-session -s "cc-$slug" "claude --session-id $uuid"
+fi
