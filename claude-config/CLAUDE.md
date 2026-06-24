@@ -32,6 +32,7 @@
 - **【硬规则·不可省略】所有 agent / subagent / Workflow agent 一律用 Opus 4.8 启动，严禁降级到 sonnet/haiku/fable。**
   - Agent 工具：显式传 `model: "opus"`。
   - Workflow 的 `agent()`：省略 `model` 即继承会话的 Opus 4.8（会话默认就是 `claude-opus-4-8[1m]`），**不要**传 `model: "sonnet"` 之类。
+  - **Agent teams 队友（teammate）**：队友**默认不继承 lead 的模型**，且本版本无法用 settings.json 锁定（`teammateDefaultModel` 字段未实现）。故 spawn 团队时**必须在指令里显式写明"所有 teammate 一律用 Opus（claude-opus-4-8）"**，否则会被降级。（显示模式已在 settings.json 设 `teammateMode:"auto"` = 彩色分屏。）
   - 不得以"省 token/省成本/任务简单"为由降级模型——这是硬规则。
 - 优先使用 **agent teams / subagents / Workflow** 与 **ultrathink**：能并行委派的尽量并行，能先深度思考的先想透。
 - 最佳实践参考见 `~/.claude/references/best-practices.md`。
