@@ -160,14 +160,19 @@ _send_line(){
   } 9>"${TMPDIR:-/tmp}/hub-send-${sess}.lock"
 }
 
-# 组装 agent 间通讯 preamble(单行)。$1=对方label $2=正文 $3=要回信?(1/0)
+# 组装 agent 间通讯 preamble(单行;字段化「类型/正文/回执/规矩」+ 禁客套硬规矩)。
+# 单行是硬约束:tmux 里多行会提前提交,故用 ｜ 分隔而非换行。$1=对方label $2=正文 $3=要回信?(1/0)
 _wrap(){
-  local tgt="$1" msg="$2" want="$3" me path
+  local tgt="$1" msg="$2" want="$3" me path kind reply
   me="$(_self_label)"; path="$(_self_path)"
   msg="$(printf '%s' "$msg" | tr '\n\t' '  ')"   # 压成单行(去换行+Tab),避免提前提交/破坏 TSV
-  local p="[HUB·agent间通讯] cc:${me} (@${path}) → 你(cc:${tgt})。${msg} ｜(这是 agent 对接：直接给结论/数据/字段，简洁、机器可读，别写给人看的排版或客套"
-  [ "$want" = "1" ] && p="${p}；要回就执行 → hub say ${me} \"<你的答复>\""
-  printf '%s)' "$p"
+  if [ "$want" = "1" ]; then
+    kind="需回复"; reply="必回 → hub say ${me} \"<结论/数据>\""
+  else
+    kind="知会"; reply="无需回复;有需求才 hub say ${me} \"…\""
+  fi
+  printf '[HUB·机器对接] cc:%s(@%s) → cc:%s ｜类型: %s ｜正文: %s ｜回执: %s ｜规矩: agent↔agent 机器对接——只给结论/数据/字段/决策,禁开场白·问候·致谢·客套·复述原话·给人看排版,能一句别两句' \
+    "$me" "$path" "$tgt" "$kind" "$msg" "$reply"
 }
 
 # ---------------------------------------------------------------------
