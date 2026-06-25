@@ -14,7 +14,6 @@ cp tmux.conf ~/.tmux.conf
 grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.bashrc
 echo "[5/6] 安装 systemd 服务（开机自动恢复 Claude 会话）"
 cp systemd/cloud-sessions.service /etc/systemd/system/
-mkdir -p ~/.config; [ -f ~/.config/cloud-sessions.list ] || echo "/opt/workspace" > ~/.config/cloud-sessions.list
 cp systemd/cloud-outbox.service /etc/systemd/system/
 systemctl daemon-reload && systemctl enable cloud-sessions.service cloud-outbox.service
 echo "[6/6] 防火墙基线（仅放行必要端口）"
