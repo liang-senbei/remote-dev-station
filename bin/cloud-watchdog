@@ -10,6 +10,10 @@
 import os, json, time, subprocess, sys
 
 STATE = os.path.expanduser("~/.cloud-status/_watchdog.json")
+try:
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)   # 自愈:STATE 目录曾随 :8722 清理被删→退避状态每轮丢失(崩溃会话被每 15s 狂拉),这里确保它存在
+except Exception:
+    pass
 CJSON = os.path.expanduser("~/.claude.json")
 MODEL = os.environ.get("CLOUD_MODEL", "claude-opus-4-8[1m]")
 OPTS  = os.environ.get("CLOUD_OPTS", "--effort max")
