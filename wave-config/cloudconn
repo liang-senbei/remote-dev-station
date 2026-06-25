@@ -1,0 +1,63 @@
+#!/bin/bash
+# 韧性连接 Wave 会话:mosh 到云服务器跑指定命令。
+#  · 干净退出(detach / 菜单 Esc / claude 正常退出 → 退出码 0)→ 不重连。
+#  · 真断线(非 0)→ 5 秒自动重连(Ctrl-C 取消)。
+#  · 服务器重启/长断联:探活看守发现 :22 连续 ~80s 不可达且本标签确有活 mosh-client →
+#    kill 它(mosh 卡死不会自退),让"非0→自动重连"接管;重连后 cloudgo 按 blockid 接回原会话。
+TARGET="${*:-cloudgo}"; HOST="root@100.109.254.125"; HOSTIP="100.109.254.125"; MOSH="/opt/homebrew/bin/mosh"
+# 标签稳定 ID:cmd 块拿不到 WAVETERM_BLOCKID,从 WAVETERM_SWAPTOKEN(base64 JSON)里解 blockid。
+bid="${WAVETERM_BLOCKID:-}"
+if [ -z "$bid" ] && [ -n "${WAVETERM_SWAPTOKEN:-}" ]; then
+  bid=$(printf '%s' "$WAVETERM_SWAPTOKEN" | python3 -c 'import sys,base64,json
+s=sys.stdin.read().strip()
+s+="="*(-len(s)%4)
+try:
+    print(json.loads(base64.b64decode(s)).get("rpccontext",{}).get("blockid",""))
+except Exception:
+    pass' 2>/dev/null)
+fi
+case "$bid" in *[!0-9a-fA-F-]*) bid= ;; esac
+# 临时会话:用带超时的 mosh-server,客户端断开 60s 后退出 → destroy-unattached 销毁(关了不再赖着)。
+margs=()
+case "$TARGET" in *cloudtmp*) margs=(--server=/usr/local/bin/mosh-server-tmout) ;; esac
+
+# ── 探活看守(服务器重启/长断联自动重连)──────────────────────────────
+# 整机重启会让 mosh 卡在 "Last contact" 永不自退(它以为只是网络抖动)→ 现有的"非0→重连"
+# 不触发。看守解决:每 8s 探 :22,连续 ~10 次(~80s)不可达 且 本标签确有活 mosh-client →
+# kill 该 mosh-client(→ mosh 退出 → 触发重连)。失败一律保守:无 nc / 找不到本标签 mosh-client
+# / 探活成功 → 绝不 kill。scoped:只杀【本 cloudconn 名下】的 mosh-client,绝不误伤别标签。
+CC_PID=$$
+_reach_watch() {
+  command -v /usr/bin/nc >/dev/null 2>&1 || return 0   # 无 nc → 禁用看守(回退纯手动,安全)
+  local miss=0 mc x c
+  while kill -0 "$CC_PID" 2>/dev/null; do
+    sleep 8
+    mc=$(pgrep -P "$CC_PID" -f mosh-client 2>/dev/null | head -1)      # mosh-client 是直接子进程?
+    if [ -z "$mc" ]; then                                              # 否则它在 mosh(perl)之下
+      for x in $(pgrep -P "$CC_PID" 2>/dev/null); do
+        c=$(pgrep -P "$x" -f mosh-client 2>/dev/null | head -1)
+        [ -n "$c" ] && { mc="$c"; break; }
+      done
+    fi
+    [ -z "$mc" ] && { miss=0; continue; }                             # 重连间隙没有 mosh-client → 不计
+    if /usr/bin/nc -z -G 4 "$HOSTIP" 22 >/dev/null 2>&1; then
+      miss=0
+    else
+      miss=$((miss+1))
+      [ "$miss" -ge 10 ] && { kill "$mc" 2>/dev/null; miss=0; }       # ~80s 不可达 → 杀卡死的 mosh-client
+    fi
+  done
+}
+_reach_watch & WPID=$!
+trap 'kill "$WPID" 2>/dev/null' EXIT
+# ───────────────────────────────────────────────────────────────────
+
+while true; do
+  "$MOSH" "${margs[@]}" "$HOST" -- bash -ic "WAVETERM_BLOCKID='$bid'; $TARGET"
+  ec=$?
+  if [ "$ec" -eq 0 ]; then
+    printf "\n\033[32m── 已退出会话(此标签可关;重开会自动回到它)──\033[0m\n"; break
+  fi
+  printf "\n\033[33m── 连接断开(码 %s)。5 秒后自动重连,Ctrl-C 取消 ──\033[0m\n" "$ec"
+  sleep 5 || break
+done
