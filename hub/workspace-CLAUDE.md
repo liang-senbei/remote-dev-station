@@ -18,7 +18,7 @@
 - 覆盖示例：`cld /opt/workspace/proj --model sonnet --effort medium`
 
 ## 自动恢复
-开会话时目录自动登记进 `~/.config/cloud-sessions.list` → 重启/断电后开机服务自动重建该目录主会话（`--continue` 接回对话）。
+开会话即登记进 `~/.cloud-sessions/<会话>.json`。重启/断电后开机服务 `cloud-sessions`(`cloud-boot.sh`)**只启 tmux server + 拉起 `cloud-watchdog.timer`**——**不一次性全恢复**(14 个重会话齐起会 OOM 雪崩)。之后 `cloud-watchdog` 每 ~15s 一轮、看内存、**一次最多 1 个**地把登记会话 `claude --resume <uuid>` 温和拉回(从 jsonl 续上、历史不丢、用当前账号);`/exit` 主动结束(ended=true)的不恢复。几分钟内陆续回齐,Mac/手机端 Wave/Moshi 重连即接回。
 
 ## 环境速记
 - 服务器 `echo-j2`（root）。看图：粘贴截图后让我 `pullimg` 取回；产物可 `macput` 回 Mac 或开 `http://100.109.254.125:8088/<文件>`。
