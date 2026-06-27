@@ -269,5 +269,6 @@
   },
   "alwaysThinkingEnabled": true,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "light"
+  "theme": "light",
+  "teammateMode": "in-process"
 }

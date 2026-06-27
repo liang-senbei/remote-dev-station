@@ -32,7 +32,7 @@
 - **【硬规则·不可省略】所有 agent / subagent / Workflow agent 一律用 Opus 4.8 启动，严禁降级到 sonnet/haiku/fable。**
   - Agent 工具：显式传 `model: "opus"`。
   - Workflow 的 `agent()`：省略 `model` 即继承会话的 Opus 4.8（会话默认就是 `claude-opus-4-8[1m]`），**不要**传 `model: "sonnet"` 之类。
-  - **Agent teams 队友（teammate）**：队友**默认不继承 lead 的模型**，且本版本无法用 settings.json 锁定（`teammateDefaultModel` 字段未实现）。故 spawn 团队时**必须在指令里显式写明"所有 teammate 一律用 Opus（claude-opus-4-8）"**，否则会被降级。（显示模式已在 settings.json 设 `teammateMode:"auto"` = 彩色分屏。）
+  - **Agent teams 队友（teammate）**：队友**默认不继承 lead 的模型**，且本版本无法用 settings.json 锁定（`teammateDefaultModel` 字段未实现）。故 spawn 团队时**必须在指令里显式写明"所有 teammate 一律用 Opus（claude-opus-4-8）"**，否则会被降级。（显示模式 settings.json 设 `teammateMode:"in-process"` = TUI 底部一排彩色 agent;**别设 auto/tmux 分屏**——本机 mosh→嵌套 tmux 下分屏会 send-keys 竞态、teammate 出 shell 空壳，GitHub #40168;v2.1.179 默认已是 in-process。）
   - 不得以"省 token/省成本/任务简单"为由降级模型——这是硬规则。
 - 优先使用 **agent teams / subagents / Workflow** 与 **ultrathink**：能并行委派的尽量并行，能先深度思考的先想透。
 - **默认用 `AskUserQuestion` 提问（让我点选，别让我手打）**：凡是要**和我确认、让我拍板、征求我的意见/建议/偏好/选型**，默认用 `AskUserQuestion` 工具给选项让我选——**一个问题就问一个、多个问题就一次性问多个**（该工具一次最多 4 个）。有推荐项就放第一个并标「(推荐)」。我若觉得选项都不合适，会自己在「其它」里手输。**例外**：实在无法收敛成选项的开放式问题，才退回普通文字问。
