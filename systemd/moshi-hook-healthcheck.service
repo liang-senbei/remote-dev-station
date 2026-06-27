@@ -1,0 +1,7 @@
+[Unit]
+Description=moshi-hook daemon socket healthcheck (restart if stuck)
+After=moshi-hook.service
+
+[Service]
+Type=oneshot
+ExecStart=/root/.local/bin/moshi-hook-healthcheck
