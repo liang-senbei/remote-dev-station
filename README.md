@@ -17,6 +17,48 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 ---
 
+## 🚀 从零部署(Quick Start —— 新服务器 / 交接给朋友照这个)
+
+> ⚠️ `install.sh` **只部署会话层**(脚本 / systemd / tmux / ufw),**不装** Tailscale / mosh / Node+Claude Code —— 这些前置要先自备。
+
+**前置条件**
+1. **海外云服务器**:root、Ubuntu/Debian、建议 **≥16G 内存**(会话是重进程,约 ~10 个活跃封顶,见 §12.3)。
+2. **Tailscale 账号**:组中美加密内网,服务器 + 你的电脑 / 手机都装客户端并登入**同一 tailnet**。
+3. **电脑**:Wave 终端(官方版即可;中文 + 自定义主题是作者自建分叉,选装,见末附)+ mosh + Tailscale。
+4. **手机(选装)**:Moshi App(远程批准 / 操作)。
+5. 会基本 git / Linux / ssh。
+
+**服务器 0→1**
+```bash
+# ① 前置(自备)
+curl -fsSL https://tailscale.com/install.sh | sh && tailscale up   # 记下它分配的 100.x.y.z
+apt update && apt install -y tmux mosh git
+# 装 Node.js 18+（nvm 或 nodesource），再装 Claude Code（以官方安装文档为准）
+npm install -g @anthropic-ai/claude-code
+claude            # 首次登录你的 Claude 账号(Pro/Max);凭据落盘,之后免登
+
+# ② 部署本体
+git clone git@github.com:xiaoxihexiaoyu/remote-dev-station.git
+cd remote-dev-station && ./install.sh    # 装 bin 脚本 / systemd 自愈 / tmux / ufw
+source ~/.bashrc                          # 让 cloudgo 等函数生效
+```
+
+**电脑(Mac)0→1**
+1. 装 Tailscale + Wave 终端 + mosh;`tailscale up` 登入**同一 tailnet**。
+2. 还原 Wave 配置:`cp -r wave-config/waveterm/* ~/.config/waveterm/`(详见末附「Wave 客户端配置」)。
+3. 取仓库里的 `cloudconn` 放到 `~/bin/`,**把里面的 `HOST="root@100.x.y.z"` 改成你自己服务器的 Tailscale IP**。
+4. Wave 侧栏点「会话」widget → 首次连上 → 选择器 `➕` 新建会话 → 进 Claude Code。
+
+**最后:换成你自己的(个人层)**
+- `claude-config/CLAUDE.md` → 换成你的规则(**别用作者的业务规则**);settings / hooks / MCP / 插件按需,完整对照见 **附二「通用骨架 vs 个人配置」**。
+
+**常见卡点**
+- 连不上 → 确认两端在同一 tailnet(`tailscale status`)、`cloudconn` 的 HOST IP 改对了。
+- `cloudgo` 找不到 → 没 `source ~/.bashrc` 或没接上 bashrc 片段。
+- 手机 Moshi 报 DNS 失败 → 主机地址填 **IP**、别用 `*.ts.net`(见 §4)。
+
+---
+
 ## 1. 全景图
 
 ```
