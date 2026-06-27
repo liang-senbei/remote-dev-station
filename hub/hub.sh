@@ -261,33 +261,21 @@ case "$cmd" in
     msg="$*"; [ -z "$msg" ] && { echo "⛔ 消息为空" >&2; exit 2; }
     want=0; [ "$cmd" = "ask" ] && want=1
     line="$(_wrap "${t#$PREFIX}" "$msg" "$want")"
-    if [ "${HUB_FORCE:-}" = "1" ] || [ "$(_classify "$t")" = "ready" ]; then
-      [ -s "$INBOX/$t.tsv" ] && _flush "$t" >/dev/null    # 先按序补投旧留言,再发新消息
-      _send_line "$t" "$line"
-      echo "✅ 已发给 ${t}："; echo "   $line"
-    else
-      st="$(_classify "$t")"
-      _spool "$t" "$line" "$(_self_label)"; _ensure_watcher "$t"
-      echo "📭 ${t} 现在不在空输入框（${st}：$(_state_zh "$st")），已存入留言箱（待发 $(_inbox_count "$t") 条）。它一回到输入框会自动投递；也可 hub flush ${t#$PREFIX} 手动催 / hub inbox ${t#$PREFIX} 查看。" >&2
-    fi
+    # 纯直发(2026-06-28 用户拍板):不判定就绪、不 spool,直接 send-keys 投进对方输入框。
+    # 旧的"投不出就存留言箱+30min看守"会在目标长期不就绪时永久卡死丢消息,故废弃。
+    _send_line "$t" "$line"
+    echo "✅ 已直发给 ${t}："; echo "   $line"
     ;;
   all)
     msg="$*"; [ -z "$msg" ] && { echo "⛔ 消息为空" >&2; exit 2; }
-    me_sess="$(_self_sess)"; sent=0; spooled=0
+    me_sess="$(_self_sess)"; sent=0
     while IFS= read -r s; do
       [ -z "$s" ] && continue
       [ "$s" = "$me_sess" ] && continue
       line="$(_wrap "${s#$PREFIX}" "$msg" 0)"
-      if [ "${HUB_FORCE:-}" = "1" ] || [ "$(_classify "$s")" = "ready" ]; then
-        [ -s "$INBOX/$s.tsv" ] && _flush "$s" >/dev/null
-        _send_line "$s" "$line"; echo "✅ → $s"; sent=$((sent+1))
-      else
-        st="$(_classify "$s")"
-        _spool "$s" "$line" "$(_self_label)"; _ensure_watcher "$s"
-        echo "📭 → $s 留言箱($(_state_zh "$st"))"; spooled=$((spooled+1))
-      fi
+      _send_line "$s" "$line"; echo "✅ → $s"; sent=$((sent+1))   # 纯直发,不判定/不 spool
     done <<< "$(_sessions)"
-    echo "(广播完成：直发 $sent 个$( [ "$spooled" -gt 0 ] && printf '，留言 %s 个(就绪自动投递)' "$spooled" ))"
+    echo "(广播完成:直发 $sent 个)"
     ;;
   flush)
     if [ -n "${1:-}" ]; then
