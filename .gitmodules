@@ -1,0 +1,4 @@
+[submodule "waveterm-zh"]
+	path = waveterm-zh
+	url = git@github.com:xiaoxihexiaoyu/waveterm-zh.git
+	branch = feat/i18n-chinese-localization
