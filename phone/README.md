@@ -1,9 +1,9 @@
 # 手机端(Moshi)· 从零配置 runbook
 
 > 让手机当"第三个遥控器":远程**批准** Claude 的权限请求 + 远程**开终端**操作服务器会话。
-> Moshi App 有 iOS / Android(作者用 Vivo)。服务器侧的 moshi-hook 守护 + 自愈已由 `install.sh` +
-> systemd 装好(见 [`../systemd/moshi-hook.service`](../systemd/) 和 `moshi-hook-healthcheck.*`),
-> 本文只讲**手机怎么接上**这半。
+> Moshi App 有 iOS / Android(作者用 Vivo)。服务器侧的 moshi-hook **systemd 单元**由 `install.sh` 放好
+> (见 [`../systemd/moshi-hook.service`](../systemd/) 和 `moshi-hook-healthcheck.*`),但**二进制要
+> `moshi-hook update` 自己装、配对后再 `enable`**(§1、§2 讲);本文只讲**手机怎么接上**这半。
 
 ## 0. 先搞清:Moshi 有两条独立配对
 

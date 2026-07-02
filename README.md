@@ -19,7 +19,7 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 ## 🚀 从零部署(Quick Start —— 新服务器 / 交接给朋友照这个)
 
-> ⚠️ `install.sh` **只部署会话层**(脚本 / systemd / tmux / ufw),**不装** Tailscale / mosh / Node+Claude Code —— 这些前置要先自备。
+> ⚠️ `install.sh` 会装:依赖(tmux/mosh/git/ufw/fail2ban)+ Claude Code(native,无需 Node)+ 会话层(全部 bin 脚本 / systemd 自愈 / tmux)+ shell 增强 + 防火墙。**只有 Tailscale 要先自备**(入网命脉,得先 `tailscale up`)。
 
 **前置条件**
 1. **海外云服务器**:root、Ubuntu/Debian、建议 **≥16G 内存**(会话是重进程,约 ~10 个活跃封顶,见 §12.3)。
@@ -30,17 +30,16 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 **服务器 0→1**
 ```bash
-# ① 前置(自备)
+# ① 前置:只有 Tailscale 要先自备(其余依赖 + Claude Code 由 install.sh 装)
 curl -fsSL https://tailscale.com/install.sh | sh && tailscale up   # 记下它分配的 100.x.y.z
-apt update && apt install -y tmux mosh git
-# 装 Node.js 18+（nvm 或 nodesource），再装 Claude Code（以官方安装文档为准）
-npm install -g @anthropic-ai/claude-code
-claude            # 首次登录你的 Claude 账号(Pro/Max);凭据落盘,之后免登
 
-# ② 部署本体
-git clone git@github.com:xiaoxihexiaoyu/remote-dev-station.git
-cd remote-dev-station && ./install.sh    # 装 bin 脚本 / systemd 自愈 / tmux / ufw
+# ② 部署本体(install.sh 装依赖 / Claude Code / 全部 bin 脚本 / systemd 自愈 / tmux / 防火墙)
+git clone git@github.com:xiaoxihexiaoyu/remote-dev-station.git   # 客户换成自己的 fork（原仓私有、无权限）
+cd remote-dev-station && ./install.sh
 source ~/.bashrc                          # 让 cloudgo 等函数生效
+
+# ③ 登录 Claude(install.sh 已装好 claude；这步交互登录你的 Pro/Max，凭据落盘、之后免登)
+claude
 ```
 
 **电脑(Mac)0→1**
@@ -68,7 +67,7 @@ source ~/.bashrc                          # 让 cloudgo 等函数生效
        cloudconn│(mosh+断线重连+传块ID)        SSH/mosh│(自带密钥)
                ▼                                      ▼
    ╔══════════════ Tailscale/WireGuard 中美加密直连 ══════════════════╗
-   ║              Mac 100.101.160.72 ⇄ 服务器 100.109.254.125          ║
+   ║              Mac ⇄ 服务器（同一 Tailscale tailnet 内直连）        ║
    ╚════════════════════════════════╤═════════════════════════════════╝
                                      ▼
    ╔══════════════════ 美国服务器 echo-j2 (root) ═════════════════════╗
@@ -206,7 +205,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 **Wave 客户端配置 `wave-config/`**:
 - `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
 - **还原**:`cp -r wave-config/waveterm/* ~/.config/waveterm/ && cp -r wave-config/waveterm-dev/* ~/.config/waveterm-dev/` → 重开 Wave 即生效(termtheme/widgets 是运行时配置,不用重编译)。
-- 主题/图标/标签的**源码**(`theme.scss`/`app.tsx`/`widgets.tsx`,需 `build:prod`+`electron-builder --dir` 编进 .app)在自建分叉 `~/build/waveterm-zh`,不在本仓库。
+- 主题/图标/标签的**源码**(`theme.scss`/`app.tsx`/`widgets.tsx`,需构建编进 .app)现在就在本仓的 **`waveterm-zh/` submodule**(= `xiaoxihexiaoyu/waveterm-zh`,完整历史 + 汉化/主题);构建见 [`DEPLOY.md`](DEPLOY.md) 阶段二 + `waveterm-zh/BUILD.md`。
 - ⚠️ **不含**:Wave 数据库(`~/Library/Application Support/waveterm`,标签/块布局/历史 = 每机状态,别备份)+ GLM 密钥(`~/.config/glm-proxy/keys.txt`,**勿入库**)。
 
 **其它**:新服务器一键重建 `./install.sh`;本仓库 push 到**私有** GitHub(含内网IP/路径);另定期备份 `~/.claude/projects/`(对话历史 = 会话的"灵魂",见 §7)。
@@ -230,3 +229,5 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 - `wave-config/`(我的主题/部件审美)· `hammerspoon-init.lua`(我的 Mac)· `bin/wechat-cli`(业务)· `systemd/moshi-hook.service` + moshi 配对(我的手机审批)。
 
 > 一句话:**`bin/` + `systemd/`(cloud/novnc 部分) + `hub/` + `cloudconn` + Wave 工具 = 通用骨架;`claude-config/` 整目录 + `wave-config/` + 几个 Mac/业务脚本 = 个人配置。**
+>
+> ⚠️ **注**:🟢通用层里 `cloudconn` 与 `com.wavetheme.ui.plist` 是**通用结构、但内含作者 IP/用户名**,复用时按 [DEPLOY.md](DEPLOY.md) 阶段二「必改清单」替换;`bin/novnc-start.sh` 已改为自动取本机 IP、无需手改。

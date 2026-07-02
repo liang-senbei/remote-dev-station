@@ -35,7 +35,8 @@
 照 [README.md](README.md) 的「从零部署 Quick Start」执行:前置(Tailscale / mosh / Node + Claude Code)→ `git clone` 本仓 → `./install.sh` → `source ~/.bashrc`。
 
 - ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
-- **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` 全过。
+- ⚠️ **会话恢复依赖 cc-state 钩子**:install.sh 装了 cc-state 二进制,但它要写进 `~/.claude/settings.json` 的 hooks 才会把会话登记进恢复表 —— 钩子接线属客户 claude-config,在阶段四配客户 settings.json 时加上(结构参考 `claude-config/settings.json`)。
+- **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。
 
 ## 3. 阶段二 · 客户端(电脑)
 
@@ -63,6 +64,7 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 - 各平台前置 / 打包的**权威步骤**见 [`waveterm-zh/BUILD.md`](waveterm-zh/BUILD.md)。
 - **汉化维护 + 上游更新**(Wave 出新版怎么 merge upstream、补翻新增文案)见 [`waveterm-zh/i18n-tooling/UPDATE.md`](waveterm-zh/i18n-tooling/UPDATE.md)。
 - 🌏 国内构建:UPDATE.md 里给了一套镜像环境变量(GOPROXY=goproxy.cn、ELECTRON_MIRROR=npmmirror、ALL_PROXY 走本地代理),照它设,否则拉依赖会很慢 / 失败。
+- 🔒 **私有 submodule 访问**:`waveterm-zh` 是作者私有仓(SSH URL),客户 `--recurse-submodules` / `submodule update` 会因无权限失败。给客户前二选一:把它设公开(Wave 是 Apache-2.0,合法),或客户 fork 后把 `.gitmodules` 的 url 改成客户自己的 fork。
 
 - **验证**:客户从自己电脑连上、成功开一个会话进 Claude Code。
 
@@ -87,6 +89,7 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 - `bash cloud_infra_check.sh` + 各项常驻/排程体检。
 - 客户从**电脑**和**手机**各开一个会话、跑一次权限批准,确认远程遥控 + 审批闭环。
 - 交接:把"部署参数表"(含服务器 IP / 各账号)交给客户自己留档,**不入库**。
+- ⚠️ **明确告知客户**:会话默认 `--dangerously-skip-permissions`(全自主、无逐步权限提示),唯一人工闸是 Moshi 审批、而 Moshi 选装。未装 Moshi = 无人工闸;让客户知情并接受(建议至少配 Moshi)。
 
 ## 7. 红线清单(Claude 部署全程必须守)
 
