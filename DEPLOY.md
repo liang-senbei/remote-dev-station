@@ -39,8 +39,14 @@
 
 ## 3. 阶段二 · 客户端(电脑)
 
-- **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh;还原 `wave-config/`;`cloudconn` 里 `HOST=` 改成**客户服务器的 Tailscale IP**。
+- **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh。`wave-config/` 是**作者个人层**(README 附二 §🔴,含作者 IP/用户名),**别整份照搬**——拿它当模板,把下列作者私有值全换成客户自己的。
 - **Windows**:照 [windows/README.md](windows/README.md)。
+
+> **⚠️ 必改的作者私有值**(客户端凡拷 `wave-config/` / `cloudconn` 都要换,否则会连回作者的服务器):
+> - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`;`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全换成客户自己服务器的 Tailscale IP。
+> - **Mac 用户名**:`widgets.json` 的 `cmd` 里 `/Users/xiaoyu/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `/Users/xiaoyu/…` —— 换成客户自己的用户名。
+> - `hammerspoon-init.lua` 是作者 Mac 专属(且指向已退役的 :8722),客户忽略或按需重配。
+> - 服务器侧 `bin/novnc-start.sh` 已改为**自动取本机 Tailscale IP**,无需手改。
 
 ### 可选 · 用魔改版 Wave 客户端(汉化 + 自定义主题)
 

@@ -22,8 +22,10 @@ DISPLAY=:1 google-chrome --no-sandbox --no-first-run --no-default-browser-check 
   --user-data-dir=/root/.chrome-vnc "https://claude.ai/code" >/var/log/chrome-vnc.log 2>&1 &
 x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -bg -o /var/log/x11vnc.log 2>/dev/null
 sleep 1
-websockify --web=/usr/share/novnc 100.109.254.125:6080 localhost:5900 >/var/log/websockify.log 2>&1 &
+# 绑本机自己的 Tailscale IP（自动取、不写死；只在 tailnet 内可达 = 安全边界）
+TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"; TS_IP="${TS_IP:-127.0.0.1}"
+websockify --web=/usr/share/novnc "${TS_IP}:6080" localhost:5900 >/var/log/websockify.log 2>&1 &
 
-echo "noVNC 桌面已起: http://100.109.254.125:6080/vnc.html  (DISPLAY=:1)"
+echo "noVNC 桌面已起: http://${TS_IP}:6080/vnc.html  (DISPLAY=:1)"
 wait "$XVFB"     # Xvfb 活着就一直 wait;它一死 → 往下 exit → systemd 重启整套
 exit 1
