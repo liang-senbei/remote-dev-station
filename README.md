@@ -40,6 +40,7 @@ source ~/.bashrc                          # 让 cloudgo 等函数生效
 
 # ③ 登录 Claude(install.sh 已装好 claude；这步交互登录你的 Pro/Max，凭据落盘、之后免登)
 claude
+# 无头卡在浏览器那步 → docs/headless-login.md;Tailscale 无头授权/三设备同网 → docs/tailscale-setup.md
 ```
 
 **电脑(Mac)0→1**

@@ -3,7 +3,7 @@ Description=Project dashboards portal — serves ONLY /root/inbox/dashboards on 
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 -m http.server 8088 --bind 100.109.254.125 --directory /root/inbox/dashboards
+ExecStart=/usr/local/bin/cloud-dashboards.sh
 Restart=on-failure
 RestartSec=5
 

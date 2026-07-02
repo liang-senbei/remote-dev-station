@@ -19,6 +19,7 @@ mkdir -p ~/.local/bin
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
+install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 可选桌面/看板层 service 的 ExecStart 指这里
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 install -m755 windows/server-side/* ~/.local/bin/    # Windows 客户端「按标签页恢复终端」用的服务器侧脚本
 

@@ -47,7 +47,7 @@
 > - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`;`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全换成客户自己服务器的 Tailscale IP。
 > - **Mac 用户名**:`widgets.json` 的 `cmd` 里 `/Users/xiaoyu/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `/Users/xiaoyu/…` —— 换成客户自己的用户名。
 > - `hammerspoon-init.lua` 是作者 Mac 专属(且指向已退役的 :8722),客户忽略或按需重配。
-> - 服务器侧 `bin/novnc-start.sh` 已改为**自动取本机 Tailscale IP**,无需手改。
+> - 服务器侧的 `bin/novnc-start.sh`(noVNC)与 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改。
 
 ### 可选 · 用魔改版 Wave 客户端(汉化 + 自定义主题)
 
@@ -97,3 +97,11 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 2. 不经手客户明文密钥 —— 让客户自己填。
 3. origin 换成客户自己的仓,别让客户依赖作者的。
 4. 每阶段**验证过**再进下一阶段;拿不准就 **AskUserQuestion 问客户**,别用看似合理的假设填空。
+
+## 深入 runbook(docs/)
+
+某一步卡住时查这些细则(都实测核实过):
+- [`docs/headless-login.md`](docs/headless-login.md) —— 无头 VPS 上 `claude` 首次 OAuth 登录(卡在浏览器那步)。
+- [`docs/tailscale-setup.md`](docs/tailscale-setup.md) —— Tailscale 三设备同 tailnet + 无头授权 + IP/key 过期。
+- [`docs/mac-reverse-channel.md`](docs/mac-reverse-channel.md) —— (选装)服务器 Claude 够到 Mac 取/送文件、取截图。
+- [`docs/desktop-layer.md`](docs/desktop-layer.md) —— (选装)服务器图形桌面层(noVNC + Chrome→claude.ai/code)安装。
