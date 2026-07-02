@@ -16,6 +16,10 @@ DISPLAY=:1 xfwm4            >/var/log/xfwm4.log 2>&1 &
 DISPLAY=:1 xfdesktop        >/var/log/xfdesktop.log 2>&1 &
 DISPLAY=:1 xfce4-panel --disable-wm-check >/var/log/xfce4-panel.log 2>&1 &
 sleep 2
+# 自动开 Chrome 到 claude.ai/code(网页版 Claude Code:富文本输入+贴图,从服务器干净 IP 登录、不碰 Mac 环境)
+DISPLAY=:1 google-chrome --no-sandbox --no-first-run --no-default-browser-check \
+  --password-store=basic --disable-session-crashed-bubble --start-maximized \
+  --user-data-dir=/root/.chrome-vnc "https://claude.ai/code" >/var/log/chrome-vnc.log 2>&1 &
 x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -bg -o /var/log/x11vnc.log 2>/dev/null
 sleep 1
 websockify --web=/usr/share/novnc 100.109.254.125:6080 localhost:5900 >/var/log/websockify.log 2>&1 &
