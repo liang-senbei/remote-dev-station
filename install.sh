@@ -3,6 +3,10 @@
 set -e
 cd "$(dirname "$0")"
 
+# 前置护栏:本脚本假定 Debian/Ubuntu 系(apt)+ x86_64/arm64;可重复运行(各步幂等)
+command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);其它发行版请手动改下面的包管理部分。"; exit 1; }
+case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
+
 echo "[1/6] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban
 
@@ -15,6 +19,8 @@ mkdir -p ~/.local/bin
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
+install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
+install -m755 windows/server-side/* ~/.local/bin/    # Windows 客户端「按标签页恢复终端」用的服务器侧脚本
 
 echo "[4/6] 部署 tmux 配置 + .bashrc 函数块"
 cp tmux.conf ~/.tmux.conf
