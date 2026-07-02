@@ -1,0 +1,73 @@
+# DEPLOY.md — 给 Claude 看的"整套远程开发体系"部署驱动
+
+> 本文是给 **AI 操作员(Claude)** 读的部署 runbook:照它把 `remote-dev-station` 这套
+> "美国服务器跑 Claude Code + 电脑/手机远程遥控" 的体系,给一个**新客户 / 新机器**从零部署好。
+>
+> 人读的分层说明在 [README.md](README.md);本文只讲**怎么一步步执行、哪里要问客户、哪里要扫客户机器**。
+> 各阶段的细节不在这里重复,而是**引用**对应文档([README](README.md) / [phone/](phone/README.md) /
+> [windows/](windows/README.md) / [claude-config/RESTORE.md](claude-config/RESTORE.md))。
+
+## 怎么用这份文档
+
+客户对 Claude 说"照 remote-dev-station 的 DEPLOY.md 给我部署",Claude 读本文后:
+1. **先收集客户参数**(阶段零),别猜;
+2. **按阶段执行,每阶段验证过再进下一阶段**;
+3. 遇到"客户本地已有资料",**扫描客户机器迁移他自己的**,绝不套用作者(仓主)的私有值/skill/记忆/凭据。
+
+## 0. 两个概念(先内化,贯穿全程)
+
+- **通用核心** = 这套体系本身:会话层脚本 / systemd 自愈 / tmux / ufw、Wave 客户端配置骨架、Moshi 配对**流程**。谁都一样,直接部署。
+- **客户私有叠加** = 客户自己的:云服务器 / 账号 / 凭据 / Tailscale IP / 记忆 / 已有的 skill·MCP·dotfiles。**属于客户**,要么现场问、要么扫客户机器迁移。
+
+> 🚫 **红线:绝不把作者(`xiaoxihexiaoyu`)的私有值、skill、记忆、密钥塞给客户。** 本仓 `claude-config/` 里那 95 个 skill、CLAUDE.md、记忆等,都是**作者的叠加层**,只在"作者自己换新机器"时用(见 [RESTORE.md](claude-config/RESTORE.md))。给客户 = 装通用核心 + 迁**客户自己的**。
+
+## 1. 阶段零 · 收集客户参数(用 AskUserQuestion 逐项问,填一张临时"部署参数表",不入库)
+
+- **服务器**:有海外云服务器吗?root SSH 通吗?Ubuntu/Debian?内存(建议 ≥16G)?→ 没有,先指导客户开一台。
+- **Tailscale**:有账号吗?→ 服务器 + 电脑 + 手机都要进**同一 tailnet**。
+- **Claude 账号**:客户自己的 Pro/Max —— 部署时**客户自己 `claude` 登录**,你不经手他的凭据。
+- **客户端**:Mac / Windows / 两者都要?
+- **手机**:要不要 Moshi 远程批准/操作?→ 客户自己的 Moshi 账号。
+- **客户已有本地资料**:客户以前用过 Claude Code 吗?有没有想保留的 skill / MCP / CLAUDE.md / 记忆 / dotfiles?→ 决定阶段四扫不扫、扫什么。
+
+## 2. 阶段一 · 服务器 0→1
+
+照 [README.md](README.md) 的「从零部署 Quick Start」执行:前置(Tailscale / mosh / Node + Claude Code)→ `git clone` 本仓 → `./install.sh` → `source ~/.bashrc`。
+
+- ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
+- **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` 全过。
+
+## 3. 阶段二 · 客户端(电脑)
+
+- **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh;还原 `wave-config/`;`cloudconn` 里 `HOST=` 改成**客户服务器的 Tailscale IP**。
+- **Windows**:照 [windows/README.md](windows/README.md)。
+- **验证**:客户从自己电脑连上、成功开一个会话进 Claude Code。
+
+## 4. 阶段三 · 手机(选装)
+
+照 [phone/README.md](phone/README.md) 配 Moshi:agent 钩子配对(批权限)+ 可选 SSH host setup(开终端)。**用客户自己的 Moshi 账号**,主机地址填 **IP**。
+
+## 5. 阶段四 · 客户本地资料迁移(关键——扫客户的,不套作者的)
+
+仅当阶段零里客户说"有想保留的 Claude 资料"时做。Claude 扫描客户旧机器 / 旧配置:
+
+- **扫 `~/.claude/`**:`CLAUDE.md`、`settings.json`、`skills/`、`commands/`、`hooks/`、`mcpServers.json`、`plugins`、以及项目记忆目录。
+- **逐类判断**:哪些客户要带走 → 迁到新服务器对应位置;哪些是旧环境专属(绝对路径 / 旧密钥)→ 到新环境重配。
+- **skill / MCP**:列出**客户装了哪些**,问客户哪些要带;能从市场重装的重装(只迁清单不搬内容),客户私有的手动迁。
+- **记忆**:客户的记忆是客户的,迁过去;**不导入作者的记忆**。
+- **密钥**:让**客户自己**重新填(`.secrets.env` 等),你不经手明文。
+
+> 对照:作者自己换新机器 = 照 [RESTORE.md](claude-config/RESTORE.md) 还原**作者的**叠加层;给客户则相反 —— 还原**客户的**。同一套"扫描 + 迁移"手法,数据源不同。
+
+## 6. 阶段五 · 收尾验证
+
+- `bash cloud_infra_check.sh` + 各项常驻/排程体检。
+- 客户从**电脑**和**手机**各开一个会话、跑一次权限批准,确认远程遥控 + 审批闭环。
+- 交接:把"部署参数表"(含服务器 IP / 各账号)交给客户自己留档,**不入库**。
+
+## 7. 红线清单(Claude 部署全程必须守)
+
+1. 不把作者的私有值 / skill / 记忆 / 凭据塞给客户;客户的叠加靠**扫客户机器**得到。
+2. 不经手客户明文密钥 —— 让客户自己填。
+3. origin 换成客户自己的仓,别让客户依赖作者的。
+4. 每阶段**验证过**再进下一阶段;拿不准就 **AskUserQuestion 问客户**,别用看似合理的假设填空。
