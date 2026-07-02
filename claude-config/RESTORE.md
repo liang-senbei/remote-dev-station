@@ -15,6 +15,6 @@
 - 先 re-add 市场再装。各市场远端:
   - 公共,直接 re-add:`anthropic-agent-skills`(anthropics/skills)、`daymade-skills`(daymade/claude-code-skills)、`claude-plugins-official`、`claude-code-plugins`、`openai-codex`、`claude-code-warp`
   - **`hello2cc-local`(本地 directory 市场,关键)**:真源是 `git clone https://github.com/hellowind777/hello2cc.git` → `~/.claude/hello2cc-local`,再以 directory 源 re-add(known_marketplaces 里记的是本地路径,真正可恢复的是这个 git 仓)。
-- 再按 `installed_plugins.json` / 各市场 re-install 9 插件 + 34 skill。
+- 再按 `installed_plugins.json` / 各市场 re-install 9 插件 + 95 skill。
 
 > 备份哲学同本仓:**只存配置与清单,不存可重装/可重 clone 的内容**(技能、插件、密钥均不入库)。

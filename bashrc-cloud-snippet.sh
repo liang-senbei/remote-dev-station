@@ -4,8 +4,8 @@ if [ -f "$FNM_DIR/fnm" ]; then
   export PATH="$FNM_DIR:$PATH"
   eval "$(fnm env --shell bash --use-on-cd)" 2>/dev/null
 fi
-# 侧边栏/cld 默认模型（Opus 4.8 1M）+ 默认参数（最大推理力度）；想改就改这两行
-CLOUD_MODEL="claude-opus-4-8[1m]"
+# 侧边栏/cld 默认模型（Fable 5 1M，2026-07-02 起从 Opus 4.8 切换）+ 默认参数（最大推理力度）；想改就改这两行
+CLOUD_MODEL="claude-fable-5[1m]"
 CLOUD_OPTS="--effort max"
 cloud() {
   local dir="${1:?用法: cloud <工作目录> [claude 参数...]}"; shift

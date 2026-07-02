@@ -1,24 +1,38 @@
 #!/bin/bash
-# 一键部署：在一台新 Ubuntu 服务器上重建这套 远程 Claude Code 环境
+# 一键部署：在一台新 Ubuntu/Debian 服务器上重建这套 远程 Claude Code 环境
 set -e
+cd "$(dirname "$0")"
+
 echo "[1/6] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban
+
 echo "[2/6] 安装 Claude Code (native)"
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
-echo "[3/6] 部署辅助脚本到 ~/.local/bin 和 /usr/local/bin"
+
+echo "[3/6] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
-install -m755 bin/pullimg bin/macget bin/macput bin/macls ~/.local/bin/
-install -m755 bin/cloud-boot.sh /usr/local/bin/
+# 会话系统 + Mac 桥接 + 工具全部装齐（cloudgo / watchdog 自愈 / 会话恢复都依赖它们）
+install -m755 bin/* ~/.local/bin/
+install -m755 cc-state ~/.local/bin/
+install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
+
 echo "[4/6] 部署 tmux 配置 + .bashrc 函数块"
 cp tmux.conf ~/.tmux.conf
 grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.bashrc
-echo "[5/6] 安装 systemd 服务（开机自动恢复 Claude 会话）"
-cp systemd/cloud-sessions.service /etc/systemd/system/
-cp systemd/cloud-outbox.service /etc/systemd/system/
-systemctl daemon-reload && systemctl enable cloud-sessions.service cloud-outbox.service
-echo "[6/6] 防火墙基线（仅放行必要端口）"
+
+echo "[5/6] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
+cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-watchdog.timer /etc/systemd/system/
+# 手机 Moshi 单元一并放好；二进制由 moshi-hook update 装、配对后再 enable（见 phone/README.md）
+cp systemd/moshi-hook.service systemd/moshi-hook-healthcheck.service systemd/moshi-hook-healthcheck.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable cloud-sessions.service cloud-watchdog.timer
+
+echo "[6/6] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
-echo "完成。记得：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac' 别名；② git 身份；③ tailscale up"
+ufw --force enable
+
+echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac' 别名；② git 身份；③ tailscale up"
+echo "注：图形桌面层(noVNC/xfce/Chrome) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
 
 # ---- Shell 增强 (fzf + starship + ble.sh) ----
 echo "[+] 安装 shell 增强"

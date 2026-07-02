@@ -226,7 +226,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 **🔴 个人层(我特定的,复用必换)**
 - `claude-config/CLAUDE.md` —— 我的业务规则(Echo 前缀、raas/公司、机器分工)。
 - `claude-config/{settings.json, hooks/, mcpServers.json, installed_plugins.json, known_marketplaces.json}` —— **我选的 6 MCP / 9 插件 / 7 市场** + 钩子接线(含 moshi/hub)。⚠️ 工具本身大多通用、可从市场重装,**但"选了哪些"这套组合是个人配置**。
-- Skills(34)+ `hello2cc-local`(我的本地市场 = `github.com/hellowind777/hello2cc`)—— **个人技能组合**(内容不入库,清单在上面 records 里;还原见 `claude-config/RESTORE.md`)。
+- Skills(95)+ `hello2cc-local`(我的本地市场 = `github.com/hellowind777/hello2cc`)—— **个人技能组合**(内容不入库,清单在上面 records 里;还原见 `claude-config/RESTORE.md`)。
 - `wave-config/`(我的主题/部件审美)· `hammerspoon-init.lua`(我的 Mac)· `bin/wechat-cli`(业务)· `systemd/moshi-hook.service` + moshi 配对(我的手机审批)。
 
 > 一句话:**`bin/` + `systemd/`(cloud/novnc 部分) + `hub/` + `cloudconn` + Wave 工具 = 通用骨架;`claude-config/` 整目录 + `wave-config/` + 几个 Mac/业务脚本 = 个人配置。**
