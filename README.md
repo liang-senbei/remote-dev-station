@@ -10,7 +10,7 @@
 Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** 里。
 
 - **Mac**:用 **Wave 终端** → `cloudconn` → **mosh + Tailscale** → 服务器
-- **手机**:用 **Moshi App** → SSH/mosh → 服务器
+- **手机**:用 **Moshi App** → SSH/mosh → 服务器,从零配置见 [`phone/`](phone/README.md)
 - **Windows 笔电**:用 **Wave 终端** →(**反向 SSH 隧道 / WSL2-mosh**)→ 服务器,见 [`windows/`](windows/README.md)(含 Wave**「按标签页一键恢复终端」**)
 - 三者是**三个遥控器,操作同一批服务器上的 tmux 会话**。
 - 每个会话靠「**会话名 `cc-<名>` + 对话文件 `<uuid>.jsonl`**」绑定;断电/崩溃后 **watchdog** 守护进程按 uuid 把对话**原样自动接回**。
@@ -25,7 +25,7 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 1. **海外云服务器**:root、Ubuntu/Debian、建议 **≥16G 内存**(会话是重进程,约 ~10 个活跃封顶,见 §12.3)。
 2. **Tailscale 账号**:组中美加密内网,服务器 + 你的电脑 / 手机都装客户端并登入**同一 tailnet**。
 3. **电脑**:Wave 终端(官方版即可;中文 + 自定义主题是作者自建分叉,选装,见末附)+ mosh + Tailscale。
-4. **手机(选装)**:Moshi App(远程批准 / 操作)。
+4. **手机(选装)**:Moshi App(远程批准 / 操作);从零配置见 [`phone/`](phone/README.md)。
 5. 会基本 git / Linux / ssh。
 
 **服务器 0→1**
