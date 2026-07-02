@@ -41,6 +41,23 @@
 
 - **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh;还原 `wave-config/`;`cloudconn` 里 `HOST=` 改成**客户服务器的 Tailscale IP**。
 - **Windows**:照 [windows/README.md](windows/README.md)。
+
+### 可选 · 用魔改版 Wave 客户端(汉化 + 自定义主题)
+
+官方 Wave 就能用;想要中文界面 + 作者那套主题/侧栏,就从 `waveterm-zh/` submodule 自己构建:
+
+```bash
+git submodule update --init waveterm-zh    # 没用 --recurse-submodules clone 时补拉
+cd waveterm-zh
+# 前置:Go 1.25+、NodeJS 22 LTS、Task(taskfile.dev);Linux 另需 zip + zig
+task init         # 首次装依赖
+task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SYSTEM_FPM=1 task package)
+```
+
+- 各平台前置 / 打包的**权威步骤**见 [`waveterm-zh/BUILD.md`](waveterm-zh/BUILD.md)。
+- **汉化维护 + 上游更新**(Wave 出新版怎么 merge upstream、补翻新增文案)见 [`waveterm-zh/i18n-tooling/UPDATE.md`](waveterm-zh/i18n-tooling/UPDATE.md)。
+- 🌏 国内构建:UPDATE.md 里给了一套镜像环境变量(GOPROXY=goproxy.cn、ELECTRON_MIRROR=npmmirror、ALL_PROXY 走本地代理),照它设,否则拉依赖会很慢 / 失败。
+
 - **验证**:客户从自己电脑连上、成功开一个会话进 Claude Code。
 
 ## 4. 阶段三 · 手机(选装)
