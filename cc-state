@@ -87,7 +87,7 @@ else:
 # SessionEnd(主动 /exit 退出)→ 打 ended=True:cloud-recover/watchdog 不再自动复活它(免得你
 # 主动退的会话被拉回来),但仍可手动 cloud_resume/cloudattach 找回;其它事件 → ended=False 重新激活。
 tmux_name = tmux_session()
-if tmux_name and tmux_name != "unknown":
+if tmux_name and tmux_name != "unknown" and not tmux_name.startswith("cc-tmp-"):   # cc-tmp-* 临时会话不进恢复登记(否则关掉后被 watchdog 复活成僵尸;临时会话本就"关标签即弃",对话 jsonl 仍留可 resume)
     REG = os.path.expanduser("~/.cloud-sessions")
     try:
         os.makedirs(REG, exist_ok=True)

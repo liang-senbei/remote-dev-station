@@ -109,17 +109,21 @@ _send_line(){
 #   · Claude 选择/权限模态把【选中项】也渲染成「❯ 1. Yes」——本护栏靠「❯ 后紧跟编号项就拒」
 #     挡住常见的编号弹窗(否则会误把消息打进去、甚至替对方确认高亮项);但【非编号】弹窗仍可能
 #     被放行。要安全发,拿不准先 hub peek。
-#   · 假设【宿主 shell 提示符不含 ❯】(本机默认 bash 满足)。starship/pure/zsh 等以 ❯ 作提示符的
-#     宿主上,接收方掉到 shell 仍会被判就绪——那类宿主请改认输入框边框线,或先 peek。
+#   · starship/pure/zsh 等以 ❯ 作提示符的宿主 shell:光看 ❯ 会把"接收方掉到 shell"误判成就绪。
+#     故除 ❯ 外,再要求可见区含 Claude 输入框特征(⏵⏵ bypass 指示 / 框线 / "bypass permissions"),
+#     否则判未就绪 → 挡住"消息落进 starship shell 被当命令执行"(本 deploy kit 默认装 starship,此项是活的)。
 # HUB_FORCE=1 = 跳过本检查、无条件强发(仅用于护栏误判「未就绪」时);它【不会】让发进
 #   shell/模态变安全,只是强发,慎用。
 _ready(){
   # HUB_FORCE=1 跳过就绪检查并【大声告警】:硬发是误传根源,不能再静默。仅在确认护栏误判时用。
   [ "${HUB_FORCE:-}" = "1" ] && { echo "⚠️  HUB_FORCE=1 强发,已跳过就绪护栏——若对方不在输入框,内容会落进 shell/弹窗=误传。务必先 hub peek 确认。" >&2; return 0; }
-  local prompt
-  prompt="$(tmux capture-pane -t "$1" -p 2>/dev/null | tail -6 | grep -F '❯' | tail -1)"
-  [ -n "$prompt" ] || return 1                                  # 无 ❯:shell默认提示符/菜单/死pane → 拒
-  ! printf '%s' "$prompt" | grep -qE '❯[[:space:]]*[0-9]+[.)]'  # ❯ 指向编号项 = 选择/权限模态 → 拒
+  local pane prompt
+  pane="$(tmux capture-pane -t "$1" -p 2>/dev/null | tail -8)"
+  prompt="$(printf '%s' "$pane" | grep -F '❯' | tail -1)"
+  [ -n "$prompt" ] || return 1                                       # 无 ❯:shell默认提示符/菜单/死pane → 拒
+  printf '%s' "$prompt" | grep -qE '❯[[:space:]]*[0-9]+[.)]' && return 1   # ❯ 指向编号项 = 选择/权限模态 → 拒
+  printf '%s' "$pane" | grep -qE '⏵⏵|bypass permissions|────────|╭─|╰─' || return 1   # 无 Claude 输入框特征 → 可能是 starship 等 ❯ 提示符的 shell → 拒
+  return 0
 }
 
 # 组装 agent 间通讯 preamble(单行)。$1=对方label $2=正文 $3=要回信?(1/0)
