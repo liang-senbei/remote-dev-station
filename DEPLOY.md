@@ -37,7 +37,7 @@
 > **⚠️ 必改·会话模型(最要命)**:仓里默认 `CLOUD_MODEL=claude-fable-5[1m]` 是**作者账号的特殊模型**,普通客户 Pro/Max 账号**大概率没有** → 不改则客户端新建会话 + watchdog 断电自愈 `--resume` **全部启动即死**。装完**立刻**改成客户账号可用的模型(如 `claude-opus-4-8[1m]` / `claude-sonnet-4-6`),**两处都改**:① `~/.bashrc` 的 `CLOUD_MODEL`(管交互新建会话);② `/etc/systemd/system/cloud-watchdog.service` 的 `Environment=CLOUD_MODEL=`(管断电自愈)→ 改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`。
 
 - ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
-- ⚠️ **会话恢复依赖 cc-state 钩子**:install.sh 装了 cc-state 二进制,但它要写进 `~/.claude/settings.json` 的 hooks 才会把会话登记进恢复表。仓里给了**干净客户模板** [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions,**不含**作者的 moshi/hub-gate/statusline)—— 客户 `cp` 成自己的 `~/.claude/settings.json` 或合并其 hooks。**别照抄作者的 `claude-config/settings.json`**(它引用了本仓没有的 `hub-gate.py` 等作者专属脚本,照抄会每事件报错)。
+- ✅ **会话恢复(cc-state 钩子)装完即接线**:install.sh 若客户 `~/.claude/settings.json` **不存在**,会自动铺干净模板 [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions);**客户已有 settings.json 则不覆盖** → 需手动把该模板的 cc-state hooks 合并进去(否则会话恢复静默失效;`cloud_infra_check.sh` 会探这一项)。**别照抄作者的 `claude-config/settings.json`**——它挂了作者专属的 moshi-hook / statusline / hub-gate 等钩子(客户没装对应脚本/第三方二进制会每事件报错)。
 - **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。
 
 ## 3. 阶段二 · 客户端(电脑)
@@ -85,7 +85,8 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 - **扫 `~/.claude/`**:`CLAUDE.md`、`settings.json`、`skills/`、`commands/`、`hooks/`、`mcpServers.json`、`plugins`、以及项目记忆目录。
 - **逐类判断**:哪些客户要带走 → 迁到新服务器对应位置;哪些是旧环境专属(绝对路径 / 旧密钥)→ 到新环境重配。
 - **skill / MCP**:列出**客户装了哪些**,问客户哪些要带;能从市场重装的重装(只迁清单不搬内容),客户私有的手动迁。
-- **记忆**:客户的记忆是客户的,迁过去;**不导入作者的记忆**。
+- **记忆**:客户的记忆是客户的,迁过去;**不导入作者的记忆**。⚠️ **编码路径改名**:记忆目录名按**旧绝对路径**编码(Mac `/Users/x/proj` → 目录 `-Users-x-proj`),迁到新服务器**必须按新路径重命名**(→ `-opt-workspace-proj`),否则记忆**静默不加载**(不报错、就是不生效)。
+- **settings.json 别整份覆盖**:阶段一已铺了带 cc-state 钩子的 `~/.claude/settings.json`;迁客户旧 settings 时**只合并需要的项**,别整份盖过去(否则丢掉自愈钩子、还带进旧机的 `/Users/...` 死路径)。
 - **密钥**:让**客户自己**重新填(`.secrets.env` 等),你不经手明文。
 
 > 对照:作者自己换新机器 = 照 [RESTORE.md](claude-config/RESTORE.md) 还原**作者的**叠加层;给客户则相反 —— 还原**客户的**。同一套"扫描 + 迁移"手法,数据源不同。

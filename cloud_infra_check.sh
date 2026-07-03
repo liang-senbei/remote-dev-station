@@ -28,5 +28,11 @@ if timeout 12 /root/.local/bin/moshi-hook status >/dev/null 2>&1; then
 else
   echo "  ⏭ moshi-hook socket 无响应(可选层未装/未配对可忽略)"
 fi
+echo "-- 会话恢复接线 --"
+if [ -f "$HOME/.claude/settings.json" ] && grep -q 'cc-state' "$HOME/.claude/settings.json"; then
+  echo "  ✓ cc-state 钩子已接进 ~/.claude/settings.json(会话恢复登记生效)"
+else
+  echo "  ❌ cc-state 钩子未接进 ~/.claude/settings.json —— 会话登记表恒空、'按 uuid 接回'哑火! 恢复: cp claude-config/settings.client.json ~/.claude/settings.json(或把其 hooks 合并进已有的)"; bad=1
+fi
 [ "$bad" = 0 ] && echo "== 核心基建全绿 ==" || echo "== 核心有 ❌,按上面提示恢复 =="
 exit $bad
