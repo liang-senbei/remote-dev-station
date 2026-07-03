@@ -8,9 +8,10 @@
 # 用法：
 #   hub ls                 列出所有 cc-* 会话：项目路径 + git 远端/状态
 #   hub peek <cc> [行数]   看某个 cc 最近 N 行屏幕(默认 40)，知道它在干嘛
-#   hub say  <cc> "消息"   给某 cc 发消息(自动包 agent 间通讯 preamble)  ← 默认就用这个
-#   hub ask  <cc> "消息"   同 say，但要求对方用 `hub say <我> "..."` 回信
+#   hub say  <cc[,cc2,…]> "消息"  给一个或几个 cc 发消息(逗号分隔=定向群发,非全员、不需 HUB_ALL_OK;自动包 preamble)  ← 默认就用这个
+#   hub ask  <cc[,cc2,…]> "消息"  同 say，但要求对方用 `hub say <我> "..."` 回信
 #   hub all  "消息"        广播给除自己外的所有 cc  ← 慎用!需 HUB_ALL_OK=1 才放行
+#   (发送都记日志到 ~/.hub/send.log:时间·发送方·接收方·SENT/DEDUP-SKIP·内容;便于回溯发没发/发几次。HUB_LOG= 关闭)
 #
 # 纪律(防滥用/防误传):
 #   · 默认【定向】say/ask 发给某一个 cc;不要图省事用 all 把私事广播给全员。
@@ -55,6 +56,17 @@ _resolve(){
 
 # 文本与回车之间的停顿(秒)。可用环境变量 HUB_SEND_PAUSE 覆盖(接收方很卡可调大)。
 HUB_SEND_PAUSE="${HUB_SEND_PAUSE:-0.3}"
+# 去重窗口(秒):同一接收方在此窗口内收到【完全相同】的消息=判为重复(外层重试/双击命令/并发竞态所致),跳过第二次。0=关闭。
+HUB_DEDUP_WINDOW="${HUB_DEDUP_WINDOW:-8}"
+# 广播节流(秒):hub all 每个接收方之间的间隔。避免 N 个 agent 被同时唤醒→同时打 Claude API→触发服务端限流("Rate limited")。0=不节流。
+HUB_ALL_STAGGER="${HUB_ALL_STAGGER:-1.5}"
+# 发送日志:每次真发/去重跳过都记一行(时间·发送方·接收方·动作·内容前100字),便于回溯"到底发没发、发了几次"。HUB_LOG= 空则关闭。
+HUB_LOG="${HUB_LOG-$HOME/.hub/send.log}"
+_log(){   # $1=接收方会话  $2=动作(SENT/DEDUP-SKIP)  $3=文本
+  [ -z "${HUB_LOG:-}" ] && return 0
+  mkdir -p "$(dirname "$HUB_LOG")" 2>/dev/null || return 0
+  printf '%s  %s → %s  %-10s %s\n' "$(date -u +%FT%TZ)" "$(_self_label)" "$1" "$2" "$(printf '%s' "$3" | tr '\n' ' ' | cut -c1-100)" >> "$HUB_LOG" 2>/dev/null || true
+}
 
 # 安全发送一行(无换行)到某会话当前 pane：先打字面文本(不带回车)→ 停顿 → 再回车提交。
 #   为什么要停顿:接收方【空闲】停在提示符上时,若 Enter 紧贴文本零延迟到达,会赶在输入框
@@ -70,10 +82,24 @@ _send_line(){
   local sess="$1" text="$2"
   {
     flock 9 2>/dev/null || true
+    # 去重护栏(在锁内做→并发也安全):同一接收方同一内容在 HUB_DEDUP_WINDOW 秒内重发=跳过。
+    # 根治「消息被重复发两次」——不管源头是外层重试/双击命令/两个 hub 并发,第二次都不再打进对方输入框。
+    if [ "${HUB_DEDUP_WINDOW:-0}" != "0" ]; then
+      local _h _now _dd _lh _lt
+      _h="$(printf '%s' "$text" | cksum | awk '{print $1"_"$2}')"
+      _now="$(date +%s)"; _dd="${TMPDIR:-/tmp}/hub-dedup-${sess}"
+      [ -f "$_dd" ] && read -r _lh _lt < "$_dd" 2>/dev/null
+      if [ "$_lh" = "$_h" ] && [ "$(( _now - ${_lt:-0} ))" -lt "$HUB_DEDUP_WINDOW" ]; then
+        echo "⏭️  跳过重复:${HUB_DEDUP_WINDOW}s 内已给 $sess 发过完全相同的消息(HUB_DEDUP_WINDOW=0 可关)" >&2
+        _log "$sess" "DEDUP-SKIP" "$text"; return 9   # 9=去重跳过,供调用方区分"真发"与"跳过"
+      fi
+      printf '%s %s\n' "$_h" "$_now" > "$_dd"
+    fi
     tmux send-keys -t "$sess" -l "$text"
     sleep "$HUB_SEND_PAUSE" 2>/dev/null || sleep 0.3   # 非数字值(typo/locale 0,3)兜底,别退回零延迟竞态
     tmux send-keys -t "$sess" Enter
   } 9>"${TMPDIR:-/tmp}/hub-send-${sess}.lock"
+  _log "$sess" "SENT" "$text"
 }
 
 # 发送前护栏:粗判目标是否停在【Claude 文本输入框】(底部最后一行 ❯ 提示、且不是编号模态项)。
@@ -139,14 +165,31 @@ case "$cmd" in
     tmux capture-pane -t "$t" -p -S "-${n}"
     ;;
   say|ask)
-    t="$(_resolve "${1:?用法: hub $cmd <cc> \"消息\"}")" || exit 2
-    shift
+    raw="${1:?用法: hub $cmd <cc[,cc2,...]> \"消息\"}"; shift
     msg="$*"; [ -z "$msg" ] && { echo "⛔ 消息为空" >&2; exit 2; }
-    _ready "$t" || { echo "⛔ ${t} 看着不在 Claude 文本输入框(可能在 shell/菜单/编号弹窗/已退出),没发——否则消息会被当 shell 命令执行。先 hub peek ${t#$PREFIX} 看看;确认就绪可强发:HUB_FORCE=1 hub $cmd …(强发只跳过本检查,不会让发进 shell/模态变安全)" >&2; exit 3; }
     want=0; [ "$cmd" = "ask" ] && want=1
+    if [[ "$raw" == *,* ]]; then
+      # 定向群发:hub say a,b,c "msg" —— 只发给指定几个(非全员,不需 HUB_ALL_OK);未就绪的跳过、发送间节流复用 HUB_ALL_STAGGER
+      me_sess="$(_self_sess)"; sent=0; skipped=0
+      IFS=',' read -ra _tgts <<< "$raw"
+      for _q in "${_tgts[@]}"; do
+        read -r _q <<< "$_q"                                  # trim 首尾空白
+        [ -z "$_q" ] && continue
+        t="$(_resolve "$_q")" || { skipped=$((skipped+1)); continue; }
+        [ "$t" = "$me_sess" ] && continue
+        _ready "$t" || { echo "·  跳过 $t(不在输入框)"; skipped=$((skipped+1)); continue; }
+        [ "$sent" -gt 0 ] && [ "${HUB_ALL_STAGGER:-0}" != "0" ] && { sleep "$HUB_ALL_STAGGER" 2>/dev/null || true; }
+        _send_line "$t" "$(_wrap "${t#$PREFIX}" "$msg" "$want")"; echo "✅ → $t"; sent=$((sent+1))
+      done
+      echo "(定向群发完成，共 $sent 个$( [ "$skipped" -gt 0 ] && printf '，跳过 %s 个' "$skipped"))"
+      exit 0
+    fi
+    # 单目标(原行为:未就绪则报错引导,不静默)
+    t="$(_resolve "$raw")" || exit 2
+    _ready "$t" || { echo "⛔ ${t} 看着不在 Claude 文本输入框(可能在 shell/菜单/编号弹窗/已退出),没发——否则消息会被当 shell 命令执行。先 hub peek ${t#$PREFIX} 看看;确认就绪可强发:HUB_FORCE=1 hub $cmd …(强发只跳过本检查,不会让发进 shell/模态变安全)" >&2; exit 3; }
     line="$(_wrap "${t#$PREFIX}" "$msg" "$want")"
-    _send_line "$t" "$line"
-    echo "✅ 已发给 ${t}："; echo "   $line"
+    if _send_line "$t" "$line"; then echo "✅ 已发给 ${t}："; echo "   $line"
+    else echo "⏭️  ${t}:${HUB_DEDUP_WINDOW}s 内重复内容,已去重(未重发)"; fi
     ;;
   all)
     msg="$*"; [ -z "$msg" ] && { echo "⛔ 消息为空" >&2; exit 2; }
@@ -158,10 +201,12 @@ case "$cmd" in
       exit 4
     fi
     me_sess="$(_self_sess)"; sent=0; skipped=0
+    [ "${HUB_ALL_STAGGER:-0}" != "0" ] && echo "(广播节流:每个接收方间隔 ${HUB_ALL_STAGGER}s,避免同时唤醒全员打爆 Claude API 被限流;HUB_ALL_STAGGER=0 可关)" >&2
     while IFS= read -r s; do
       [ -z "$s" ] && continue
       [ "$s" = "$me_sess" ] && continue
       _ready "$s" || { echo "·  跳过 $s(看着不在 Claude 文本输入框)"; skipped=$((skipped+1)); continue; }
+      [ "$sent" -gt 0 ] && [ "${HUB_ALL_STAGGER:-0}" != "0" ] && { sleep "$HUB_ALL_STAGGER" 2>/dev/null || true; }   # 节流:相邻两次发送之间停一下,分散接收方的 API 调用
       line="$(_wrap "${s#$PREFIX}" "$msg" 0)"
       _send_line "$s" "$line"; echo "✅ → $s"; sent=$((sent+1))
     done <<< "$(_sessions)"
