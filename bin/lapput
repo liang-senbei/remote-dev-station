@@ -1,0 +1,7 @@
+#!/bin/bash
+# 推文件到 Windows 笔电（默认 ~/Downloads）： lapput <本地文件> [笔电目标]
+# 复用 'laptop' ssh 别名。Mac 版对应 macput。
+LAPTOP=${LAPTOP:-laptop}
+src="$1"; dst="${2:-Downloads/}"
+[ -z "$src" ] && { echo "用法: lapput <本地文件> [笔电目标，默认 Downloads/]" >&2; exit 1; }
+scp -q "$src" "$LAPTOP":"$dst" && echo "已送到笔电: ~/$dst$(basename "$src")"

@@ -1,0 +1,7 @@
+#!/bin/bash
+# 从 Windows 笔电取任意文件： lapget <笔电路径> [目标目录，默认 ~/inbox]
+# 复用 ~/.ssh/config 的 'laptop' 别名（Tailscale 直连，兜底 :2222 NSSM 隧道）。Mac 版对应 macget。
+LAPTOP=${LAPTOP:-laptop}
+src="$1"; dst="${2:-$HOME/inbox}"
+[ -z "$src" ] && { echo "用法: lapget <笔电路径，如 Downloads/x.png 或 C:/Users/shirley/Desktop/x> [目标目录]" >&2; exit 1; }
+mkdir -p "$dst"; scp -q "$LAPTOP":"$src" "$dst"/ && echo "$dst/$(basename "$src")"

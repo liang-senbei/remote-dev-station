@@ -1,0 +1,6 @@
+#!/bin/bash
+# 看 Windows 笔电某目录最近文件： lapls [目录，默认 Downloads]
+# 笔电落 PowerShell → 用 Get-ChildItem（不是 ls）。Mac 版对应 macls。
+LAPTOP=${LAPTOP:-laptop}
+dir="${1:-Downloads}"
+ssh "$LAPTOP" "Get-ChildItem ~/$dir | Sort-Object LastWriteTime -Descending | Select-Object -First 20 LastWriteTime,Length,Name | Format-Table -AutoSize"
