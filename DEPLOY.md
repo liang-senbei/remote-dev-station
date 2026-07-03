@@ -38,7 +38,7 @@
 
 - ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
 - ✅ **会话恢复(cc-state 钩子)装完即接线**:install.sh 若客户 `~/.claude/settings.json` **不存在**,会自动铺干净模板 [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions);**客户已有 settings.json 则不覆盖** → 需手动把该模板的 cc-state hooks 合并进去(否则会话恢复静默失效;`cloud_infra_check.sh` 会探这一项)。**别照抄作者的 `claude-config/settings.json`**——它挂了作者专属的 moshi-hook / statusline / hub-gate 等钩子(客户没装对应脚本/第三方二进制会每事件报错)。
-- **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。
+- **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。完整功能验收(含破坏性 selfheal 真测)在**阶段五**统一跑,这里别提前跑。
 
 ## 3. 阶段二 · 客户端(电脑)
 
@@ -93,7 +93,7 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 
 ## 6. 阶段五 · 收尾验证
 
-- `bash cloud_infra_check.sh` + 各项常驻/排程体检。
+- 跑**完整功能验收**:`/deploy-accept`(或 `bash tests/deploy-test.sh all`)——含破坏性自愈真测(只动 `cc-ztest-*` 专用测试会话,测完自动清理,不碰客户真实会话),**全绿**再做下面的人工两条。
 - 客户从**电脑**和**手机**各开一个会话、跑一次权限批准,确认远程遥控 + 审批闭环。
 - 交接:把"部署参数表"(含服务器 IP / 各账号)交给客户自己留档,**不入库**。
 - ⚠️ **明确告知客户**:会话默认 `--dangerously-skip-permissions`(全自主、无逐步权限提示),唯一人工闸是 Moshi 审批、而 Moshi 选装。未装 Moshi = 无人工闸;让客户知情并接受(建议至少配 Moshi)。
@@ -111,4 +111,6 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 - [`docs/headless-login.md`](docs/headless-login.md) —— 无头 VPS 上 `claude` 首次 OAuth 登录(卡在浏览器那步)。
 - [`docs/tailscale-setup.md`](docs/tailscale-setup.md) —— Tailscale 三设备同 tailnet + 无头授权 + IP/key 过期。
 - [`docs/mac-reverse-channel.md`](docs/mac-reverse-channel.md) —— (选装)服务器 Claude 够到 Mac 取/送文件、取截图。
+- [`docs/windows-reverse-channel.md`](docs/windows-reverse-channel.md) —— (选装)Windows 反向桥:服务器 Claude 够到 Windows 笔电(`laptop` 别名 + `lapget/lapput/lapls/lapimg`)。
 - [`docs/desktop-layer.md`](docs/desktop-layer.md) —— (选装)服务器图形桌面层(noVNC + Chrome→claude.ai/code)安装。
+- [`docs/agent-notify.md`](docs/agent-notify.md) —— (选装)agent 状态通知:等授权/完成时手机 Moshi 推送 + 可选笔电语音。
