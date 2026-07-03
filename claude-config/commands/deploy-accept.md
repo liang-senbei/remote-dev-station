@@ -30,9 +30,14 @@ argument-hint: 可选,如 "core"(只验某段)、"跳过人工项";默认全量
 3. **探迁移痕迹**(决定 migrate 段跑不跑):`~/.claude/skills`、`~/.claude/commands` 有非模板内容,
    或有 `/tmp/claude-migrate.tgz` 痕迹。拿不准就 AskUserQuestion 问一句「做过 DEPLOY 阶段四的
    资料迁移吗」。
-4. **快速闸**:`timeout 90 env -u TMUX -u TMUX_PANE claude -p ok`。无输出或非零退出 →
-   **就地终止整个验收**,只报一句:「Claude 未登录或不可用——先照 docs/headless-login.md 登录,
-   再来 /deploy-accept」。别带病往下跑,下面每一段都会假性全红,浪费所有人时间。
+4. **快速闸**:`timeout 90 env -u TMUX -u TMUX_PANE claude -p ok`,按输出分三种:
+   - 正常回显 → 继续。
+   - 输出含「safeguards flagged / AUP / 内容分类器」字样 → **别终止**:Fable 5 等模型的内容
+     分类器会拒 headless `-p` 探针,**不代表 Claude 坏或没登录**。记一笔「headless 探针被分类器
+     拦,模型可用性改由 S 组交互会话验」,照常往下跑(A4 也会因此判 SKIP,正常)。
+   - 其它非零退出 / 空输出(登录失效 / 二进制缺失 / 网络断)→ **就地终止整个验收**,只报一句:
+     「Claude 未登录或不可用——先照 docs/headless-login.md 登录,再来 /deploy-accept」。
+     别带病往下跑,下面每一段都会假性全红,浪费所有人时间。
 
 ## 阶段 1 · 并行 3 个 agent(只读 / 低扰动段)
 
