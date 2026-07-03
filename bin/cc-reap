@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# 自动清理"过时"tmux 会话:未 attach 且空闲(无活动)超过阈值分钟。
+# 对话存档(~/.claude/projects/*.jsonl)不删,随时 claude --resume 找回。
+THRESHOLD_MIN=${1:-180}
+log=/var/log/cc-reap.log
+now=$(date +%s)
+tmux ls -F '#{session_name}|#{session_attached}|#{session_activity}' 2>/dev/null | while IFS='|' read -r name att act; do
+  [ "$att" = "1" ] && continue
+  [ -z "$act" ] && continue
+  idle=$(( (now - act) / 60 ))
+  if (( idle >= THRESHOLD_MIN )); then
+    if tmux kill-session -t "$name" 2>/dev/null; then
+      echo "$(date '+%F %T') reaped $name (idle ${idle}m, threshold ${THRESHOLD_MIN}m)" >> "$log"
+    fi
+  fi
+done

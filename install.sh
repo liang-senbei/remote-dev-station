@@ -8,13 +8,13 @@ command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);�
 case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
 MODEL="${CLOUD_MODEL:-claude-fable-5[1m]}"   # 会话默认模型。客户跑 `CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh` 即全局用该模型(默认 fable-5=作者账号专属,客户多半没有)
 
-echo "[1/6] 安装依赖"
+echo "[1/7] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban python3   # python3:核心自愈(cloud-watchdog/cc-sessions/cc-state/hub)都是 python3,极简镜像可能没有
 
-echo "[2/6] 安装 Claude Code (native)"
+echo "[2/7] 安装 Claude Code (native)"
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
 
-echo "[3/6] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
+echo "[3/7] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
 mkdir -p /opt/workspace   # 默认工作区根（cloudgo/cloudnewat/cloudtmp 默认在此新建会话）
 # 会话系统 + Mac 桥接 + 工具全部装齐（cloudgo / watchdog 自愈 / 会话恢复都依赖它们）
@@ -25,13 +25,13 @@ install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 可
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）
 
-echo "[4/6] 部署 tmux 配置 + .bashrc 函数块"
+echo "[4/7] 部署 tmux 配置 + .bashrc 函数块"
 cp tmux.conf ~/.tmux.conf
 grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.bashrc
 mkdir -p ~/.claude
 [ -f ~/.claude/settings.json ] || cp claude-config/settings.client.json ~/.claude/settings.json   # 无则铺干净模板(接上 cc-state 自愈钩子,否则会话恢复静默失效);已有则不覆盖
 
-echo "[5/6] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
+echo "[5/7] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
 cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-watchdog.timer /etc/systemd/system/
 # 手机 Moshi 单元一并放好；二进制由 moshi-hook update 装、配对后再 enable（见 phone/README.md）
 cp systemd/moshi-hook.service systemd/moshi-hook-healthcheck.service systemd/moshi-hook-healthcheck.timer /etc/systemd/system/
@@ -43,11 +43,14 @@ sed -i "s#^CLOUD_MODEL=\"[^\"]*\"#CLOUD_MODEL=\"$MODEL\"#" ~/.bashrc 2>/dev/null
 sed -i "s#Environment=\"CLOUD_MODEL=[^\"]*\"#Environment=\"CLOUD_MODEL=$MODEL\"#" /etc/systemd/system/cloud-watchdog.service 2>/dev/null || true   # 断电自愈 --resume
 systemctl daemon-reload
 
-echo "[6/6] 防火墙基线（放行必要端口并启用）"
+echo "[6/7] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
 ufw --force enable
 
-echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac' 别名；② git 身份；③ tailscale up"
+echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机 + 定时收空闲会话）"
+bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
+
+echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac'（Mac 客户端）/'laptop'（Windows 客户端）别名；② git 身份；③ tailscale up"
 echo "注：图形桌面层(noVNC/xfce/Chrome) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
 [ "$MODEL" = "claude-fable-5[1m]" ] && echo "⚠️ 会话模型仍是默认 claude-fable-5[1m]（作者账号专属）。客户账号若无此模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 
