@@ -14,7 +14,7 @@
 
 ## 1. 前置
 
-- 服务器已装 `moshi-hook`(`~/.local/bin/moshi-hook`;没有或要升级就 `moshi-hook update`)。
+- 服务器装好 `moshi-hook` 二进制到 `~/.local/bin/moshi-hook`。**它是第三方产品 Moshi 的二进制、本仓不含**:从 Moshi 官方 CDN 取(`https://cdn.getmoshi.app/hook/latest/` 下对应平台二进制,源码 `github.com/rjyo/moshi`),或按 Moshi App 的 host-setup 引导装;放好后 `chmod +x`。之后 `moshi-hook update` 才能自更新(update 是自更新、需二进制先在——先有鸡后有蛋)。
 - 手机装 **Moshi App**(iOS App Store / Android 应用商店),注册并登录你的 Moshi 账号。
 - 建议服务器和手机在**同一 Tailscale tailnet**(手机开 Tailscale)——后面能用稳定内网 IP。
 

@@ -51,7 +51,7 @@ ls /usr/share/novnc/vnc.html                              # noVNC 网页资源�
 
 ## 2. 部署并 enable `novnc.service`
 
-`novnc.service` 的 `ExecStart` 指向 **`/usr/local/bin/novnc-start.sh`**。注意一个坑:核心 `install.sh` 的 `install -m755 bin/*` 会把 `novnc-start.sh` 装进 **`~/.local/bin/`**(不是 `/usr/local/bin/`),而 systemd 单元跑的是 root 的 `/usr/local/bin/` 那份——所以**必须再拷一份到 `/usr/local/bin/`**,单元文件本身核心也没部署,一并放好。
+`novnc.service` 的 `ExecStart` 指向 **`/usr/local/bin/novnc-start.sh`**。核心 `install.sh` 现在**已把 `novnc-start.sh`(和 `cloud-dashboards.sh`)预装到 `/usr/local/bin/`**,脚本路径不用操心;这里只需**部署 `novnc.service` 单元文件本身**(核心层不装它),下面一步做。
 
 ```bash
 cd /path/to/remote-dev-station        # 你 clone 仓库的目录(本机是 /root/cloud-setup)
@@ -154,4 +154,4 @@ systemctl enable --now cloud-dashboards.service
 - **开机时序**:`novnc.service` 是 `After=network-online.target`,**没显式等 `tailscaled`**。若开机时 Tailscale 比它先上不能保证,`novnc-start.sh` 取 IP 会回落 `127.0.0.1`(桌面暂时只有本机能连),需 Tailscale 就绪后 `systemctl restart novnc.service` 恢复。想根治可给单元加 `After=tailscaled.service`(本仓默认没加,保持和现网一致)。
 - **通用核心 vs 私有叠加**:
   - **通用核心(可给客户照装)**:整套流程 —— apt 依赖、`novnc-start.sh`(已改为自动取本机 IP)、`novnc.service`、安全边界。谁装都一样。
-  - **私有叠加(客户必换成自己的)**:Wave `widgets.json` 里的 `:6080`/`:8088` **URL 里那个 Tailscale IP**、`cloud-dashboards.service` 里写死的 `--bind` IP —— 都是作者的值,复用照 [DEPLOY.md](../DEPLOY.md) 阶段二「必改清单」换成客户自己的。
+  - **私有叠加(客户必换成自己的)**:Wave `widgets.json` 里的 `:6080`/`:8088` **URL 里那个 Tailscale IP** —— 作者的值,复用照 [DEPLOY.md](../DEPLOY.md) 阶段二「必改清单」换成客户自己的。(服务器侧 noVNC 与看板 service 都已自动取本机 IP、无需改。)

@@ -32,10 +32,12 @@
 
 ## 2. 阶段一 · 服务器 0→1
 
-照 [README.md](README.md) 的「从零部署 Quick Start」执行:前置(Tailscale / mosh / Node + Claude Code)→ `git clone` 本仓 → `./install.sh` → `source ~/.bashrc`。
+照 [README.md](README.md) 的「从零部署 Quick Start」执行:**唯一前置 Tailscale**(`tailscale up`,无头授权见 [`docs/tailscale-setup.md`](docs/tailscale-setup.md))→ `git clone` **客户自己的 fork** → `./install.sh`(装依赖 + Claude Code native + 全部会话层 + systemd 自愈 + 防火墙)→ `source ~/.bashrc` → `claude` 登录(无头见 [`docs/headless-login.md`](docs/headless-login.md))。
+
+> **⚠️ 必改·会话模型(最要命)**:仓里默认 `CLOUD_MODEL=claude-fable-5[1m]` 是**作者账号的特殊模型**,普通客户 Pro/Max 账号**大概率没有** → 不改则客户端新建会话 + watchdog 断电自愈 `--resume` **全部启动即死**。装完**立刻**改成客户账号可用的模型(如 `claude-opus-4-8[1m]` / `claude-sonnet-4-6`),**两处都改**:① `~/.bashrc` 的 `CLOUD_MODEL`(管交互新建会话);② `/etc/systemd/system/cloud-watchdog.service` 的 `Environment=CLOUD_MODEL=`(管断电自愈)→ 改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`。
 
 - ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
-- ⚠️ **会话恢复依赖 cc-state 钩子**:install.sh 装了 cc-state 二进制,但它要写进 `~/.claude/settings.json` 的 hooks 才会把会话登记进恢复表 —— 钩子接线属客户 claude-config,在阶段四配客户 settings.json 时加上(结构参考 `claude-config/settings.json`)。
+- ⚠️ **会话恢复依赖 cc-state 钩子**:install.sh 装了 cc-state 二进制,但它要写进 `~/.claude/settings.json` 的 hooks 才会把会话登记进恢复表。仓里给了**干净客户模板** [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions,**不含**作者的 moshi/hub-gate/statusline)—— 客户 `cp` 成自己的 `~/.claude/settings.json` 或合并其 hooks。**别照抄作者的 `claude-config/settings.json`**(它引用了本仓没有的 `hub-gate.py` 等作者专属脚本,照抄会每事件报错)。
 - **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。
 
 ## 3. 阶段二 · 客户端(电脑)
@@ -44,7 +46,7 @@
 - **Windows**:照 [windows/README.md](windows/README.md)。
 
 > **⚠️ 必改的作者私有值**(客户端凡拷 `wave-config/` / `cloudconn` 都要换,否则会连回作者的服务器):
-> - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`;`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全换成客户自己服务器的 Tailscale IP。
+> - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`(`wave-config` 版还多一个 `HOSTIP=`,探活看守会 nc 它);`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全换成客户自己服务器的 Tailscale IP。
 > - **Mac 用户名**:`widgets.json` 的 `cmd` 里 `/Users/xiaoyu/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `/Users/xiaoyu/…` —— 换成客户自己的用户名。
 > - `hammerspoon-init.lua` 是作者 Mac 专属(且指向已退役的 :8722),客户忽略或按需重配。
 > - 服务器侧的 `bin/novnc-start.sh`(noVNC)与 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改。
@@ -74,7 +76,11 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 
 ## 5. 阶段四 · 客户本地资料迁移(关键——扫客户的,不套作者的)
 
-仅当阶段零里客户说"有想保留的 Claude 资料"时做。Claude 扫描客户旧机器 / 旧配置:
+仅当阶段零里客户说"有想保留的 Claude 资料"时做。
+
+> **⚠️ 先解决"够到旧机"**:跑在新服务器上的 Claude **够不到客户的旧机器**。先用 AskUserQuestion 跟客户定传输方式,二选一:① 客户在**旧机**上 `tar czf /tmp/claude-migrate.tgz -C ~ .claude`(**先删掉 `.claude/.credentials.json` 等密钥再打包**)→ scp / 面板上传到新服务器 → Claude 解包到临时目录按下面判断;② 客户旧机装 Tailscale 进**同一 tailnet** → Claude 经 `ssh` 直接读。没有这一步,迁移无从下手。
+
+拿到旧机资料后,Claude 扫描 / 判断:
 
 - **扫 `~/.claude/`**:`CLAUDE.md`、`settings.json`、`skills/`、`commands/`、`hooks/`、`mcpServers.json`、`plugins`、以及项目记忆目录。
 - **逐类判断**:哪些客户要带走 → 迁到新服务器对应位置;哪些是旧环境专属(绝对路径 / 旧密钥)→ 到新环境重配。

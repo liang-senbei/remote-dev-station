@@ -15,6 +15,7 @@ command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
 
 echo "[3/6] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
+mkdir -p /opt/workspace   # 默认工作区根（cloudgo/cloudnewat/cloudtmp 默认在此新建会话）
 # 会话系统 + Mac 桥接 + 工具全部装齐（cloudgo / watchdog 自愈 / 会话恢复都依赖它们）
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
@@ -32,7 +33,8 @@ cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-w
 # 手机 Moshi 单元一并放好；二进制由 moshi-hook update 装、配对后再 enable（见 phone/README.md）
 cp systemd/moshi-hook.service systemd/moshi-hook-healthcheck.service systemd/moshi-hook-healthcheck.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable cloud-sessions.service cloud-watchdog.timer
+systemctl enable --now cloud-sessions.service cloud-watchdog.timer   # --now:装完即起,不必等重启(否则核心体检当场红)
+systemctl enable --now fail2ban 2>/dev/null || true                  # SSH 防爆破,cloud_infra_check 的核心项
 
 echo "[6/6] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
@@ -41,6 +43,7 @@ ufw --force enable
 echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac' 别名；② git 身份；③ tailscale up"
 echo "注：图形桌面层(noVNC/xfce/Chrome) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
 
+set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的核心(避免 set -e 让整脚本非零退出)
 # ---- Shell 增强 (fzf + starship + ble.sh) ----
 echo "[+] 安装 shell 增强"
 add-apt-repository -y universe 2>/dev/null || true

@@ -125,7 +125,7 @@ Tailscale 有个 **MagicDNS**:开了之后每台机器还有个域名式的名�
 1. **两端不在同一 tailnet** → 两边各 `tailscale status`,确认能互相看到;看不到 = 有一台没登、或登错账号。
 2. **客户端填了 MagicDNS 名** → 改成 `100.x` IP(§4)。手机端最常见。
 3. **服务器 node key 过期** → `tailscale status` 看本机状态,`tailscale up` 重认证或后台 Disable key expiry(§5)。
-4. **IP 写错了地方** → 检查 `cloudconn` 的 `HOST`、`cloud-dashboards.service` 的 `--bind`、`widgets.json` 的 URL,是不是还留着作者的 `100.109.254.125`(§3 必改清单)。
+4. **IP 写错了地方** → 检查 `cloudconn` 的 `HOST`、`widgets.json` 的 URL,是不是还留着作者的 `100.109.254.125`(§3 必改清单)。服务器侧 novnc/看板已自动取本机 IP、不用查。
 5. **代理没绕过 tailnet 段** → Mac 代理里放行 `100.64.0.0/10`(§4 坑)。
 6. **`tailscaled` 没在跑** → `systemctl is-active tailscaled`,不行 `systemctl restart tailscaled` 再 `tailscale up`。
 

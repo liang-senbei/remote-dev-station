@@ -7,7 +7,7 @@
 ## 1. 基础 config(拷回 ~/.claude/)
 - `CLAUDE.md` → `~/.claude/CLAUDE.md`(全局指令)
 - `settings.json` → `~/.claude/settings.json`(钩子:cc-state / moshi-hook / hub-gate)
-- `hooks/` `commands/` `references/` `mcpServers.json` → `~/.claude/` 对应位置
+- `hooks/`(含 cc-state 接线、hub-gate、typecheck 等) `commands/` `references/` `mcpServers.json` → `~/.claude/` 对应位置;仓根 `statusline.py` → `~/.claude/statusline.py`(状态行,settings.json 引用)
 - **6 个 MCP**(见 `mcpServers.json`):context7 · sequential-thinking · shopify-dev-mcp · fetch · fakewechat · chrome-devtools
 
 ## 2. 插件 + 技能(凭记录重装,不存内容)

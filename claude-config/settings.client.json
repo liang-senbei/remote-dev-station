@@ -1,0 +1,31 @@
+{
+  "_note": "干净的客户 ~/.claude/settings.json 模板：只含会话恢复所需的 cc-state 钩子 + 跳过危险模式确认 + 队友进程内模式。不含作者专属的 moshi-hook / hub-gate.py / statusline.py / typecheck 等（那些引用本仓没有的脚本，照抄会每事件报错）。客户 cp 成自己的 ~/.claude/settings.json，或把 hooks 合并进已有的。手机 Moshi 层要用时，再按 phone/README.md 追加 moshi-hook 钩子。",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "PreToolUse": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "teammateMode": "in-process"
+}
