@@ -9,6 +9,8 @@
       "Bash(hub all *)"
     ]
   },
+  "model": "claude-fable-5[1m]",
+  "switchModelsOnFlag": false,
   "hooks": {
     "PermissionRequest": [
       {
