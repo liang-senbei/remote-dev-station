@@ -7,6 +7,8 @@
 > 服务器侧的"会话登记 + 断线自愈"**直接复用主仓库现成的 `cc-state`(hook 驱动登记)+
 > `cloud-watchdog`(内存守卫自愈)**——那套比这里的最小参考实现更好。本层只加两样:
 > ① Windows 的接入/隧道;② Wave 的多标签页恢复 UI。
+>
+> 反过来那条线(**服务器**够到 Windows 笔电取/送文件、取截图,`laptop` 别名 + `lapget/lapput/lapls/lapimg`)见 [`docs/windows-reverse-channel.md`](../docs/windows-reverse-channel.md)。
 
 ---
 

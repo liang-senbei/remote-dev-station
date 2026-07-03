@@ -19,7 +19,7 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 ## 🚀 从零部署(Quick Start —— 新服务器 / 交接给朋友照这个)
 
-> ⚠️ `install.sh` 会装:依赖(tmux/mosh/git/ufw/fail2ban)+ Claude Code(native,无需 Node)+ 会话层(全部 bin 脚本 / systemd 自愈 / tmux)+ shell 增强 + 防火墙。**只有 Tailscale 要先自备**(入网命脉,得先 `tailscale up`)。
+> ⚠️ `install.sh` 分 [1/7]~[7/7] 步,会装:依赖(tmux/mosh/git/curl/ufw/fail2ban/python3——python3 是 watchdog/cc-sessions 等自愈脚本的运行时)+ Claude Code(native,无需 Node)+ 会话层(全部 bin 脚本 / systemd 自愈 / tmux)+ 防火墙 + **[7/7] OOM 硬化(注意:这步做系统级改动——建 8G /swapfile、sysctl overcommit=1/swappiness=60、装 earlyoom、user.slice 内存软顶、cc-reap.timer 定时收空闲会话;可单独重跑 `bash oom/harden.sh`)** + shell 增强。**只有 Tailscale 要先自备**(入网命脉,得先 `tailscale up`)。
 
 **前置条件**
 1. **海外云服务器**:root、Ubuntu/Debian、建议 **≥16G 内存**(会话是重进程,约 ~10 个活跃封顶,见 §12.3)。
@@ -33,7 +33,7 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 # ① 前置:只有 Tailscale 要先自备(其余依赖 + Claude Code 由 install.sh 装)
 curl -fsSL https://tailscale.com/install.sh | sh && tailscale up   # 记下它分配的 100.x.y.z
 
-# ② 部署本体(install.sh 装依赖 / Claude Code / 全部 bin 脚本 / systemd 自愈 / tmux / 防火墙)
+# ② 部署本体(install.sh 装依赖 / Claude Code / 全部 bin 脚本 / systemd 自愈 / tmux / 防火墙 / OOM 硬化)
 git clone git@github.com:xiaoxihexiaoyu/remote-dev-station.git   # 客户换成自己的 fork（原仓私有、无权限）
 cd remote-dev-station && ./install.sh
 source ~/.bashrc                          # 让 cloudgo 等函数生效
@@ -201,7 +201,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 
 ## 附:仓库部署 / 备份 / 还原
 
-**仓库结构**:`bin/`(服务器脚本)· `systemd/`(服务单元:watchdog/sessions/novnc/cloud-dashboards)· `cloudconn`/`mosh-server-tmout`(Mac/服务器辅助)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
+**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/cc-reap/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
 
 **Wave 客户端配置 `wave-config/`**:
 - `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
@@ -218,17 +218,18 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 本仓 = **一套可复用的「远程 Claude 工作站」骨架** + **我(Echo)的个人配置**。换人复用时:**🟢 通用层照搬,🔴 个人层替换成自己的**。
 
 **🟢 通用层(换谁都能用,是这套系统本体)**
-- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/cloud-*`+`novnc` · `install.sh` · `bashrc-*.sh`
-- 多 agent:`hub/`
-- Mac 桥接:`bin/{macget,macput,macls,pullimg}`
+- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/`(cloud-*/cc-reap/moshi-hook*/novnc)· `oom/`(OOM 硬化:swap/sysctl/earlyoom/内存软顶/cc-reap 收空闲)· `install.sh` · `bashrc-*.sh`
+- 多 agent:`hub/` · `bin/cc-agents`(agent 指挥中心,一屏看全部会话状态)
+- 跨机桥接:`bin/{macget,macput,macls,pullimg}`(Mac)· `bin/{lapget,lapput,lapls,lapimg}`(Windows 笔电,ssh 别名 `laptop`)
 - Wave 工具:`wavetheme` · `wavetheme-server` · `statusline.py` · `com.wavetheme.ui.plist`
+- 可选(通用但不配也不影响核心):`bin/cc-agents-notify` + `cloud-tts.conf.example`(agent 状态跃迁推手机/笔电语音;要自填 MOSHI_TOKEN,不填=静默不推)
 
 **🔴 个人层(我特定的,复用必换)**
 - `claude-config/CLAUDE.md` —— 我的业务规则(Echo 前缀、raas/公司、机器分工)。
 - `claude-config/{settings.json, hooks/, mcpServers.json, installed_plugins.json, known_marketplaces.json}` —— **我选的 6 MCP / 9 插件 / 7 市场** + 钩子接线(含 moshi/hub)。⚠️ 工具本身大多通用、可从市场重装,**但"选了哪些"这套组合是个人配置**。
 - Skills(95)+ `hello2cc-local`(我的本地市场 = `github.com/hellowind777/hello2cc`)—— **个人技能组合**(内容不入库,清单在上面 records 里;还原见 `claude-config/RESTORE.md`)。
-- `wave-config/`(我的主题/部件审美)· `hammerspoon-init.lua`(我的 Mac)· `bin/wechat-cli`(业务)· `systemd/moshi-hook.service` + moshi 配对(我的手机审批)。
+- `wave-config/`(我的主题/部件审美)· `hammerspoon-init.lua`(我的 Mac)· `bin/wechat-cli`(业务)· moshi 配对/token(我的手机审批;`systemd/moshi-hook*` 单元文件本身归通用层)。
 
-> 一句话:**`bin/` + `systemd/`(cloud/novnc 部分) + `hub/` + `cloudconn` + Wave 工具 = 通用骨架;`claude-config/` 整目录 + `wave-config/` + 几个 Mac/业务脚本 = 个人配置。**
+> 一句话:**`bin/` + `systemd/` + `oom/` + `hub/` + `cloudconn` + Wave 工具 = 通用骨架;`claude-config/` 整目录 + `wave-config/` + 几个 Mac/业务脚本 = 个人配置。**
 >
 > ⚠️ **注**:🟢通用层里 `cloudconn` 与 `com.wavetheme.ui.plist` 是**通用结构、但内含作者 IP/用户名**,复用时按 [DEPLOY.md](DEPLOY.md) 阶段二「必改清单」替换;`bin/novnc-start.sh` 已改为自动取本机 IP、无需手改。

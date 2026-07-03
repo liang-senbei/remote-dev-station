@@ -15,7 +15,7 @@ No desktop app, no MCP server, no daemon — just `tmux` + one shell script. A d
 - 👀 **Status at a glance** — `hub ls` shows each agent's git state, remote, and path.
 - 💬 **Agent‑to‑agent messaging** — dispatch from one central shell, or let agents message each other directly.
 - 🧠 **Structured message framing** — every message is wrapped as an explicit agent‑to‑agent note: concise, machine‑readable, with reply instructions.
-- 📬 **Reliable delivery + inbox** — `hub` confirms the recipient is at an empty prompt before sending (it understands the Claude Code *agent‑teams roster*, busy/“thinking”, modals, drafts and shells). If it can't deliver safely it **spools to an inbox and auto‑delivers** when the recipient is ready again — never silently dropped.
+- 📬 **Safe direct delivery** — `hub` confirms the recipient is sitting at a Claude input box before sending (it understands the Claude Code *agent‑teams roster*, busy/“thinking”, modals, drafts, and shells — including shells whose prompt is `❯`, e.g. starship). If it can't deliver safely it **refuses loudly and drops that send** rather than risk typing your message into a shell to be run as a command — `hub peek` then retry, or `HUB_FORCE=1` to override. Sends are de‑duplicated within `HUB_DEDUP_WINDOW`, broadcasts stagger by `HUB_ALL_STAGGER`, and `hub say a,b,c "…"` fans out to several targets (skipping any that aren't ready).
 - 🪶 **Tiny & portable** — a single Bash file; only needs `tmux` (plus `git` for status).
 
 ## Requirements
