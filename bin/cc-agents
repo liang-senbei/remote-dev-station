@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+# cc-agents — Agent 指挥中心。聚合 注册表 + 活 tmux + cc-state 状态,一屏看尽每个
+# Claude agent 的 状态/repo·分支/当前任务/今日token·成本,按"需要你"排序。
+#   cc-agents          一次性表格(交互式 tty 末尾可输序号跳进会话)
+#   cc-agents -w       watch 模式(每 3s 刷新,只读,适合侧栏监控)
+#   cc-agents --json   机器可读(供网页/手机座舱消费)
+# 性能铁律:只解析在册/活跃的这十几个会话的 jsonl,绝不 glob 全部 1000+ 个。
+import sys, os, json, time, glob, re, subprocess
+
+sys.path.insert(0, "/usr/local/bin")
+try:
+    import ccdesc            # 复用 desc() 作任务兜底
+except Exception:
+    ccdesc = None
+
+HOME   = os.path.expanduser("~")
+REG    = os.path.join(HOME, ".cloud-sessions")
+STATUS = os.path.join(HOME, ".cloud-status")
+PROJ   = os.path.join(HOME, ".claude", "projects")
+COST_CACHE = os.path.join(STATUS, ".cost-cache.json")
+
+# 每百万 token 价格(标准档,est.)。模型从 message.model 判档,未知按 opus。
+PRICE = {
+    "opus":   {"in": 15.0, "out": 75.0, "cw": 18.75, "cr": 1.50},
+    "sonnet": {"in": 3.0,  "out": 15.0, "cw": 3.75,  "cr": 0.30},
+    "haiku":  {"in": 0.80, "out": 4.0,  "cw": 1.0,   "cr": 0.08},
+}
+def tier_of(model):
+    m = (model or "").lower()
+    if "haiku" in m: return "haiku"
+    if "sonnet" in m: return "sonnet"
+    return "opus"
+
+# ---- 复用自 cc-sessions 的两个小工具(内联,因 cc-sessions 无 .py 不可 import)----
+def decode_dir(encoded):
+    toks = encoded.split("-"); idx = 1 if toks and toks[0] == "" else 0; path = ""
+    while idx < len(toks):
+        best = None; cand = ""; j = idx
+        while j < len(toks):
+            cand = cand + ("-" if cand else "") + toks[j]
+            trial = (path + "/" + cand) if path else "/" + cand
+            if os.path.isdir(trial): best = (j, trial)
+            j += 1
+        if best is None:
+            rest = "/".join(toks[idx:]); return (path + "/" + rest) if path else "/" + rest
+        idx = best[0] + 1; path = best[1]
+    return path or "/"
+
+def rel(a):
+    a = int(a)
+    if a < 5:     return "刚刚"
+    if a < 60:    return "%ds" % a
+    if a < 3600:  return "%dm" % (a // 60)
+    if a < 86400: return "%dh" % (a // 3600)
+    return "%dd" % (a // 86400)
+
+def safe(name): return re.sub(r"[^\w.\-]", "_", name)
+
+# ---- 数据源 ----------------------------------------------------------------
+def records():
+    out = []
+    for p in sorted(glob.glob(os.path.join(REG, "*.json"))):
+        try:
+            r = json.load(open(p))
+            if isinstance(r, dict) and r.get("name"): out.append(r)
+        except Exception: pass
+    return out
+
+def live_tmux():
+    d = {}
+    try:
+        o = subprocess.check_output(["tmux", "list-sessions", "-F",
+              "#{session_name}|#{session_attached}|#{session_activity}"],
+              text=True, stderr=subprocess.DEVNULL)
+        for ln in o.splitlines():
+            parts = ln.strip().split("|")
+            if len(parts) >= 3:
+                d[parts[0]] = {"attached": parts[1] == "1", "activity": int(parts[2] or 0)}
+    except Exception: pass
+    return d
+
+def status_for(name, uuid):
+    for key in (name, uuid):
+        if not key: continue
+        p = os.path.join(STATUS, safe(key) + ".json")
+        if os.path.exists(p):
+            try:
+                r = json.load(open(p))
+                if isinstance(r, dict) and r.get("state"): return r
+            except Exception: pass
+    return {}
+
+def jsonl_by_uuid(uuid):
+    if not uuid: return ""
+    hits = glob.glob(os.path.join(PROJ, "*", uuid + ".jsonl"))
+    return hits[0] if hits else ""
+
+_gitcache = {}
+def git_info(d):
+    if not d or not os.path.isdir(d): return ("-", "-")
+    if d in _gitcache: return _gitcache[d]
+    res = ("-", "-")
+    try:
+        top = subprocess.check_output(["git","-C",d,"rev-parse","--show-toplevel"],
+              text=True, stderr=subprocess.DEVNULL, timeout=0.4).strip()
+        br = subprocess.check_output(["git","-C",d,"rev-parse","--abbrev-ref","HEAD"],
+              text=True, stderr=subprocess.DEVNULL, timeout=0.4).strip()
+        res = (os.path.basename(top), br)
+    except Exception: pass
+    _gitcache[d] = res; return res
+
+def tail_task(jsonl):
+    """只读末尾 256KB,取最新 assistant 文本(或 title)作当前任务。"""
+    if not jsonl or not os.path.exists(jsonl): return ""
+    try:
+        size = os.path.getsize(jsonl)
+        with open(jsonl, "rb") as f:
+            f.seek(max(0, size - 262144))
+            chunk = f.read()
+        lines = chunk.split(b"\n")[1:]  # 丢首个半行
+        text = ""; title = ""
+        for raw in lines:
+            if not raw.strip(): continue
+            try: o = json.loads(raw)
+            except Exception: continue
+            t = o.get("type")
+            if t == "assistant":
+                for b in (o.get("message") or {}).get("content", []) or []:
+                    if isinstance(b, dict) and b.get("type") == "text" and b.get("text","").strip():
+                        text = b["text"]
+            elif t in ("custom-title", "ai-title"):
+                title = o.get("title") or o.get("text") or title
+        chosen = title or text
+        return re.sub(r"\s+", " ", chosen).strip()[:60]
+    except Exception:
+        return ""
+
+# ---- 今日 token/成本:字节偏移增量缓存 -------------------------------------
+def load_cache():
+    try: return json.load(open(COST_CACHE))
+    except Exception: return {}
+def save_cache(c):
+    try:
+        tmp = COST_CACHE + ".tmp"
+        json.dump(c, open(tmp,"w")); os.replace(tmp, COST_CACHE)
+    except Exception: pass
+
+def cost_today(uuid, jsonl, cache):
+    """从缓存偏移读新增字节,累计当天 assistant token 成本(est.)。返回 (tokens, usd)。"""
+    if not jsonl or not os.path.exists(jsonl): return (0, 0.0)
+    today = time.strftime("%Y-%m-%d", time.localtime())
+    size = os.path.getsize(jsonl)
+    ent = cache.get(uuid, {})
+    if ent.get("day") != today:
+        ent = {"day": today, "tokens": 0, "cost": 0.0,
+               "offset": max(0, size - 4*1024*1024)}  # 跨天/首跑:回扫≤4MB
+    off = min(ent.get("offset", 0), size)
+    tokens = ent.get("tokens", 0); cost = ent.get("cost", 0.0)
+    try:
+        with open(jsonl, "rb") as f:
+            f.seek(off); buf = f.read()
+        nl = buf.rfind(b"\n")
+        consume = buf if nl < 0 else buf[:nl]
+        newoff = off + (len(consume) + (1 if nl >= 0 else 0))
+        start_partial = (off > 0)  # 非首字节起读 → 丢可能的半行
+        first = True
+        for raw in consume.split(b"\n"):
+            if first and start_partial: first = False; continue
+            first = False
+            if not raw.strip(): continue
+            try: o = json.loads(raw)
+            except Exception: continue
+            if o.get("type") != "assistant": continue
+            ts = o.get("timestamp","")
+            if not ts.startswith(today): continue   # ISO 形如 2026-06-23T...
+            u = (o.get("message") or {}).get("usage") or {}
+            if not u: continue
+            p = PRICE[tier_of((o.get("message") or {}).get("model"))]
+            it=u.get("input_tokens",0); ot=u.get("output_tokens",0)
+            cw=u.get("cache_creation_input_tokens",0); cr=u.get("cache_read_input_tokens",0)
+            tokens += it+ot+cw            # 显示总量排除 cache_read(缓存复用,非新增工作量)
+            cost += (it*p["in"]+ot*p["out"]+cw*p["cw"]+cr*p["cr"]) / 1_000_000  # 成本仍含 cache_read(低价)
+        ent.update({"offset": newoff, "tokens": tokens, "cost": cost})
+        cache[uuid] = ent
+    except Exception: pass
+    return (tokens, cost)
+
+# ---- 分类(WaveTerm 标签页 → 1/2/3/4/5)-------------------------------------
+CATFILE = os.path.join(HOME, ".cloud-categories.json")
+def load_cats():
+    try: return json.load(open(CATFILE))
+    except Exception: return {}
+CATS = load_cats()
+def cat_of(tab):
+    c = CATS.get(tab or "")
+    return (c.get("num", 99), c.get("name", "未分类")) if c else (99, "未分类")
+
+# ---- 聚合 ------------------------------------------------------------------
+ATTN = {"input":0, "done":1, "stalled":2, "work":3, "idle":4, "ended":5}
+def build():
+    reg = records(); tmux = live_tmux(); cache = load_cache()
+    by_uuid = {}   # uuid -> agent；无 uuid 的用 name 兜底键
+    def put(name, rec):
+        uuid = rec.get("uuid",""); key = uuid or ("name:"+name)
+        cur = by_uuid.get(key)
+        # 去重:优先有 tmux 活的、其次 ts 新
+        rank = (1 if rec.get("_live") else 0, rec.get("ts",0))
+        if cur is None or rank > cur["_rank"]:
+            rec["_rank"] = rank; by_uuid[key] = rec
+
+    # 注册表里未结束的
+    for r in reg:
+        if r.get("ended"): continue
+        nm = r["name"]; r["_live"] = nm in tmux
+        put(nm, dict(r))
+    # 活 tmux 里不在注册表的(裸会话)
+    regnames = {r["name"] for r in reg}
+    for nm, info in tmux.items():
+        if nm == "unknown" or nm.startswith("_"): continue
+        if nm not in regnames:
+            put(nm, {"name": nm, "uuid": "", "dir": "", "ts": info["activity"], "_live": True})
+
+    agents = []
+    now = time.time()
+    for rec in by_uuid.values():
+        nm = rec["name"]; uuid = rec.get("uuid","")
+        jl = jsonl_by_uuid(uuid)
+        realdir = decode_dir(os.path.basename(os.path.dirname(jl))) if jl else rec.get("dir","")
+        repo, branch = git_info(realdir)
+        st = status_for(nm, uuid)
+        state = st.get("state","idle"); detail = st.get("detail","")
+        tinfo = tmux.get(nm, {})
+        last_ts = max(st.get("ts",0), tinfo.get("activity",0), rec.get("ts",0))
+        task = detail or tail_task(jl) or (ccdesc.desc(nm,"",uuid) if ccdesc else "")
+        toks, usd = cost_today(uuid, jl, cache)
+        # 归一 attention
+        attn = state if state in ATTN else "work"
+        if attn == "end": attn = "ended"
+        if attn == "work" and last_ts and (now-last_ts) > 600: attn = "stalled"
+        tab = rec.get("tab","")
+        cnum, cname = cat_of(tab)
+        agents.append({
+            "name": nm, "uuid": uuid, "live": rec.get("_live",False),
+            "attached": tinfo.get("attached", False),
+            "dir": realdir, "repo": repo, "branch": branch,
+            "state": state, "attention": attn,
+            "tab": tab, "cat_num": cnum, "cat_name": cname,
+            "task": task, "last_ts": last_ts, "last_rel": rel(now-last_ts) if last_ts else "-",
+            "tokens_today": toks, "cost_today_usd": round(usd, 2),
+        })
+    save_cache(cache)
+    # 先按分类(WaveTerm标签页)分组,组内按"需要你"排序
+    agents.sort(key=lambda a: (a["cat_num"], ATTN.get(a["attention"],9), -a["last_ts"]))
+    return agents
+
+# ---- 渲染 ------------------------------------------------------------------
+C = {"rst":"\033[0m","b":"\033[1m","dim":"\033[2m","cy":"\033[36m","gn":"\033[32m",
+     "yl":"\033[33m","rd":"\033[31m","mg":"\033[35m"}
+TAG = {"input":(C["rd"]+C["b"],"●等你"),"done":(C["gn"],"✓完成"),
+       "stalled":(C["mg"],"◌停滞"),"work":(C["cy"],"◐运行"),
+       "idle":(C["yl"],"○空闲"),"ended":(C["dim"],"·结束")}
+
+def dwidth(s):  # 东亚宽字符按 2 计
+    import unicodedata
+    return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
+def pad(s, w):
+    s = str(s); d = dwidth(s)
+    if d > w:
+        out=""; cur=0
+        for c in s:
+            import unicodedata
+            cw = 2 if unicodedata.east_asian_width(c) in "WF" else 1
+            if cur+cw > w-1: out+="…"; cur=w; break
+            out+=c; cur+=cw
+        return out + " "*max(0, w-cur)
+    return s + " "*(w-d)
+padw = pad
+
+def clipw(s, n):
+    import unicodedata
+    if n <= 0: return ""
+    out = ""; cur = 0
+    for c in str(s):
+        cw = 2 if unicodedata.east_asian_width(c) in "WF" else 1
+        if cur + cw > n: break
+        out += c; cur += cw
+    return out
+
+def fmt_tok(n):
+    if n >= 1_000_000: return "%.1fM" % (n/1_000_000)
+    if n >= 1000: return "%dk" % (n//1000)
+    return str(n)
+
+def host_banner():
+    try: load = open("/proc/loadavg").read().split()[:3]
+    except Exception: load = ["?","?","?"]
+    mem_t = mem_a = 0
+    try:
+        for ln in open("/proc/meminfo"):
+            if ln.startswith("MemTotal:"): mem_t = int(ln.split()[1])
+            elif ln.startswith("MemAvailable:"): mem_a = int(ln.split()[1])
+    except Exception: pass
+    used_g = (mem_t-mem_a)/1024/1024; tot_g = mem_t/1024/1024
+    try:
+        st = os.statvfs("/"); disk_pct = 100*(1-(st.f_bavail/st.f_blocks)) if st.f_blocks else 0
+    except Exception: disk_pct = 0
+    try:
+        o = subprocess.check_output(["ss","-tln"], text=True, stderr=subprocess.DEVNULL)
+        tun = f"{C['gn']}✓{C['rst']}" if ":2222 " in o else f"{C['rd']}✗{C['rst']}"
+    except Exception: tun = "?"
+    def pc(n):
+        try: return int(subprocess.check_output(["pgrep","-xc",n], text=True, stderr=subprocess.DEVNULL).strip() or 0)
+        except Exception: return 0
+    memcol = C['rd'] if (tot_g and used_g/tot_g > 0.85) else C['rst']
+    diskcol = C['rd'] if disk_pct > 90 else C['rst']
+    return (f"{C['b']}{C['cy']} {os.uname().nodename}{C['rst']}  负载 {','.join(load)}  "
+            f"内存 {memcol}{used_g:.1f}/{tot_g:.0f}G{C['rst']}  磁盘 {diskcol}{disk_pct:.0f}%{C['rst']}  "
+            f"隧道 {tun}  claude {pc('claude')}·mosh {pc('mosh-server')}")
+
+_ANSI = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
+def hb_plain():
+    return _ANSI.sub("", host_banner()).strip()
+
+def render(agents):
+    out = [host_banner()]
+    waiting = [a for a in agents if a["attention"]=="input"]
+    if waiting:
+        names = ", ".join(a["name"] for a in waiting)
+        out.append(f"{C['rd']}{C['b']} ⚠ {len(waiting)} 个 agent 等你:{names}{C['rst']}")
+    out.append(f"{C['b']}{C['cy']} Agent 指挥中心 · {time.strftime('%H:%M:%S')} · 共 {len(agents)} 个{C['rst']}")
+    out.append(f"{C['dim']} {'#':>2} {'状态':<6} {'会话':<16} {'分支':<18} {'最后':<5} {'今日':>6} {'$':>6}  当前任务{C['rst']}")
+    curcat = None
+    for i, a in enumerate(agents, 1):
+        if a["cat_name"] != curcat:                       # 分类组头(WaveTerm 标签页)
+            curcat = a["cat_name"]
+            tag = f"[{a['cat_num']}] " if a["cat_num"] != 99 else ""
+            out.append(f"{C['b']}{C['mg']}── {tag}{curcat} ──{C['rst']}")
+        col, label = TAG.get(a["attention"], (C["dim"], a["attention"]))
+        att = "*" if a["attached"] else " "
+        line = (f" {i:>2}{att}{col}{pad(label,6)}{C['rst']} "
+                f"{pad(a['name'],16)} {C['dim']}{pad(a['branch'],18)}{C['rst']} "
+                f"{a['last_rel']:<5} {fmt_tok(a['tokens_today']):>6} "
+                f"{('$'+format(a['cost_today_usd'],'.2f')):>6}  "
+                f"{C['dim']}{a['task']}{C['rst']}")
+        out.append(line)
+    return "\n".join(out)
+
+def watch(make):
+    import signal
+    def restore(*_): sys.stdout.write("\033[?25h"); sys.stdout.flush(); sys.exit(0)
+    signal.signal(signal.SIGINT, restore); signal.signal(signal.SIGTERM, restore)
+    sys.stdout.write("\033[?25l")
+    try:
+        while True:
+            sys.stdout.write("\033[H\033[2J"); sys.stdout.write(render(make()))
+            sys.stdout.write(f"\n\n{C['dim']}  (每3s刷新 · Ctrl-C 退出){C['rst']}\n"); sys.stdout.flush()
+            time.sleep(3)
+    finally:
+        restore()
+
+# ---- 交互式指挥中心(curses)------------------------------------------------
+TAGTXT = {"input":"●等你","done":"✓完成","stalled":"◌停滞","work":"◐运行","idle":"○空闲","ended":"·结束"}
+def interactive():
+    import curses, locale
+    locale.setlocale(locale.LC_ALL, "")
+    CMAP = {"input":1,"done":2,"work":3,"stalled":4,"idle":5,"ended":6,"hdr":3,"warn":1}
+
+    def app(scr):
+        curses.curs_set(0); curses.use_default_colors()
+        for name,fg in [("input",curses.COLOR_RED),("done",curses.COLOR_GREEN),
+                        ("work",curses.COLOR_CYAN),("stalled",curses.COLOR_MAGENTA),
+                        ("idle",curses.COLOR_YELLOW),("ended",curses.COLOR_WHITE)]:
+            curses.init_pair(CMAP[name], fg, -1)
+        scr.timeout(2500)
+        agents = build(); sel = 0; flash = ""
+
+        def put(y, x, s, w=None, attr=0):
+            h, mw = scr.getmaxyx()
+            if y >= h or x >= mw: return
+            s = str(s)
+            if w is not None: s = padw(s, w)
+            s = clipw(s, mw - x - 1)
+            try: scr.addstr(y, x, s, attr)
+            except curses.error: pass
+
+        while True:
+            scr.erase(); H, W = scr.getmaxyx()
+            sel = max(0, min(sel, len(agents)-1)) if agents else 0
+            # 主机横幅
+            put(0, 1, hb_plain(), attr=curses.color_pair(CMAP["hdr"]) | curses.A_BOLD)
+            waiting = [a for a in agents if a["attention"]=="input"]
+            if waiting:
+                put(1, 1, f"⚠ {len(waiting)} 个 agent 等你: " + ", ".join(a['name'] for a in waiting),
+                    attr=curses.color_pair(CMAP["input"]) | curses.A_BOLD)
+            put(2, 1, f"指挥中心 · {time.strftime('%H:%M:%S')} · 共 {len(agents)} 个",
+                attr=curses.color_pair(CMAP["hdr"]) | curses.A_BOLD)
+            # 列头
+            hy = 3
+            put(hy, 2, "状态", 6, curses.A_DIM); put(hy, 9, "会话", 18, curses.A_DIM)
+            put(hy, 28, "分支", 16, curses.A_DIM); put(hy, 45, "最后", 6, curses.A_DIM)
+            put(hy, 52, "今日", 6, curses.A_DIM); put(hy, 59, "$est", 7, curses.A_DIM)
+            put(hy, 67, "当前任务", attr=curses.A_DIM)
+            # 行(按分类标签页分组,组头独占一行不参与选择)
+            y = hy + 1; curcat = None
+            for i, a in enumerate(agents):
+                if a["cat_name"] != curcat:
+                    curcat = a["cat_name"]
+                    if y >= H-1: break
+                    tg = f"[{a['cat_num']}] " if a["cat_num"] != 99 else ""
+                    put(y, 1, f"── {tg}{curcat} ──", attr=curses.color_pair(CMAP['stalled']) | curses.A_BOLD)
+                    y += 1
+                if y >= H-1: break
+                rowattr = curses.A_REVERSE if i == sel else 0
+                col = curses.color_pair(CMAP.get(a["attention"], 6))
+                if i == sel:
+                    try: scr.addstr(y, 0, " "*(W-1), curses.A_REVERSE)
+                    except curses.error: pass
+                mark = "▸" if i == sel else (" ")
+                att  = "*" if a["attached"] else " "
+                put(y, 0, mark, attr=rowattr)
+                put(y, 2, TAGTXT.get(a["attention"], a["attention"]), 6, col | rowattr | curses.A_BOLD)
+                put(y, 9, att + a["name"], 18, rowattr)
+                put(y, 28, a["branch"], 16, rowattr | curses.A_DIM)
+                put(y, 45, a["last_rel"], 6, rowattr)
+                put(y, 52, fmt_tok(a["tokens_today"]), 6, rowattr)
+                put(y, 59, "$"+format(a["cost_today_usd"], ".0f"), 7, rowattr)
+                put(y, 67, a["task"], attr=rowattr | curses.A_DIM)
+                y += 1
+            # 页脚
+            hint = "↑↓选择  ⏎进入  s下指令  x结束  r刷新  q退出"
+            put(H-1, 1, (flash + "   " if flash else "") + hint, attr=curses.A_DIM)
+            scr.refresh()
+
+            ch = scr.getch(); flash = ""
+            if ch == -1: agents = build(); continue            # 超时自动刷新
+            if ch in (ord('q'), 27): return None
+            elif ch in (curses.KEY_DOWN, ord('j')): sel = min(sel+1, len(agents)-1)
+            elif ch in (curses.KEY_UP, ord('k')):   sel = max(sel-1, 0)
+            elif ch in (curses.KEY_ENTER, 10, 13):
+                if agents: return ("attach", agents[sel]["name"])
+            elif ch == ord('r'): agents = build()
+            elif ch == ord('s'):                               # 给 agent 下指令(send-keys)
+                if not agents: continue
+                nm = agents[sel]["name"]
+                scr.move(H-1, 0); scr.clrtoeol()
+                scr.addstr(H-1, 1, f"指令→{nm}: ", curses.color_pair(CMAP['work'])|curses.A_BOLD)
+                curses.curs_set(1); curses.echo()
+                try: line = scr.getstr().decode("utf-8", "ignore")
+                except Exception: line = ""
+                curses.noecho(); curses.curs_set(0)
+                if line.strip():
+                    subprocess.run(["tmux","send-keys","-t",nm, line, "Enter"], stderr=subprocess.DEVNULL)
+                    flash = f"已发给 {nm}"; agents = build()
+            elif ch == ord('x'):
+                if not agents: continue
+                nm = agents[sel]["name"]
+                put(H-1, 1, f"确认结束会话 {nm}? 按 y 确认,其它取消", attr=curses.color_pair(CMAP['input'])|curses.A_BOLD)
+                scr.refresh()
+                if scr.getch() in (ord('y'), ord('Y')):
+                    subprocess.run(["tmux","kill-session","-t",nm], stderr=subprocess.DEVNULL)
+                    flash = f"已结束 {nm}"; time.sleep(0.3); agents = build()
+                    sel = max(0, min(sel, len(agents)-1))
+
+    try:
+        res = curses.wrapper(app)
+    except Exception:
+        watch(build); return                                   # curses 失败回落
+    if res and res[0] == "attach":
+        os.execvp("tmux", ["tmux", "attach", "-t", res[1]])
+
+def main():
+    arg = sys.argv[1] if len(sys.argv) > 1 else ""
+    if arg == "--json":
+        agents = build()
+        summ = {"total":len(agents),
+                "waiting":sum(1 for a in agents if a["attention"]=="input"),
+                "working":sum(1 for a in agents if a["attention"] in ("work","stalled")),
+                "done":sum(1 for a in agents if a["attention"]=="done"),
+                "idle":sum(1 for a in agents if a["attention"] in ("idle","ended")),
+                "tokens_today":sum(a["tokens_today"] for a in agents),
+                "cost_today_usd":round(sum(a["cost_today_usd"] for a in agents),2)}
+        print(json.dumps({"host":os.uname().nodename,"generated_at":time.time(),
+                          "summary":summ,"agents":agents}, ensure_ascii=False, indent=2))
+        return
+    if arg in ("-w","--watch"):
+        watch(build); return                                   # 纯展示 watch(回落/日志用)
+    if arg == "--once":
+        print(render(build())); return
+    # 默认:交互式指挥中心(tty);非 tty 则打印一次
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        interactive()
+    else:
+        print(render(build()))
+
+if __name__ == "__main__":
+    main()
