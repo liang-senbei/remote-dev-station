@@ -108,6 +108,7 @@ task package      # 生产构建 + 打包,产物在 make/(Linux ARM64 用 USE_SY
 ## 深入 runbook(docs/)
 
 某一步卡住时查这些细则(都实测核实过):
+- [`docs/deploy-test.md`](docs/deploy-test.md) —— 部署后功能验收:五闭环定义 + 全量测试点(A/S/O/M/H)+ S5 失败定位表;配 `/deploy-accept` 命令与 `tests/deploy-test.sh`(阶段五收尾跑)。
 - [`docs/headless-login.md`](docs/headless-login.md) —— 无头 VPS 上 `claude` 首次 OAuth 登录(卡在浏览器那步)。
 - [`docs/tailscale-setup.md`](docs/tailscale-setup.md) —— Tailscale 三设备同 tailnet + 无头授权 + IP/key 过期。
 - [`docs/mac-reverse-channel.md`](docs/mac-reverse-channel.md) —— (选装)服务器 Claude 够到 Mac 取/送文件、取截图。

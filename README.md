@@ -43,6 +43,8 @@ claude
 # 无头卡在浏览器那步 → docs/headless-login.md;Tailscale 无头授权/三设备同网 → docs/tailscale-setup.md
 ```
 
+**装完验收(推荐)**:服务器上跑 `bash tests/deploy-test.sh all`(或把 `claude-config/commands/deploy-accept.md` 拷进 `~/.claude/commands/`,对 Claude 说一句 `/deploy-accept`)——完整功能验收,含**断电自愈真测**(只碰 `cc-ztest-*` 专用测试会话、测完自动清理),出一页报告。测试点/判据见 [`docs/deploy-test.md`](docs/deploy-test.md)。
+
 **电脑(Mac)0→1**
 1. 装 Tailscale + Wave 终端 + mosh;`tailscale up` 登入**同一 tailnet**。
 2. 还原 Wave 配置:`cp -r wave-config/waveterm/* ~/.config/waveterm/`(详见末附「Wave 客户端配置」)。
@@ -201,7 +203,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 
 ## 附:仓库部署 / 备份 / 还原
 
-**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
+**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知/部署验收)· `tests/`(部署后验收脚本 `deploy-test.sh`)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
 
 **Wave 客户端配置 `wave-config/`**:
 - `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
