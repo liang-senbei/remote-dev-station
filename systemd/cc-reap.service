@@ -1,9 +1,0 @@
-[Unit]
-Description=Reap idle unattached Claude tmux sessions (transcript kept, resumable)
-After=cloud-sessions.service
-
-[Service]
-Type=oneshot
-Environment=HOME=/root
-Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/root/.local/bin/cc-reap 180

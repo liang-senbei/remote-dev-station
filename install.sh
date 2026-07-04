@@ -48,7 +48,7 @@ echo "[6/7] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
 ufw --force enable
 
-echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机 + 定时收空闲会话）"
+echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"
 bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
 
 echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac'（Mac 客户端）/'laptop'（Windows 客户端）别名；② git 身份；③ tailscale up"

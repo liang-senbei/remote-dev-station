@@ -22,7 +22,6 @@ chkopt moshi-hook-healthcheck.timer "daemon卡死自愈兜底"       "systemctl 
 chkopt novnc.service                "服务器 GUI 桌面 :6080"    "装图形桌面层(见桌面层文档)"
 chkopt cloud-dashboards.service     "项目看板 :8088"           "systemctl restart cloud-dashboards.service"
 chkopt earlyoom.service             "RAM见底主动杀最肥claude"  "bash oom/harden.sh 装 OOM 防护层"
-chkopt cc-reap.timer                "每30min收空闲>180min会话" "bash oom/harden.sh 装 OOM 防护层"
 chkopt cloudflared.service          "对外域名隧道(作者专属)"  "作者环境专用,客户一般不需要"
 echo "-- 功能探活 --"
 if timeout 12 /root/.local/bin/moshi-hook status >/dev/null 2>&1; then

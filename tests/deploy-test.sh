@@ -175,14 +175,13 @@ PYEOF
   if [ -z "$miss" ]; then pass A8 "ufw 基线齐(22/tcp+mosh-udp+tailscale0)且 fail2ban 在岗" "ufw active + fail2ban active"
   else fail A8 "防火墙基线缺项" "缺:$miss"; fi
 
-  # A9 OOM 五层硬化落地(oom/harden.sh 承诺的可验状态)
-  local eo rt sw oc smb; miss=""
+  # A9 OOM 四层硬化落地(oom/harden.sh 承诺的可验状态)
+  local eo sw oc smb; miss=""
   eo=$(systemctl is-active earlyoom 2>/dev/null);      [ "$eo" = "active" ] || miss="$miss earlyoom=$eo"
-  rt=$(systemctl is-active cc-reap.timer 2>/dev/null); [ "$rt" = "active" ] || miss="$miss cc-reap.timer=$rt"
   sw=$(cat /proc/sys/vm/swappiness 2>/dev/null);       [ "${sw:-0}" = "60" ] || miss="$miss swappiness=$sw(应60)"
   oc=$(cat /proc/sys/vm/overcommit_memory 2>/dev/null);[ "${oc:-9}" = "1" ]  || miss="$miss overcommit=$oc(应1)"
   smb=$(free -m | awk '/^Swap:/{print $2}');           [ "${smb:-0}" -ge 8000 ] || miss="$miss swap=${smb}MB(应≥8000)"
-  if [ -z "$miss" ]; then pass A9 "OOM 硬化到位(earlyoom+cc-reap+swappiness60+overcommit1+swap≥8G)" "swap=${smb}MB"
+  if [ -z "$miss" ]; then pass A9 "OOM 硬化到位(earlyoom+swappiness60+overcommit1+swap≥8G)" "swap=${smb}MB"
   else fail A9 "OOM 硬化没落地(单会话内存暴涨会拖垮整机),重跑 bash oom/harden.sh" "缺:$miss"; fi
 
   # A10 hub 多会话中控可用

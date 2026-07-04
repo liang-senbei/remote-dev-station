@@ -19,7 +19,7 @@ Claude **不在你设备上**,跑在 **美国服务器 echo-j2** 的 **tmux** �
 
 ## 🚀 从零部署(Quick Start —— 新服务器 / 交接给朋友照这个)
 
-> ⚠️ `install.sh` 分 [1/7]~[7/7] 步,会装:依赖(tmux/mosh/git/curl/ufw/fail2ban/python3——python3 是 watchdog/cc-sessions 等自愈脚本的运行时)+ Claude Code(native,无需 Node)+ 会话层(全部 bin 脚本 / systemd 自愈 / tmux)+ 防火墙 + **[7/7] OOM 硬化(注意:这步做系统级改动——建 8G /swapfile、sysctl overcommit=1/swappiness=60、装 earlyoom、user.slice 内存软顶、cc-reap.timer 定时收空闲会话;可单独重跑 `bash oom/harden.sh`)** + shell 增强。**只有 Tailscale 要先自备**(入网命脉,得先 `tailscale up`)。
+> ⚠️ `install.sh` 分 [1/7]~[7/7] 步,会装:依赖(tmux/mosh/git/curl/ufw/fail2ban/python3——python3 是 watchdog/cc-sessions 等自愈脚本的运行时)+ Claude Code(native,无需 Node)+ 会话层(全部 bin 脚本 / systemd 自愈 / tmux)+ 防火墙 + **[7/7] OOM 硬化(注意:这步做系统级改动——建 8G /swapfile、sysctl overcommit=1/swappiness=60、装 earlyoom、user.slice 内存软顶;可单独重跑 `bash oom/harden.sh`)** + shell 增强。**只有 Tailscale 要先自备**(入网命脉,得先 `tailscale up`)。
 
 **前置条件**
 1. **海外云服务器**:root、Ubuntu/Debian、建议 **≥16G 内存**(会话是重进程,约 ~10 个活跃封顶,见 §12.3)。
@@ -201,7 +201,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 
 ## 附:仓库部署 / 备份 / 还原
 
-**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/cc-reap/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
+**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
 
 **Wave 客户端配置 `wave-config/`**:
 - `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
@@ -218,7 +218,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 本仓 = **一套可复用的「远程 Claude 工作站」骨架** + **我(Echo)的个人配置**。换人复用时:**🟢 通用层照搬,🔴 个人层替换成自己的**。
 
 **🟢 通用层(换谁都能用,是这套系统本体)**
-- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/`(cloud-*/cc-reap/moshi-hook*/novnc)· `oom/`(OOM 硬化:swap/sysctl/earlyoom/内存软顶/cc-reap 收空闲)· `install.sh` · `bashrc-*.sh`
+- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/`(cloud-*/moshi-hook*/novnc)· `oom/`(OOM 硬化:swap/sysctl/earlyoom/内存软顶)· `install.sh` · `bashrc-*.sh`
 - 多 agent:`hub/` · `bin/cc-agents`(agent 指挥中心,一屏看全部会话状态)
 - 跨机桥接:`bin/{macget,macput,macls,pullimg}`(Mac)· `bin/{lapget,lapput,lapls,lapimg}`(Windows 笔电,ssh 别名 `laptop`)
 - Wave 工具:`wavetheme` · `wavetheme-server` · `statusline.py` · `com.wavetheme.ui.plist`

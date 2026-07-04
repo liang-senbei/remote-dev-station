@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # OOM 硬化（幂等，可重复跑）：防"单个 1M-context claude 会话 RAM 暴涨拖垮整机"。
 # 实测过的失败模式——单进程涨到 6.7G，swap 却还剩 59%：swappiness 太低时内核宁可硬 OOM 也不换页。
-# 五层：swap 兜底 + overcommit/swappiness + earlyoom 主动杀最肥 claude + user.slice 软顶 + cc-reap 收空闲。
+# 四层：swap 兜底 + overcommit/swappiness + earlyoom 主动杀最肥 claude + user.slice 软顶。
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 say(){ echo "  [oom] $*"; }
@@ -37,11 +37,4 @@ mkdir -p /etc/systemd/system/user.slice.d
 sed "s/__MEMHIGH__/$MEMHIGH/" "$HERE/user-slice-memoryhigh.conf" > /etc/systemd/system/user.slice.d/50-memoryhigh.conf
 systemctl daemon-reload 2>/dev/null
 say "user.slice MemoryHigh=$MEMHIGH（RAM ${RAM_MB}MB×0.8）"
-
-# 5) cc-reap 定时（每 30min 杀空闲>180min 未 attach 会话；对话存档不删，claude --resume 可找回）
-if [ -f "$HERE/../systemd/cc-reap.service" ]; then
-  install -m644 "$HERE/../systemd/cc-reap.service" "$HERE/../systemd/cc-reap.timer" /etc/systemd/system/
-  systemctl daemon-reload 2>/dev/null
-  systemctl enable --now cc-reap.timer >/dev/null 2>&1 && say "cc-reap.timer 已启" || say "⚠️ cc-reap.timer 没起"
-fi
-say "完成。核对：systemctl is-active earlyoom cc-reap.timer ；cat /proc/sys/vm/swappiness（应=60）"
+say "完成。核对：systemctl is-active earlyoom ；cat /proc/sys/vm/swappiness（应=60）"

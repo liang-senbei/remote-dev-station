@@ -46,7 +46,7 @@ S5 最长等 120s);全量 10 分钟内。
    这是一切自愈的地基:登记表恒空 = watchdog 无从拉起,还**不报错**。
 3. **杀会话 → watchdog 按 uuid 拉回**——tmux 会话被杀(≈断电/崩溃)后,15s 级 watchdog 连名带对话
    原样接回。对应 S5(正向)+ S2(反向:主动 `/exit` 的不纠缠)。
-4. **OOM 硬化在位**——swap / swappiness / overcommit / earlyoom / user.slice 软顶 / cc-reap 五层都在,
+4. **OOM 硬化在位**——swap / swappiness / overcommit / earlyoom / user.slice 软顶 四层都在,
    单个会话内存暴涨拖不垮整机。对应 A8。
 5. **tailscale·ufw·可选层就位**——入网命脉 + 防火墙基线 + 装了的可选层(Moshi/桌面/看板)都活着。
    对应 A4/A9 + O 段。
@@ -60,14 +60,14 @@ S5 最长等 120s);全量 10 分钟内。
 
 | 编号·测什么 | 怎么测 | 期望(PASS 判据) | FAIL 怎么判 / 去哪修 |
 |---|---|---|---|
-| **A1** 脚本与接线就位 | `~/.local/bin/` 下 `cc-state cc-sessions cloud-watchdog cloud-forget cloud-sessmenu cloud-sesslist cloud-sesspreview cloud-delmenu cc-reap hub` 全部可执行;`/usr/local/bin/cloud-boot.sh` 在;`grep -q 'Moshi-CloudCode setup' ~/.bashrc`;`[ -f ~/.tmux.conf ]` | 全在 | 缺啥都别单补,重跑 `./install.sh`(幂等) |
+| **A1** 脚本与接线就位 | `~/.local/bin/` 下 `cc-state cc-sessions cloud-watchdog cloud-forget cloud-sessmenu cloud-sesslist cloud-sesspreview cloud-delmenu hub` 全部可执行;`/usr/local/bin/cloud-boot.sh` 在;`grep -q 'Moshi-CloudCode setup' ~/.bashrc`;`[ -f ~/.tmux.conf ]` | 全在 | 缺啥都别单补,重跑 `./install.sh`(幂等) |
 | **A2** 登录 + 模型真可用 | `timeout 90 env -u TMUX -u TMUX_PANE claude --model "$M" -p ok` | 退出码 0 且有非空回复 | 报未登录 → [headless-login.md](headless-login.md);报模型不存在/无权限 → **DEPLOY 阶段一「必改·会话模型」**(最高频坑) |
 | **A3** 模型两处一致 | 比对 `~/.bashrc` 的 `CLOUD_MODEL="…"` 与 `/etc/systemd/system/cloud-watchdog.service` 的 `Environment="CLOUD_MODEL=…"` | 两值相同,且客户机上**不是** `claude-fable-5[1m]` | 只改一处 = "新建会话正常、断电自愈全死"(或反过来);两处都改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer` |
 | **A4** systemd 核心 + 入网 | `systemctl is-active cloud-watchdog.timer cloud-sessions.service tailscaled fail2ban`;`systemctl is-enabled cloud-watchdog.timer cloud-sessions.service`;`tailscale ip -4` | 全 active 且 enabled;有 `100.x.y.z` | 不 active 的按 `cloud_infra_check.sh` 打印的「恢复:」提示;tailscale 起不来 → [tailscale-setup.md](tailscale-setup.md) |
 | **A5** cc-state 钩子接线 | `grep -q cc-state ~/.claude/settings.json` | 命中 | 没命中 = 登记表恒空、自愈静默哑火 → 铺/合并 `claude-config/settings.client.json`(DEPLOY 阶段一) |
 | **A6** 建会话→登记闭环 | 建 `n=cc-deploytest-$RANDOM`:`tmux new-session -d -s $n "cd /opt/workspace && IS_SANDBOX=1 claude --model \"$M\" --effort max -n deploytest --dangerously-skip-permissions"`;10s 后 pane 进程树里仍有 claude;`tmux send-keys -t $n '只回复 ok' Enter`;轮询 ≤60s `~/.cloud-sessions/$n.json` 出现且 `.uuid` 非空 | 会话活着 + 登记齐 | claude 秒退 → 回看 A2/A3;登记文件不出现 → A5;uuid 恒空 → 看 `~/.claude/projects/-opt-workspace/` 有没有新 jsonl |
 | **A7** 登记可解析 | (A6 会话还活着时)`cc-sessions list` 含 `$n`;`cc-sessions resolve $n` 给出 dir+uuid;测完 `cloud-forget $n` 清场 | 都命中,清场成功 | resolve 失败 = 登记 json 损坏/缺字段 → 直接看 `~/.cloud-sessions/$n.json` 内容 |
-| **A8** OOM 硬化在位 | `free -m` 看 Swap;`cat /proc/sys/vm/swappiness`;`cat /proc/sys/vm/overcommit_memory`;`systemctl is-active earlyoom cc-reap.timer`;`[ -f /etc/systemd/system/user.slice.d/50-memoryhigh.conf ]` | swap ≥ 8G(或原有更大)、swappiness=60、overcommit=1、两单元 active、conf 在 | 任一缺 → 重跑 `bash oom/harden.sh`(幂等);earlyoom 装不上的极简镜像按脚本自己的提示处理 |
+| **A8** OOM 硬化在位 | `free -m` 看 Swap;`cat /proc/sys/vm/swappiness`;`cat /proc/sys/vm/overcommit_memory`;`systemctl is-active earlyoom`;`[ -f /etc/systemd/system/user.slice.d/50-memoryhigh.conf ]` | swap ≥ 8G(或原有更大)、swappiness=60、overcommit=1、earlyoom active、conf 在 | 任一缺 → 重跑 `bash oom/harden.sh`(幂等);earlyoom 装不上的极简镜像按脚本自己的提示处理 |
 | **A9** 防火墙基线 | `ufw status` | `Status: active`,含 `22/tcp`、`60000:61000/udp`(mosh)、`Anywhere on tailscale0` | 缺哪条照 install.sh 第 [6/7] 步补 `ufw allow …`,再 `ufw --force enable` |
 | **A10** 基建体检全绿 | `bash cloud_infra_check.sh; echo $?` | 退出码 0(可选层显示 ⏭ 不算失败) | 按它打印的「恢复:」逐项修完重跑 |
 
@@ -138,7 +138,7 @@ S5 是全链路(登记 → recoverable 过滤 → timer → 内存守卫 → res
 |---|---|---|---|---|
 | 1 | 120s 没动静,journal 里连提都没提这会话 | `systemctl is-active cloud-watchdog.timer`;`cc-sessions recoverable` 里有没有它 | timer 没跑;或被 recoverable 滤掉:登记 `ended=true` / `uuid` 空 / 对话 jsonl 不在 / 登记的 dir 已不存在 | timer:`systemctl enable --now cloud-watchdog.timer`;其余打开 `~/.cloud-sessions/<名>.json` 看哪个字段不对,分别回修 A5/A6;jsonl 不在多半是迁移路径编码错(M1) |
 | 2 | journal 有"拉回 …",但会话起了又死、反复,最后打"退避" | `journalctl -u cloud-watchdog --since -10min`;把 unit 那条 resume 命令手跑一遍看真实报错 | **watchdog 用的是 unit 里 `Environment=CLOUD_MODEL`,不是 `~/.bashrc`**——只改了 bashrc 一处,自愈还在用作者专属模型,启动即死 | DEPLOY 阶段一「必改·会话模型」**两处都改** → `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`;然后等退避冷却(600s)或删 `~/.cloud-status/_watchdog.json` 立即重试 |
-| 3 | journal 打"内存仅 xxxMB(<4000),暂缓恢复" | `free -m` | 不是 bug:内存守卫在防 OOM 雪崩,空闲 <4G 整轮不拉 | 关几个闲会话(或等 cc-reap 收)后自动继续;真要激进,调 watchdog 里 `MIN_FREE_MB`(自担 OOM 风险) |
+| 3 | journal 打"内存仅 xxxMB(<4000),暂缓恢复" | `free -m` | 不是 bug:内存守卫在防 OOM 雪崩,空闲 <4G 整轮不拉 | 关几个闲会话后自动继续;真要激进,调 watchdog 里 `MIN_FREE_MB`(自担 OOM 风险) |
 | 4 | journal 打"退避 <名>: 180s 内拉起 3 次仍死,冷却 600s" | 手动跑一遍 resume 命令,看它到底怎么死的 | 会话本身起不来(模型/登录/目录没了),watchdog 按设计退避防狂拉 | 先修死因(多半就是第 2 行),再等冷却或删 `~/.cloud-status/_watchdog.json` |
 | 5 | 会话回来了,但登记 uuid 变了 / 对话是全新的 | `ls ~/.claude/projects/<目录编码>/ \| grep <旧uuid>`;手跑 `env -u TMUX -u TMUX_PANE claude --resume <旧uuid>` 看报错 | 旧 jsonl 没了(被删 / 路径编码不对),resume 失败落成新对话 | 找回/修正 jsonl 位置(M1);实在找不回就接受新对话、让登记随之更新 |
 | 6 | tmux 会话在,里面却是个 bash 壳、没 claude | `ps --forest -o pid,cmd -g $(tmux list-panes -t <名> -F '#{pane_pid}')`;`diff ~/.local/bin/cloud-watchdog bin/cloud-watchdog` | 旧版 watchdog 的 `\|\| exec bash` 残留:claude 崩了剩壳冒充存活,watchdog 以为成功不再补救 | 重跑 `./install.sh` 装仓版(新版故意让失败会话彻底死 → 下轮重试 + 退避兜底) |
