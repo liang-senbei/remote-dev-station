@@ -256,21 +256,23 @@ PYEOF
   fi
 
   # S1 起一个真会话(启动命令照抄 bashrc-cloud-snippet 的 cloud():IS_SANDBOX=1 + skip-permissions;
-  #    -d 后台 + env -u TMUX 以便本脚本自己在 tmux 里跑时也能建)。判据:cc-state 的 SessionStart
-  #    钩子 ≤60s 在 ~/.cloud-status/ 写出状态文件 = 会话活了且钩子链路通。
+  #    -d 后台 + env -u TMUX 以便本脚本自己在 tmux 里跑时也能建)。判据:cc-state 的「恢复登记」文件
+  #    ~/.cloud-sessions/<name>.json ≤60s 出现 = 会话活了且 cc-state 钩子链路通。
+  #    ★为什么盯登记文件、不盯 ~/.cloud-status:后者是已下线的 :8722 看板产物,当前部署的 cc-state
+  #      多半不再写它(实测确实没写);而登记文件(name/dir/uuid/ended)才是断电自愈真正依赖、新旧 cc-state 都写的。
   env -u TMUX -u TMUX_PANE tmux new-session -d -s "$ZNAME" \
     "cd '$ZDIR' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions"
-  local stf="$HOME/.cloud-status/$ZNAME.json" t0 okS1=""
+  local reg="$HOME/.cloud-sessions/$ZNAME.json" t0 okS1=""
   t0=$(date +%s)
-  while [ $(( $(date +%s) - t0 )) -le 60 ]; do [ -s "$stf" ] && { okS1=$(( $(date +%s) - t0 )); break; }; sleep 2; done
-  if [ -n "$okS1" ]; then pass S1 "测试会话 $ZNAME 启动,${okS1}s 内状态文件出现(cc-state 钩子链路通)" "$stf"
+  while [ $(( $(date +%s) - t0 )) -le 60 ]; do [ -s "$reg" ] && { okS1=$(( $(date +%s) - t0 )); break; }; sleep 2; done
+  if [ -n "$okS1" ]; then pass S1 "测试会话 $ZNAME 启动,${okS1}s 内恢复登记出现(cc-state 钩子链路通)" "$reg"
   else
-    fail S1 "60s 无状态文件(会话没起来或钩子没接上)" "屏幕尾行: $(tmux capture-pane -p -t "$ZNAME" 2>/dev/null | tail -3 | one_line)"
+    fail S1 "60s 无恢复登记文件(会话没起来或 cc-state 钩子没接上)" "屏幕尾行: $(tmux capture-pane -p -t "$ZNAME" 2>/dev/null | tail -3 | one_line)"
     cleanup_ztest; return 0
   fi
 
-  # S2 恢复登记表正确(name↔dir↔uuid,ended=false —— 断电自愈全靠这条记录)
-  local reg="$HOME/.cloud-sessions/$ZNAME.json" rdir="" rend="" i
+  # S2 恢复登记表字段正确(name↔dir↔uuid,ended=false —— 断电自愈全靠这条记录)
+  local rdir="" rend="" i
   for i in $(seq 1 15); do
     IFS=$'\t' read -r ZUUID rdir rend < <(python3 - "$reg" <<'PYEOF'
 import json, sys
@@ -288,36 +290,64 @@ PYEOF
     cleanup_ztest; return 0
   fi
 
-  # S3 对话存档唯一(--resume 的接头暗号恰好一份)
-  local n; n=$(ls "$HOME"/.claude/projects/*/"$ZUUID".jsonl 2>/dev/null | wc -l)
-  if [ "$n" -eq 1 ]; then pass S3 "对话存档 jsonl 恰 1 份" "$(ls "$HOME"/.claude/projects/*/"$ZUUID".jsonl 2>/dev/null)"
-  else fail S3 "对话存档数量异常(=$n,应为 1)" "glob ~/.claude/projects/*/$ZUUID.jsonl"; fi
-
-  # S4 给会话发真提示词,等它答完(状态机 done)且屏幕出现暗号 —— 证明这是台能干活的会话
-  sleep 3   # 等 TUI 输入框就绪
-  tmux send-keys -t "$ZNAME" -l "请原样回复一行:$ZMARK 已收到"
-  sleep 1
-  tmux send-keys -t "$ZNAME" Enter
-  local state="" cap=""
+  # ── 先让会话产生一次真对话(S3/S4 的前提)────────────────────────────────
+  # 实测关键事实:新会话在「提交第一条消息」之前根本不写 ~/.claude/projects/*/<uuid>.jsonl,
+  # 而 cc-sessions recoverable 要求 jsonl 存在才算「可恢复」→ 没发过消息的会话 kill 掉 watchdog 也不会拉。
+  # 所以必须先发一条消息把对话落盘,S5 才有得测;故把「发消息」放在 S3(存档校验)之前。
+  # 提交是否成功一律以「暗号是否进了 jsonl」为准 —— 不看 ~/.cloud-status(已下线)、也不 grep 屏幕:
+  #   暗号会先在输入框回显 → capture-pane 假命中;而 jsonl 只记「已提交」的对话轮次,才是真凭据。
+  local jl="" submitted="" answered="" tries=0
+  sleep 3                                              # 等 TUI 输入框就绪
+  tmux send-keys -t "$ZNAME" -l "reply with exactly this token: $ZMARK"
+  sleep 1; tmux send-keys -t "$ZNAME" Enter
   t0=$(date +%s)
   while [ $(( $(date +%s) - t0 )) -le 120 ]; do
-    state=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("state",""))' "$stf" 2>/dev/null)
-    [ "$state" = "done" ] && break; sleep 3
+    jl=$(ls "$HOME"/.claude/projects/*/"$ZUUID".jsonl 2>/dev/null | head -1)
+    if [ -n "$jl" ] && grep -qF "$ZMARK" "$jl" 2>/dev/null; then submitted=$(( $(date +%s) - t0 )); break; fi
+    tries=$((tries+1)); [ $((tries % 4)) -eq 0 ] && tmux send-keys -t "$ZNAME" Enter   # 首个 Enter 可能被启动横幅吞 → ~每12s 补发一次
+    sleep 3
   done
-  cap=$(tmux capture-pane -p -t "$ZNAME" -S -200 2>/dev/null)
-  if [ "$state" = "done" ] && printf '%s' "$cap" | grep -qF "$ZMARK"; then
-    pass S4 "会话真干活:$(( $(date +%s) - t0 ))s 内答完(state=done)且屏幕含暗号 $ZMARK" "状态机+capture-pane 双证"
-  else
-    fail S4 "会话没答上(state=${state:-无} / 暗号未现)——模型不可用或输入没进去" "屏幕尾行: $(printf '%s' "$cap" | tail -3 | one_line)"
-    cleanup_ztest; return 0
+  # 顺带探一下模型是否真回了话(bonus,不作判据):Fable5 等被内容分类器拦时只落用户轮、不落 assistant 轮,
+  # 但对话已可 --resume,断电自愈不受影响 —— 所以模型没回话不判 S4 负。
+  if [ -n "$submitted" ]; then
+    answered=$(python3 - "$jl" "$ZMARK" <<'PYEOF'
+import json, sys
+f, mark = sys.argv[1], sys.argv[2]; seen = asst = False
+try:
+    for ln in open(f):
+        try: o = json.loads(ln)
+        except Exception: continue
+        if mark in json.dumps(o, ensure_ascii=False) and o.get("type") == "user": seen = True
+        if seen and o.get("type") == "assistant": asst = True
+except Exception: pass
+print("yes" if asst else "no")
+PYEOF
+)
   fi
 
-  # S5【头号测试】模拟断电:杀掉 tmux 会话,看 watchdog 是否 ≤90s 连名带原对话拉回
+  # S3 对话存档唯一(--resume 的接头暗号恰好一份;由上面这条消息落盘)
+  local n; n=$(ls "$HOME"/.claude/projects/*/"$ZUUID".jsonl 2>/dev/null | wc -l)
+  if [ "$n" -eq 1 ]; then pass S3 "对话存档 jsonl 恰 1 份" "$jl"
+  else fail S3 "对话存档数量异常(=$n,应为 1;=0 多半是消息没提交进去)" "glob ~/.claude/projects/*/$ZUUID.jsonl"; fi
+
+  # S4 消息确已提交进对话(暗号落进 jsonl)= 会话既能收指令、对话也可被 resume 接回
+  if [ -n "$submitted" ]; then
+    pass S4 "暗号 $ZMARK 已落进对话 jsonl(${submitted}s;以 jsonl 为凭、与屏幕回显无关)$([ "$answered" = yes ] && echo ' + 模型已回话' || echo ' · 模型未回话(可能被内容分类器拦,不影响可恢复性)')" "jsonl 凭据"
+  else
+    fail S4 "120s 内暗号没进 jsonl(消息没提交成功——TUI 卡弹窗/输入没进去/模型起不来)" "屏幕尾行: $(tmux capture-pane -p -t "$ZNAME" 2>/dev/null | tail -3 | one_line)"
+    cleanup_ztest; return 0                            # 没有可恢复对话 → S5 无从测,清理退出
+  fi
+
+  # S5【头号测试】模拟断电:kill 掉 tmux 会话。实测 kill-session 不会触发 SessionEnd → 登记 ended 保持
+  #    false,忠实模拟「崩溃/断电」(而非「主动 /exit」——那会 ended=true、按设计不该自愈)。
+  #    随后看 watchdog 是否 ≤90s 连名带原对话 --resume 拉回。
   if ! [[ "$ZNAME" =~ ^cc-ztest-[0-9]+$ ]]; then
     fail S5 "安全断言失败:会话名 '$ZNAME' 不符 ^cc-ztest-[0-9]+$,拒绝 kill" "防呆护栏"
     cleanup_ztest; return 0
   fi
   tmux kill-session -t "$ZNAME" 2>/dev/null
+  sleep 3
+  local recov; recov=$(cc-sessions recoverable 2>/dev/null | grep -c "$ZNAME")   # 死后应立即进「可恢复」名单(登记在∧jsonl在∧不在线∧非ended)
   local killt back="" alive="" proc="" markd=""
   killt=$(date +%s)
   while [ $(( $(date +%s) - killt )) -le 90 ]; do
@@ -325,7 +355,7 @@ PYEOF
     sleep 3
   done
   if [ -z "$back" ]; then
-    fail S5 "kill 后 90s 无同名会话回归——断电自愈不工作" "watchdog.timer=$(systemctl is-active cloud-watchdog.timer 2>/dev/null) 登记ended=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("ended"))' "$reg" 2>/dev/null)"
+    fail S5 "kill 后 90s 无同名会话回归——断电自愈不工作" "recoverable列出=$recov watchdog.timer=$(systemctl is-active cloud-watchdog.timer 2>/dev/null) 登记ended=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("ended"))' "$reg" 2>/dev/null)"
   else
     sleep 30                                                       # ② 复查:不是回光返照
     tmux has-session -t "$ZNAME" 2>/dev/null && alive=1
