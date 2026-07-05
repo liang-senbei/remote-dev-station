@@ -1,5 +1,53 @@
 {
-  "__comment__": "把下面两个 widget 合并进 Wave 的 widgets.json(%USERPROFILE%\\.config\\waveterm\\widgets.json)。cmd 里的 <USERPROFILE> 换成真实路径,如 C:\\Users\\you。display:order 越小越靠上。安装脚本 install.ps1 会自动按动态路径写入、并保证无 BOM。",
+  "__comment__": "把下面这些 widget 合并进 Wave 的 widgets.json(%USERPROFILE%\\.config\\waveterm\\widgets.json)。cmd 里的 <USERPROFILE> 换成真实路径,如 C:\\Users\\you。display:order 越小越靠上。安装脚本 install.ps1 会自动按动态路径写入、并保证无 BOM。",
+
+  "cc-agents": {
+    "display:order": -4,
+    "icon": "satellite-dish",
+    "label": "指挥中心",
+    "color": "#eb6f92",
+    "description": "一屏看全部 agent 会话状态(cc-agents),经 WSL mosh 抗断进服务器",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\cc-mosh-run.ps1 cc-agents",
+        "cmd:interactive": true
+      }
+    }
+  },
+
+  "tunnel-check": {
+    "display:order": -1,
+    "icon": "plug-circle-check",
+    "label": "隧道",
+    "color": "#56949f",
+    "description": "检查反向隧道在线,断了自动重启 NSSM 服务(笔电本地跑)",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\tunnel-check.ps1",
+        "cmd:interactive": true
+      }
+    }
+  },
+
+  "cc-pick": {
+    "display:order": 0,
+    "icon": "rectangle-list",
+    "label": "选会话",
+    "color": "#c4a7e7",
+    "description": "列/选服务器会话进入(cloudgo 选择器),经 WSL mosh 抗断",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\cc-mosh-run.ps1 bash -ic cloudgo",
+        "cmd:interactive": true
+      }
+    }
+  },
 
   "cc-launch": {
     "display:order": -3,

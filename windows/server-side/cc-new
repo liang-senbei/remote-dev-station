@@ -1,26 +1,36 @@
 #!/usr/bin/env bash
-# cc-new <名称…>  服务器侧:按名开/续 Claude 会话。Wave「新会话」widget 调用它。
-#   · 已在跑 → attach;登记过 → --resume 同 uuid;全新 → --session-id 钉死新 uuid 并登记。
-#   · 会话名直接用你起的名字(保留中文,只清空格和 .: 引号反引号)→ tmux 名 = cc-<名>,一眼可认。
-#   · 所属 Wave 标签页经环境变量 CC_TAB 传入,记入注册表第 6 列,供「恢复本页」按页过滤。
-#
-# 注:本仓库已有更完善的 hook 驱动登记(cc-state)+ 内存守卫自愈(cloud-watchdog)。
-#     建议:把这里的"出生即 --session-id 钉死"思路并入 cc-state,登记表用 ~/.cloud-sessions/。
-#     此脚本是 Wave 层的最小自包含参考实现。
-REG=/root/.claude/cc-registry.tsv
-PROJ="${CC_PROJ:-/opt/workspace}"     # ← 改成你的项目根
+# cc-new <名称>  在 /opt/workspace/<名称> 开/续受管 Claude 会话。
+export PATH="$HOME/.local/bin:$PATH"   # ssh 非交互调用时 sshd 只给极简 PATH,claude 在 ~/.local/bin 找不到 → pane 127 秒退
+#   · 已在跑 → attach;有登记 → --resume 接回;全新 → 同步写登记表(不靠异步钩子)+ 钉死 --session-id。
+#   登记进主账本 ~/.cloud-sessions/,cloud-watchdog 自愈、「恢复本页」可一键弹回。
 name="$*"
 [ -z "$name" ] && { echo "用法: cc-new <名称>"; exit 1; }
 slug=$(printf '%s' "$name" | tr -s '[:space:]' '-' | tr -d '.:`"'"'" | sed 's/^-*//; s/-*$//')
-[ -z "$slug" ] && slug="s$(date +%s | tail -c 6)"
-uuid=$(awk -F'\t' -v s="$slug" '$1==s{print $3; exit}' "$REG" 2>/dev/null)
-if tmux has-session -t "cc-$slug" 2>/dev/null; then
-  exec tmux attach -t "cc-$slug"
-fi
+[ -z "$slug" ] && slug="s$(date +%m%d%H%M%S)"
+sess="cc-$slug"; dir="/opt/workspace/$slug"; mkdir -p "$dir"
+python3 - "$dir" <<'PY' 2>/dev/null || true
+import json,os,sys
+p=os.path.expanduser("~/.claude.json")
+try: d=json.load(open(p)) if os.path.exists(p) else {}
+except Exception: d={}
+if isinstance(d,dict):
+    d.setdefault("projects",{}).setdefault(sys.argv[1],{})["hasTrustDialogAccepted"]=True
+    json.dump(d,open(p,"w"))
+PY
+tmux has-session -t "$sess" 2>/dev/null && exec tmux attach -t "$sess"
+CLOUD_MODEL=""; CLOUD_OPTS=""
+eval "$(grep -m1 '^CLOUD_MODEL=' "$HOME/.bashrc" 2>/dev/null)"
+eval "$(grep -m1 '^CLOUD_OPTS='  "$HOME/.bashrc" 2>/dev/null)"
+mkdir -p "$HOME/.cloud-sessions"; reg="$HOME/.cloud-sessions/$sess.json"
+uuid=""
+[ -s "$reg" ] && uuid=$(python3 -c "import json,sys
+try: print((json.load(open(sys.argv[1])) or {}).get('uuid',''))
+except Exception: print('')" "$reg" 2>/dev/null)
 if [ -n "$uuid" ]; then
-  exec tmux new-session -s "cc-$slug" "claude --resume $uuid"
-else
-  uuid=$(cat /proc/sys/kernel/random/uuid)
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$slug" "$name" "$uuid" "$PROJ" "$(date +%s)" "${CC_TAB:-}" >> "$REG"
-  exec tmux new-session -s "cc-$slug" "claude --session-id $uuid"
+  exec env -u TMUX tmux new-session -s "$sess" -e "CC_TAB=${CC_TAB:-}" \
+    "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --resume '$uuid' -n '$slug' --dangerously-skip-permissions"
 fi
+uuid=$(cat /proc/sys/kernel/random/uuid)
+python3 -c "import json,sys,time;json.dump({'name':sys.argv[1],'dir':sys.argv[2],'uuid':sys.argv[3],'ts':time.time(),'src':'cc-new','ended':False,'tab':sys.argv[4]},open(sys.argv[5],'w'))" "$sess" "$dir" "$uuid" "${CC_TAB:-}" "$reg"
+exec env -u TMUX tmux new-session -s "$sess" -e "CC_TAB=${CC_TAB:-}" \
+  "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --session-id '$uuid' -n '$slug' --dangerously-skip-permissions"

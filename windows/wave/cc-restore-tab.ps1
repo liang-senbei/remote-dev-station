@@ -3,8 +3,11 @@
 # 依赖:同目录的 cc-wave-lib.ps1;服务器侧 cc-restore / cc-slugs-by-tab(见仓库 bin/ 与 windows/README)。
 # 注意:本脚本须由 Wave widget 启动(块内才有 WAVETERM_SWAPTOKEN);外部 shell 跑不出 wsh 权限。
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8   # ssh/wsh 回传 UTF-8;PS5.1 默认按本地码页(GBK)解码会乱码/坏中文 slug(hotfix,待回写仓库)
 $ErrorActionPreference = 'SilentlyContinue'
-$SRV = 'root@<SERVER_PUBLIC_IP>'   # ← 改成你的服务器(user@host)
+$dv = Join-Path $env:USERPROFILE '.ssh\deploy-vars.ps1'   # 个人/客户配置层:提供 $SRV
+if (-not (Test-Path $dv)) { Write-Host "缺 $dv —— 先跑 wave\install.ps1 或拷 deploy-vars.ps1.example 填 `$SRV" -ForegroundColor Red; exit 1 }
+. $dv
 $wsh = Join-Path $env:LOCALAPPDATA 'waveterm\Data\bin\wsh.exe'
 $log = Join-Path $env:USERPROFILE '.ssh\cc-restore-tab.log'
 . (Join-Path $env:USERPROFILE '.ssh\cc-wave-lib.ps1')

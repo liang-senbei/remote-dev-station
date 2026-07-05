@@ -1,6 +1,9 @@
 # tunnel-check.ps1 — 检查反向隧道是否在线;断了就重启 NSSM 服务。可做成 Wave widget 或定时任务。
 # 判活方式:ssh 到服务器看它本机有没有在 127.0.0.1:2222 监听(= 隧道这头活着)。
-$server = 'root@<SERVER_PUBLIC_IP>'              # ← 改成你的服务器
+$dv = Join-Path $env:USERPROFILE '.ssh\deploy-vars.ps1'   # 个人/客户配置层:提供 $SRV
+if (-not (Test-Path $dv)) { Write-Host "缺 $dv —— 先跑 wave\install.ps1 或拷 deploy-vars.ps1.example 填 `$SRV" -ForegroundColor Red; exit 1 }
+. $dv
+$server = $SRV
 $svcName = 'LaptopReverseTunnel'           # NSSM 服务名
 $port = 2222                                # 反向隧道在服务器侧绑的端口
 

@@ -1,18 +1,32 @@
 #!/usr/bin/env bash
-# cc-restore [slug]  服务器侧:登记过但没在跑(tmux 没了)的会话,后台 --resume 连名带对话拉回。
-#   无参 = 全部。cron / 手动 / Wave「恢复本页」均可调。
+# cc-restore [slug]  服务器侧:登记过(~/.cloud-sessions/*.json)但 tmux 没在跑的会话,后台 --resume 连名带对话拉回。
+#   无参 = 全部未主动结束(ended:false)的。cron / 手动 / Wave「恢复本页」第一步均可调。
+#   账本与 cc-new / cc-slugs-by-tab 同源(~/.cloud-sessions/),启动参数与 cc-new 同规格。
 #
 # ⚠️ 注意:这是「无脑全拉」版,会话多/内存小会 OOM 雪崩。生产请用本仓库的 cloud-watchdog
 #     (内存守卫:空闲<阈值整轮暂缓、每轮最多 1 个、崩溃退避、ended 标记不复活主动退出的)。
 #     本脚本仅供 Wave 层手动一键触发的最小参考。
-REG=/root/.claude/cc-registry.tsv
-[ -s "$REG" ] || { echo "(注册表空)"; exit 0; }
+export PATH="$HOME/.local/bin:$PATH"   # ssh 非交互调用时 sshd 只给极简 PATH,claude 在 ~/.local/bin 找不到 → pane 以 127 秒退(keuury 实锤)
+REG_DIR="$HOME/.cloud-sessions"
+[ -d "$REG_DIR" ] || { echo "(账本空)"; exit 0; }
 only="$1"; r=0; a=0
-while IFS=$'\t' read -r slug name uuid proj created tab; do
-  [ -z "$slug" ] && continue
+CLOUD_MODEL=""; CLOUD_OPTS=""
+eval "$(grep -m1 '^CLOUD_MODEL=' "$HOME/.bashrc" 2>/dev/null)"
+eval "$(grep -m1 '^CLOUD_OPTS='  "$HOME/.bashrc" 2>/dev/null)"
+shopt -s nullglob
+for f in "$REG_DIR"/cc-*.json; do
+  line=$(python3 -c "import json,sys
+r=json.load(open(sys.argv[1]))
+print('\t'.join([str(r.get(k,'')) for k in ('name','dir','uuid','tab')]+[str(r.get('ended',False))]))" "$f" 2>/dev/null) || continue
+  IFS=$'\t' read -r sess dir uuid tab ended <<<"$line"
+  { [ -z "$sess" ] || [ -z "$uuid" ]; } && continue
+  slug="${sess#cc-}"
   [ -n "$only" ] && [ "$only" != "$slug" ] && continue
-  if tmux has-session -t "cc-$slug" 2>/dev/null; then a=$((a+1)); continue; fi
-  tmux new-session -d -s "cc-$slug" "claude --resume $uuid" \
-    && { echo "↻ 恢复 cc-$slug  [$name]"; r=$((r+1)); } || echo "✗ 失败 cc-$slug"
-done < "$REG"
+  [ "$ended" = "True" ] && continue
+  tmux has-session -t "$sess" 2>/dev/null && { a=$((a+1)); continue; }
+  [ -d "$dir" ] || dir="/opt/workspace/$slug"
+  tmux new-session -d -s "$sess" -e "CC_TAB=${tab}" \
+    "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --resume '$uuid' -n '$slug' --dangerously-skip-permissions" \
+    && { echo "↻ 恢复 $sess"; r=$((r+1)); } || echo "✗ 失败 $sess"
+done
 echo "完成:恢复 $r,已在跑 $a。"

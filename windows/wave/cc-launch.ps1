@@ -2,7 +2,10 @@
 # 会话出生即 `cc-new` 钉死 session-id,并打上"本页 tab"标记(CC_TAB),归「恢复本页」管。
 # 依赖:同目录 cc-wave-lib.ps1;服务器侧 cc-new(见 windows/README)。
 
-$SRV = 'root@<SERVER_PUBLIC_IP>'   # ← 改成你的服务器(user@host)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8   # ssh/wsh 回传 UTF-8;PS5.1 默认按本地码页(GBK)解码会乱码/坏中文 slug(hotfix,待回写仓库)
+$dv = Join-Path $env:USERPROFILE '.ssh\deploy-vars.ps1'   # 个人/客户配置层:提供 $SRV
+if (-not (Test-Path $dv)) { Write-Host "缺 $dv —— 先跑 wave\install.ps1 或拷 deploy-vars.ps1.example 填 `$SRV" -ForegroundColor Red; exit 1 }
+. $dv
 $wsh = Join-Path $env:LOCALAPPDATA 'waveterm\Data\bin\wsh.exe'
 $log = Join-Path $env:USERPROFILE '.ssh\cc-restore-tab.log'
 . (Join-Path $env:USERPROFILE '.ssh\cc-wave-lib.ps1')

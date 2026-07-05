@@ -26,6 +26,7 @@
 ---
 
 ## 1. 反向 SSH 隧道(NSSM 常驻服务)
+> 🚀 **一键**:管理员跑 `install-tunnel.ps1`(建密钥+NSSM 服务,结尾打印服务器侧两步)。下面是原理/手动细节。
 
 笔电主动建反向隧道,服务器经 `127.0.0.1:2222` 回连笔电(也用来给隧道判活)。做成 **NSSM 服务**断线自动重连、开机自启。
 
@@ -38,6 +39,7 @@
 ---
 
 ## 2. WSL2 + mosh
+> 🚀 **一键**:管理员跑 `install-wsl-mosh.ps1`(装 WSL2+Ubuntu+mosh + `.wslconfig` 封顶内存;两段式,装完重启再跑一次)。
 
 Windows 无原生 mosh,在 WSL2(Ubuntu)里装 `mosh`,Wave 的 widget 走 `wsl -d Ubuntu -- mosh <server> -- <进会话命令>`。
 
