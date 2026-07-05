@@ -1,0 +1,6 @@
+#!/bin/bash
+# 推文件到 Mac（默认 ~/Downloads）： macput <本地文件> [Mac目标]
+MAC=${MAC:-mac}
+src="$1"; dst="${2:-Downloads/}"
+[ -z "$src" ] && { echo "用法: macput <本地文件> [Mac目标]" >&2; exit 1; }
+scp -q "$src" "$MAC":"$dst" && echo "已送到 Mac: ~/$dst$(basename "$src")"

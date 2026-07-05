@@ -1,0 +1,14 @@
+#!/bin/bash
+# 输出 tmux 会话：名字 + 最近活动相对时间，按最近排序；可选 $1=ERE 过滤名字
+pat="${1:-.}"
+now=$(date +%s)
+tmux list-sessions -F '#{session_activity}|#{session_name}' 2>/dev/null | sort -rn | \
+while IFS='|' read -r act sn; do
+  [[ "$sn" =~ $pat ]] || continue
+  d=$((now - act)); [ "$d" -lt 0 ] && d=0
+  if   [ "$d" -lt 60 ];    then t="刚刚"
+  elif [ "$d" -lt 3600 ];  then t="$((d/60))分前"
+  elif [ "$d" -lt 86400 ]; then t="$((d/3600))时前"
+  else t="$((d/86400))天前"; fi
+  printf '%-30s  %s\n' "$sn" "$t"
+done

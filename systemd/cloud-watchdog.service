@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile/auto-resurrect dead Claude sessions (watchdog)
+After=cloud-sessions.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=120
+Environment=HOME=/root
+Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment="CLOUD_MODEL=claude-fable-5[1m]"
+Environment="CLOUD_OPTS=--effort max"
+Environment=DISABLE_AUTOUPDATER=1
+ExecStart=/root/.local/bin/cloud-watchdog

@@ -1,0 +1,30 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "Notification": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "PreToolUse": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "/root/.local/bin/cc-state", "async": true }] }
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "teammateMode": "in-process"
+}

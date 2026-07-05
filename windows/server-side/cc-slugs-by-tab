@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# cc-slugs-by-tab <tabid>  输出属于某 Wave 标签页的会话 slug(一行一个)。
+# Wave「恢复本页」用它把恢复范围限定在"当前这一页该有的终端"。
+awk -F'\t' -v t="$1" 'NF && $6==t {print $1}' /root/.claude/cc-registry.tsv

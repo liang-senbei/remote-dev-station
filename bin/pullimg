@@ -1,0 +1,7 @@
+#!/bin/bash
+# 抓 Mac 上最近一张 Wave 粘贴/截图的图片到 ~/inbox，打印服务器路径
+MAC=${MAC:-mac}
+f=$(ssh "$MAC" 'bash -c "ls -t /var/folders/*/*/T/waveterm-*/waveterm_paste_*.png 2>/dev/null | head -1"')
+[ -z "$f" ] && { echo "Mac 上没找到 Wave 粘贴的图片" >&2; exit 1; }
+mkdir -p ~/inbox; o=~/inbox/$(basename "$f")
+scp -q "$MAC":"$f" "$o" && echo "$o"

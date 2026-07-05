@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+# cc-state — authoritative session-state writer, driven by Claude Code lifecycle hooks.
+# Each hook pipes its event JSON on stdin; we record the session's live state to
+# ~/.cloud-status/<tmux-session>.json so the dashboard reads truth (not screen-scraping).
+import sys, os, json, time, subprocess, re
+
+DIR = os.path.expanduser("~/.cloud-status")
+os.makedirs(DIR, exist_ok=True)
+
+def tmux_session():
+    pane = os.environ.get("TMUX_PANE", "")
+    if not pane:
+        return ""
+    try:
+        return subprocess.check_output(["tmux", "display", "-p", "-t", pane, "#{session_name}"],
+                                       text=True, stderr=subprocess.DEVNULL).strip()
+    except Exception:
+        return ""
+
+raw = ""
+try:
+    if not sys.stdin.isatty():
+        raw = sys.stdin.read()
+except Exception:
+    pass
+try:
+    data = json.loads(raw) if raw.strip() else {}
+except Exception:
+    data = {}
+
+ev = data.get("hook_event_name") or (sys.argv[1] if len(sys.argv) > 1 else "")
+key = tmux_session() or data.get("session_id", "") or "unknown"
+safe = re.sub(r"[^\w.\-]", "_", key)
+
+MAP = {
+    "UserPromptSubmit": ("work", "开始处理"),
+    "PreToolUse":       ("work", "运行中"),
+    "PostToolUse":      ("work", "处理中"),
+    "SubagentStop":     ("work", "子 agent 完成,继续"),
+    "Notification":     ("input", "等待你(决策/输入)"),
+    "PermissionRequest":("input", "等待授权"),
+    "Stop":             ("done", "已完成,等待指令"),
+    "SessionStart":     ("idle", "会话已启动"),
+    "SessionEnd":       ("end", "会话结束"),
+}
+st, detail = MAP.get(ev, ("work", ev or "活动"))
+
+def short(s, n=64):
+    return re.sub(r"\s+", " ", str(s)).strip()[:n]
+
+tool = data.get("tool_name")
+ti = data.get("tool_input") or {}
+if ev == "PreToolUse" and tool:
+    if tool == "Bash":      detail = "运行命令: " + short(ti.get("command", ""), 50)
+    elif tool in ("Edit", "Write", "Read"): detail = f"{tool} " + short(ti.get("file_path", ""), 50)
+    elif tool == "Task":    detail = "派发子任务: " + short(ti.get("description", ""), 45)
+    else:                   detail = "运行工具 " + tool
+elif ev == "UserPromptSubmit":
+    p = data.get("prompt") or data.get("user_prompt") or ""
+    if p: detail = "处理: " + short(p, 50)
+elif ev == "Notification":
+    m = data.get("message") or ""
+    if m: detail = short(m, 60)
+elif ev == "PermissionRequest":
+    if tool == "Bash":   detail = "等待授权: " + short(ti.get("command", ""), 45)
+    elif tool:           detail = "等待授权: " + tool
+    else:                detail = "等待授权"
+
+path = os.path.join(DIR, safe + ".json")
+if ev == "SessionEnd":
+    try: os.remove(path)
+    except Exception: pass
+else:
+    rec = {"state": st, "event": ev, "detail": detail, "ts": time.time(), "session": key}
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(rec, f, ensure_ascii=False)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+# ---- 按会话恢复登记表 (name↔dir↔uuid) ----------------------------------------
+# 重启后 cloud-recover 据此逐会话 `claude --resume <uuid>`,让每个会话连名带对话原样回来
+# (而非旧的"每目录 --continue 只回一个")。只在能拿到 tmux 会话名时登记。
+# 语义:登记项一直保留、可恢复,直到用户显式删除(cloud-forget);不主动过期。
+# SessionEnd(主动 /exit 退出)→ 打 ended=True:cloud-recover/watchdog 不再自动复活它(免得你
+# 主动退的会话被拉回来),但仍可手动 cloud_resume/cloudattach 找回;其它事件 → ended=False 重新激活。
+tmux_name = tmux_session()
+if tmux_name and tmux_name != "unknown" and not tmux_name.startswith("cc-tmp-"):   # cc-tmp-* 临时会话不进恢复登记(否则关掉后被 watchdog 复活成僵尸;临时会话本就"关标签即弃",对话 jsonl 仍留可 resume)
+    REG = os.path.expanduser("~/.cloud-sessions")
+    try:
+        os.makedirs(REG, exist_ok=True)
+        rpath = os.path.join(REG, re.sub(r"[^\w.\-]", "_", tmux_name) + ".json")
+        uuid = data.get("session_id", "") or ""
+        cwd = data.get("cwd") or os.getcwd()
+        if not uuid and os.path.exists(rpath):           # 本次事件没带 session_id → 保留旧 uuid
+            try: uuid = (json.load(open(rpath)) or {}).get("uuid", "") or ""
+            except Exception: uuid = ""
+        tab = os.environ.get("CC_TAB", "")
+        if not tab and os.path.exists(rpath):            # 事件没带 CC_TAB → 保留旧 tab(Wave 标签页归属是粘性的)
+            try: tab = (json.load(open(rpath)) or {}).get("tab", "") or ""
+            except Exception: tab = ""
+        rec = {"name": tmux_name, "dir": cwd, "uuid": uuid, "ts": time.time(),
+               "src": "hook", "ended": (ev == "SessionEnd"), "tab": tab}
+        tmp = rpath + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(rec, f, ensure_ascii=False)
+        os.replace(tmp, rpath)
+    except Exception:
+        pass

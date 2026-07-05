@@ -1,0 +1,14 @@
+{
+    "glmpool": {
+        "display:name": "GLM-5.2 智谱(轮换池)",
+        "display:order": -5,
+        "display:icon": "robot",
+        "display:description": "智谱 GLM-5.2 · 本地密钥轮换池(多 key 自动故障转移)",
+        "ai:provider": "custom",
+        "ai:apitype": "anthropic-messages",
+        "ai:endpoint": "http://127.0.0.1:8718/v1/messages",
+        "ai:apitoken": "pool",
+        "ai:model": "glm-5.2",
+        "ai:capabilities": ["tools"]
+    }
+}

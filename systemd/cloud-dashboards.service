@@ -1,0 +1,11 @@
+[Unit]
+Description=Project dashboards portal — serves ONLY /root/inbox/dashboards on :8088 (项目看板门户)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/cloud-dashboards.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

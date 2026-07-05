@@ -1,0 +1,4 @@
+#!/bin/bash
+# 给临时会话用的 mosh-server 包装:客户端断开 60 秒后 mosh-server 自动退出,
+# 从而 tmux 失去客户端 → destroy-unattached 销毁会话(否则 mosh 赖着,临时会话关了还在跑)。
+exec env MOSH_SERVER_NETWORK_TMOUT=60 mosh-server "$@"

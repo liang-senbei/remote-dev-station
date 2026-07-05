@@ -1,0 +1,13 @@
+#!/bin/bash
+# cloudgo 菜单。每行输出: <真实会话名>\t<给人看的显示>
+# cloudgo 用 fzf --with-nth=2 只显示第 2 列(去掉 cc- 前缀的干净名),选中时取第 1 列(真名)做 cloudattach。
+printf '%s\t%s\n' "➕" "➕ 新建会话(选目录)…"
+printf '%s\t%s\n' "⟳" "⟳ 原生选择器恢复(未登记的老对话)…"
+printf '%s\t%s\n' "🔓" "🔓 忘记本标签的会话绑定(改绑/重选)"
+printf '%s\t%s\n' "⏱" "⏱ 临时会话(用完即弃,不进恢复体系)"
+# 活会话:真名 \t 去cc-显示 · 活动时间
+cloud-sesslist 2>/dev/null | while read -r name t; do
+  [ -n "$name" ] && printf '%s\t%s  · %s\n' "$name" "${name#cc-}" "$t"
+done
+# 离线但可恢复:真名 \t 去cc-显示 ⏸
+cc-sessions recoverable 2>/dev/null | awk -F'\t' '{d=$1; sub(/^cc-/,"",d); printf "%s\t%s  ⏸离线·点我接回原对话 (%s)\n", $1, d, $4}'

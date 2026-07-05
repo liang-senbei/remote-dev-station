@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+# cloud-watchdog — 每次运行对账一次:登记表里"该活、却没在跑(tmux 没了)"的会话,自动
+# claude --resume <uuid> 连名带对话拉回。由 cloud-watchdog.timer 每 ~15s 触发。
+# 模型:登记表 = "我要它一直活着"的期望状态;不想要的用 cloud-forget 移出,这里就不再管。
+# ⚠️ 内存守卫(重要):本机内存有限(~15G),会话是重进程。OOM 后绝不能一次猛拉一堆,否则
+#    拉起来又被 OOM 杀、循环雪崩。故:① 空闲内存低于阈值就整轮暂缓;② 每轮最多温和拉 1 个,
+#    下一轮重新看内存。这样最多恢复到"内存装得下"为止,装不下的留着不动(不会再 OOM)。
+# 崩溃退避:同一会话短时间内反复死(拉起又没了),暂时停拉,防狂拉。
+# 主动退出(SessionEnd→ended=True)的会话不在此恢复(cc-sessions recoverable 已过滤)。
+import os, json, time, subprocess, sys
+
+STATE = os.path.expanduser("~/.cloud-status/_watchdog.json")
+try:
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)   # 自愈:STATE 目录曾随 :8722 清理被删→退避状态每轮丢失(崩溃会话被每 15s 狂拉),这里确保它存在
+except Exception:
+    pass
+CJSON = os.path.expanduser("~/.claude.json")
+MODEL = os.environ.get("CLOUD_MODEL", "claude-fable-5[1m]")
+OPTS  = os.environ.get("CLOUD_OPTS", "--effort max")
+
+WINDOW       = 180    # 观察窗口(秒)
+MAXTRY       = 3      # 窗口内最多拉起次数,超了就退避
+BACKOFF      = 600    # 退避冷却(秒)
+MIN_FREE_MB  = 4000   # 空闲内存低于此值就整轮暂缓:留 4G 余量给会话长大(上下文增长),
+                      #   只装到 ~11G,离 14.9G 那条 OOM 线留缓冲。要更激进可调小(有 OOM 风险)。
+MAX_PER_CYCLE = 1     # 每轮最多拉几个(温和恢复,逐轮看内存)
+
+def q(s):
+    return "'" + str(s).replace("'", "'\\''") + "'"
+
+def load(p, d):
+    try:
+        with open(p) as f:
+            return json.load(f)
+    except Exception:
+        return d
+
+def mem_avail_mb():
+    try:
+        for line in open("/proc/meminfo"):
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 99999
+
+def pretrust(dirs):
+    if not dirs:
+        return
+    d = load(CJSON, None)
+    if not isinstance(d, dict):
+        return
+    proj = d.setdefault("projects", {}); ch = False
+    for x in dirs:
+        e = proj.setdefault(x, {})
+        if not e.get("hasTrustDialogAccepted"):
+            e["hasTrustDialogAccepted"] = True; ch = True
+    if ch:
+        try:
+            tmp = CJSON + ".wdtmp"
+            with open(tmp, "w") as f:
+                json.dump(d, f)
+            os.replace(tmp, CJSON)
+        except Exception:
+            pass
+
+# 1) 该活却没在跑的(cc-sessions recoverable 已:登记∧jsonl在∧不在线∧非ended∧反解realdir∧去重)
+try:
+    out = subprocess.check_output(["cc-sessions", "recoverable"], text=True)
+except Exception:
+    sys.exit(0)
+
+dead = []
+for line in out.splitlines():
+    p = line.split("\t")
+    if len(p) >= 3:
+        dead.append((p[0], p[1], p[2]))   # name, realdir, uuid
+
+now = int(time.time())
+st = load(STATE, {})
+if not isinstance(st, dict):
+    st = {}
+
+# 全活着 → 清空尝试记录
+if not dead:
+    if st:
+        try:
+            with open(STATE, "w") as f:
+                json.dump({}, f)
+        except Exception:
+            pass
+    sys.exit(0)
+
+# 2) 过退避/目录检查,得到本轮"可拉候选"(此处先不记尝试)
+eligible = []
+for name, realdir, uuid in dead:
+    rec = st.get(name, {"hits": [], "blocked_until": 0})
+    if now < rec.get("blocked_until", 0):
+        continue                                       # 退避冷却中
+    hits = [t for t in rec.get("hits", []) if now - t < WINDOW]
+    if len(hits) >= MAXTRY:                             # 窗口内已拉 MAXTRY 次仍死 → 退避
+        rec["blocked_until"] = now + BACKOFF; rec["hits"] = []; st[name] = rec
+        print(f"退避 {name}: {WINDOW}s 内拉起 {MAXTRY} 次仍死,冷却 {BACKOFF}s")
+        continue
+    if not os.path.isdir(realdir):
+        continue
+    rec["hits"] = hits; st[name] = rec
+    eligible.append((name, realdir, uuid))
+
+# 3) 内存守卫 + 温和恢复:内存不够整轮暂缓;够也每轮最多拉 MAX_PER_CYCLE 个
+avail = mem_avail_mb()
+to_start = []
+if eligible:
+    if avail < MIN_FREE_MB:
+        print(f"内存仅 {avail}MB(<{MIN_FREE_MB}),暂缓恢复 {len(eligible)} 个,待内存回升(防再次 OOM)")
+    else:
+        to_start = eligible[:MAX_PER_CYCLE]
+
+# 4) 只对真要拉的记本次尝试(供退避计数)
+for name, realdir, uuid in to_start:
+    rec = st.get(name, {"hits": [], "blocked_until": 0})
+    rec.setdefault("hits", []).append(now); rec["blocked_until"] = 0; st[name] = rec
+
+# 不在 dead 里的(又活了)→ 清掉退避记录
+deadnames = {n for n, _, _ in dead}
+for k in list(st.keys()):
+    if k not in deadnames:
+        st.pop(k, None)
+
+pretrust(sorted({d for _, d, _ in to_start}))
+for name, realdir, uuid in to_start:
+    # 临起前再确认这名字没被抢先建(用户手动恢复 / boot 并发)→ 防同名或"同对话双开"冲突
+    if subprocess.run(["tmux", "has-session", "-t", name],
+                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        continue
+    # 不加 "|| exec bash":claude 失败就让会话彻底结束 → 下轮重试(退避兜底)。否则崩溃会剩个
+    # bash 壳冒充"存活"(tmux 会话还在),watchdog 以为成功不再补救 = 隐性失败(你看到的就是这个壳)。
+    label = name[3:] if name.startswith("cc-") else name   # 去 cc- 前缀当显示名,恢复时带上 -n,TUI 也显示、不再丢
+    inner = (f"cd {q(realdir)} && IS_SANDBOX=1 claude --model {q(MODEL)} {OPTS} "
+             f"--resume {q(uuid)} -n {q(label)} --dangerously-skip-permissions")
+    subprocess.run(["tmux", "new-session", "-d", "-s", name, inner])
+    print(f"watchdog 拉回 {name} [resume {uuid[:8]}] @ {realdir}  (空闲内存 {avail}MB)")
+
+try:
+    with open(STATE, "w") as f:
+        json.dump(st, f)
+except Exception:
+    pass

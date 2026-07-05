@@ -1,0 +1,91 @@
+{
+    "server-files": {
+        "display:order": 4,
+        "icon": "folder-open",
+        "label": "服务器文件",
+        "blockdef": {
+            "meta": {
+                "view": "preview",
+                "file": "/opt/workspace",
+                "connection": "root@cloud"
+            }
+        },
+        "color": "var(--wicon-4)"
+    },
+    "cc-go": {
+        "display:order": 1,
+        "icon": "comments",
+        "label": "会话",
+        "blockdef": {
+            "meta": {
+                "view": "term",
+                "controller": "cmd",
+                "cmd": "<YOUR_HOME>/bin/cloudconn cloudgo",
+                "cmd:interactive": true
+            }
+        },
+        "color": "var(--wicon-1)"
+    },
+    "server-vnc": {
+        "display:order": 5,
+        "icon": "desktop",
+        "label": "服务器桌面",
+        "blockdef": {
+            "meta": {
+                "view": "web",
+                "url": "http://<SERVER_TAILSCALE_IP>:6080/vnc.html?autoconnect=true&resize=scale"
+            }
+        },
+        "color": "var(--wicon-3)"
+    },
+    "theme-switch": {
+        "display:order": 2,
+        "icon": "palette",
+        "label": "主题",
+        "blockdef": {
+            "meta": {
+                "view": "web",
+                "url": "http://127.0.0.1:8799/"
+            }
+        },
+        "color": "var(--wicon-2)"
+    },
+    "defwidget@terminal": {
+        "display:hidden": true
+    },
+    "defwidget@files": {
+        "display:hidden": true
+    },
+    "defwidget@web": {
+        "display:hidden": true
+    },
+    "defwidget@sysinfo": {
+        "display:hidden": true
+    },
+    "project-dashboards": {
+        "display:order": 3,
+        "icon": "table-columns",
+        "label": "项目看板",
+        "color": "var(--wicon-5)",
+        "blockdef": {
+            "meta": {
+                "view": "web",
+                "url": "http://<SERVER_TAILSCALE_IP>:8088/"
+            }
+        }
+    },
+    "cc-tmp": {
+        "display:order": 6,
+        "icon": "hourglass-half",
+        "label": "临时会话",
+        "color": "var(--wicon-6)",
+        "blockdef": {
+            "meta": {
+                "view": "term",
+                "controller": "cmd",
+                "cmd": "<YOUR_HOME>/bin/cloudconn cloudtmp",
+                "cmd:interactive": true
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+#!/bin/bash
+# 抓 Windows 笔电上最近一张 Wave 粘贴/截图的图片到 ~/inbox，打印服务器路径。Mac 版对应 pullimg。
+# Windows 端 Wave 粘贴临时目录 = %TEMP% 下递归的 waveterm_paste_*.png。
+LAPTOP=${LAPTOP:-laptop}
+# 笔电 PowerShell 里找最新的一张（%TEMP% 递归），返回 FullName
+f=$(ssh "$LAPTOP" 'powershell -NoProfile -Command "(Get-ChildItem -Path $env:TEMP -Recurse -Filter waveterm_paste_*.png -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName"' | tr -d "\r")
+[ -z "$f" ] && { echo "笔电上没找到 Wave 粘贴的图片（先探目录: ssh laptop 'dir \$env:TEMP\\waveterm*'）" >&2; exit 1; }
+f="${f//\\//}"   # 反斜杠→正斜杠，scp 才吃得下 Windows 路径
+mkdir -p ~/inbox; o=~/inbox/$(basename "$f")
+scp -q "$LAPTOP":"$f" "$o" && echo "$o"

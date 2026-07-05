@@ -1,0 +1,13 @@
+[Unit]
+Description=Moshi hook daemon
+After=network.target
+[Service]
+Type=simple
+Environment=HOME=/root
+Environment=XDG_RUNTIME_DIR=/run/user/0
+ExecStartPre=/bin/mkdir -p /run/user/0
+ExecStart=/root/.local/bin/moshi-hook serve
+Restart=on-failure
+RestartSec=3
+[Install]
+WantedBy=multi-user.target

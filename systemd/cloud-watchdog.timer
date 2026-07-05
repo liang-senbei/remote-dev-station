@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Claude session watchdog every 15s
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=15s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

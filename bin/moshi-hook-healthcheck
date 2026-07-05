@@ -1,0 +1,14 @@
+#!/bin/bash
+# moshi-hook 健康检查兜底 —— 探 daemon 的本地 socket,连续 2 次无响应才重启。
+# 为什么需要:moshi-hook daemon 偶发"进程还活着、但 socket 卡死/不响应"——systemd 只看
+# 进程在不在(它一直 active),看不出 socket 卡死,所以不会自动重启;而 socket 一卡,
+# hub 发送 + 手机审批(PermissionRequest 钩子走它)全瘫。本脚本由 .timer 每分钟跑一次补这个洞。
+# 连续 2 次(间隔 3s)才判死,避免单次网络/调度抖动误重启(重启会断一次手机审批 WS)。
+MH=/root/.local/bin/moshi-hook
+probe(){ timeout 12 "$MH" status >/dev/null 2>&1; }
+probe && exit 0
+sleep 3
+probe && exit 0
+logger -t moshi-hook-healthcheck "daemon socket 连续2次无响应 → 重启 moshi-hook.service"
+systemctl restart moshi-hook.service
+exit 0

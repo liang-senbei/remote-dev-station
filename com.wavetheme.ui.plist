@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wavetheme.ui</string>
+  <key>ProgramArguments</key>
+  <!-- 部署时把 /Users/YOUR_USERNAME 换成你自己的 Mac 家目录(即 <YOUR_HOME>);
+       plist 是 XML,占位符不能带尖括号,故这里用 /Users/YOUR_USERNAME 形式。 -->
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/YOUR_USERNAME/bin/wavetheme-server</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/tmp/wavetheme-ui.log</string>
+</dict>
+</plist>
