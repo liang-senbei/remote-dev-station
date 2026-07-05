@@ -1,20 +1,4 @@
 {
-    "cc-agents": {
-        "display:order": 0,
-        "icon": "satellite-dish",
-        "label": "指挥中心",
-        "color": "var(--wicon-1)",
-        "description": "一屏看全部 agent 会话状态(cc-agents：进会话/成本/需要你)。服务器端 TUI，经 cloud 连接运行。",
-        "blockdef": {
-            "meta": {
-                "view": "term",
-                "controller": "cmd",
-                "connection": "root@cloud",
-                "cmd": "cc-agents",
-                "cmd:interactive": true
-            }
-        }
-    },
     "server-files": {
         "display:order": 4,
         "icon": "folder-open",
