@@ -4,10 +4,13 @@ After=cloud-sessions.service
 
 [Service]
 Type=oneshot
+# KillMode=process:oneshot 退出时只杀主进程,不回收 cgroup 里 fork 出的 tmux 服务器。
+# 缺它(默认 control-group)→ 复活的会话随 oneshot 结束被连带杀掉,断电自愈失效。
+KillMode=process
 TimeoutStartSec=120
 Environment=HOME=/root
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment="CLOUD_MODEL=claude-fable-5[1m]"
+Environment="CLOUD_MODEL=claude-opus-4-8[1m]"
 Environment="CLOUD_OPTS=--effort max"
 Environment=DISABLE_AUTOUPDATER=1
 ExecStart=/root/.local/bin/cloud-watchdog

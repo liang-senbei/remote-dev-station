@@ -13,7 +13,7 @@
 会话名 `cc-<目录名>`；起名后为 `cc-<目录名>-<名字>`（名字同时进 tmux 名 + Claude `-n` 显示名，列表/恢复处都认得出）。
 
 ## 默认参数（开会话时自动带，命令行可覆盖）
-- 模型 **Fable 5 1M**（`claude-fable-5[1m]`，改 `~/.bashrc` 里 `CLOUD_MODEL`；2026-07-02 起从 Opus 4.8 切换）
+- 模型 **Fable 5 1M**（`claude-opus-4-8[1m]`，改 `~/.bashrc` 里 `CLOUD_MODEL`；2026-07-02 起从 Opus 4.8 切换）
 - **`--effort max`**（改 `CLOUD_OPTS`）
 - 覆盖示例：`cld /opt/workspace/proj --model sonnet --effort medium`
 
