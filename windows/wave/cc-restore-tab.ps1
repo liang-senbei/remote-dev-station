@@ -1,5 +1,5 @@
 # cc-restore-tab.ps1 — Wave widget「恢复本页」:一键复活【当前标签页】的所有 Claude 终端。
-# 流程:解析当前 tab → 服务器侧 cc-restore 复活所有 tmux → 取本页会话 → 逐个 wsh run 弹终端块。
+# 流程:解析当前 tab → 服务器侧 cc-restore 复活所有 tmux → 取本页会话 → 本块就地 ssh -t 接回(0.14.5 wsh run 不可用)。
 # 依赖:同目录的 cc-wave-lib.ps1;服务器侧 cc-restore / cc-slugs-by-tab(见仓库 bin/ 与 windows/README)。
 # 注意:本脚本须由 Wave widget 启动(块内才有 WAVETERM_SWAPTOKEN);外部 shell 跑不出 wsh 权限。
 
@@ -31,9 +31,13 @@ if ($slugs.Count -eq 0) {
   Start-Sleep 6; exit
 }
 Write-Host "→ 本页恢复 $($slugs.Count) 个终端:" -ForegroundColor Cyan
-foreach ($s in $slugs) {
-  Write-Host "   • cc-$s"
-  (& $wsh run -c "ssh -t $SRV /usr/local/bin/cc-new $s" 2>&1) | Out-File $log -Append -Encoding utf8
+# 0.14.5 实测:wsh run 在 cmd 块 JWT 上下文静默失败(rc=1 无输出;与 blocks list 的 no-workspaces 同一路由断点),
+# 弹块 API 不可用 → 改为【本块就地接回】第一个会话(与「新会话」同一条已验证的 ssh -t 通路);
+# 多会话时其余的点「新会话」输同名即 attach(cc-new 幂等)。
+$first = $slugs[0]
+if ($slugs.Count -gt 1) {
+  Write-Host ("其余 " + ($slugs.Count - 1) + " 个,点「新会话」输同名接回 → " + (($slugs | Select-Object -Skip 1) -join ' / ')) -ForegroundColor Yellow
 }
-Write-Host "✓ 本页 $($slugs.Count) 个终端已恢复,各自接回内容。" -ForegroundColor Green
+Write-Host "⤷ 本块就地接回 cc-$first(断开后本块结束,再点 widget 即可)" -ForegroundColor Green
+ssh -t $SRV "/usr/local/bin/cc-new '$first'"
 Start-Sleep 3

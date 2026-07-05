@@ -18,7 +18,7 @@
 
 function Get-WaveTab {
   param([string]$wsh, [string]$log)
-  function LL($m) { if ($log) { "$([DateTime]::Now.ToString('HH:mm:ss')) [lib] $m" | Out-File $log -Append -Encoding utf8 } }
+  function LL($m) { if ($log) { try { "$([DateTime]::Now.ToString('HH:mm:ss')) [lib] $m" | Out-File $log -Append -Encoding utf8 } catch {} } }  # try:并发实例写同一日志会锁冲突,不能让日志毁主路
   $r = [pscustomobject]@{ blockid = ''; tabid = '' }
   $swap = $env:WAVETERM_SWAPTOKEN
   if (-not $swap -and -not $env:WAVETERM_JWT) { LL 'no WAVETERM_SWAPTOKEN/JWT (不在 Wave 块内?)'; return $r }

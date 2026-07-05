@@ -1,1 +1,4 @@
 *.log
+
+# Windows 客户端本地配置(填了真服务器地址,别提交)
+windows/wave/deploy-vars.ps1
