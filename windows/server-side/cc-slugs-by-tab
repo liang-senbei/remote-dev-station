@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
-# cc-slugs-by-tab <tabid>  输出属于某 Wave 标签页的会话 slug(一行一个)。
-# Wave「恢复本页」用它把恢复范围限定在"当前这一页该有的终端"。
-awk -F'\t' -v t="$1" 'NF && $6==t {print $1}' /root/.claude/cc-registry.tsv
+# cc-slugs-by-tab <tabid>  输出 ~/.cloud-sessions/ 里属于某 Wave 标签页、未主动结束的会话 slug(去 cc- 前缀)。
+tab="$1"; [ -z "$tab" ] && exit 0
+python3 - "$tab" <<'PY'
+import json,os,sys,glob
+tab=sys.argv[1]
+for f in sorted(glob.glob(os.path.expanduser("~/.cloud-sessions/*.json"))):
+    try: r=json.load(open(f))
+    except Exception: continue
+    if r.get("tab")==tab and not r.get("ended"):
+        n=r.get("name","")
+        print(n[3:] if n.startswith("cc-") else n)
+PY
