@@ -1,6 +1,22 @@
 {
   "__comment__": "把下面这些 widget 合并进 Wave 的 widgets.json(%USERPROFILE%\\.config\\waveterm\\widgets.json)。cmd 里的 <USERPROFILE> 换成真实路径,如 C:\\Users\\you。display:order 越小越靠上。安装脚本 install.ps1 会自动按动态路径写入、并保证无 BOM。",
 
+  "cc-agents-ssh": {
+    "display:order": -5,
+    "icon": "satellite-dish",
+    "label": "指挥中心",
+    "color": "#f6c177",
+    "description": "一屏看全部 agent 会话状态,走普通 ssh(免 WSL mosh)",
+    "blockdef": {
+      "meta": {
+        "view": "term",
+        "controller": "cmd",
+        "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File <USERPROFILE>\\.ssh\\cc-agents-ssh.ps1",
+        "cmd:interactive": true
+      }
+    }
+  },
+
   "cc-agents": {
     "display:order": -4,
     "icon": "satellite-dish",

@@ -13,7 +13,7 @@ $sshDir = Join-Path $env:USERPROFILE '.ssh'
 New-Item -ItemType Directory -Force -Path $sshDir | Out-Null
 
 # 1) 三个脚本 → ~/.ssh\,带 BOM
-foreach ($f in 'cc-wave-lib.ps1','cc-restore-tab.ps1','cc-launch.ps1','cc-mosh-run.ps1') {
+foreach ($f in 'cc-wave-lib.ps1','cc-restore-tab.ps1','cc-launch.ps1','cc-mosh-run.ps1','cc-agents-ssh.ps1') {
   $src = Join-Path $here $f
   $dst = Join-Path $sshDir $f
   $txt = [IO.File]::ReadAllText($src, [Text.Encoding]::UTF8)
@@ -44,6 +44,18 @@ if ($raw -match '"cc-agents"') {
   Copy-Item $wp ("$wp.bak-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
   $up = ($env:USERPROFILE).Replace('\','\\')
   $ins = @"
+  "cc-agents-ssh": {
+    "display:order": -5,
+    "icon": "satellite-dish",
+    "label": "指挥中心",
+    "color": "#f6c177",
+    "description": "一屏看全部 agent 会话状态,走普通 ssh(免 WSL mosh)",
+    "blockdef": { "meta": {
+      "view": "term", "controller": "cmd",
+      "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File ${up}\\.ssh\\cc-agents-ssh.ps1",
+      "cmd:interactive": true
+    } }
+  },
   "cc-agents": {
     "display:order": -4,
     "icon": "satellite-dish",
