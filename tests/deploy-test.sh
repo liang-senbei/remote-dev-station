@@ -4,6 +4,7 @@
 #
 # 用法:
 #   bash tests/deploy-test.sh core                      # A组·核心链路(只读探测,不碰现有会话)
+#   bash tests/deploy-test.sh deck                      # B组·deck 服务端(只读:脚本齐/防127 PATH行/账本同源/面板出)
 #   bash tests/deploy-test.sh selfheal                  # S组·断电自愈真测(破坏性,只碰 cc-ztest-* 自建会话)
 #   bash tests/deploy-test.sh optional                  # O组·可选层(moshi手机审批/noVNC桌面/看板;未装=SKIP)
 #   bash tests/deploy-test.sh migrate --projects /opt/workspace/a,/opt/workspace/b   # M组·迁移验收
@@ -38,7 +39,7 @@ skip(){    echo "[SKIP] $1 $2 | ${3:-}";    SKIPS=$((SKIPS+1)); }
 blocked(){ echo "[BLOCKED] $1 $2 | ${3:-}"; BLOCKS=$((BLOCKS+1)); }
 one_line(){ tr '\n' ' ' | sed 's/  */ /g; s/ $//' | cut -c1-220; }   # 证据压成一行,防刷屏
 
-usage(){ sed -n '5,11p' "${BASH_SOURCE[0]}"; }
+usage(){ sed -n '5,13p' "${BASH_SOURCE[0]}"; }
 
 # =========================== A 组 · 核心链路(只读) ===========================
 run_core(){
@@ -102,7 +103,7 @@ PYEOF
   else fail A3 "有 hook 命令指向不存在/不可执行的路径(换机后写死路径失效?)" "$(printf '%s' "$out" | grep BAD | one_line)"; fi
 
   # A4【最要命】bashrc 与 watchdog.service 的 CLOUD_MODEL 一致,且该模型真能出活
-  #    (客户账号没有那个特殊模型时:新建会话 + 断电自愈会"启动即死",这里当场抓出来)
+  #    (客户账号没有作者专属模型时:新建会话 + 断电自愈会"启动即死",这里当场抓出来)
   # ★红字:下面的 claude -p 探针必须 env -u TMUX -u TMUX_PANE(见文件头)——否则探针自己的
   #   cc-state 钩子会继承 TMUX_PANE,把正在部署/验收的会话登记表覆写、SessionEnd 标 ended=true,
   #   把被验对象打残。绝对不许去掉。
@@ -196,6 +197,69 @@ PYEOF
   if [ "$e1" = "enabled" ] && [ "$e2" = "enabled" ]; then
     pass A11 "cloud-sessions.service 与 cloud-watchdog.timer 均已 enabled(重启自动到位)" "enabled/enabled"
   else fail A11 "开机自启缺失(重启后自愈体系起不来)" "cloud-sessions=$e1 watchdog.timer=$e2"; fi
+}
+
+# =========================== B 组 · deck 服务端(只读) ===========================
+# 全部只读:不新建/杀会话、不跑 claude 探针,只查 deck 脚本(cc-new/cc-restore/
+# cc-slugs-by-tab/cc-agents)是否装齐、防-127 的 PATH 行在不在、账本是否同源、面板能否出。
+run_deck(){
+  echo "== B组·deck 服务端(只读) =="
+  local out rc miss b p
+
+  # B1 四个 deck 脚本存在且可执行(在 PATH 里,通常 /usr/local/bin 或 ~/.local/bin)
+  miss=""
+  for b in cc-new cc-restore cc-slugs-by-tab cc-agents; do
+    command -v "$b" >/dev/null 2>&1 || miss="$miss $b"
+  done
+  if [ -z "$miss" ]; then pass B1 "deck 四脚本齐备(cc-new/cc-restore/cc-slugs-by-tab/cc-agents 均在 PATH)" "command -v 全命中"
+  else fail B1 "deck 脚本缺失" "缺:$miss"; fi
+
+  # B2 防 127:cc-new / cc-restore 脚本头部必须有一行 export PATH= 且含 .local/bin
+  #    否则 ssh -t 非交互调用下 sshd 只给极简 PATH → 找不到 claude → 会话秒退 status 127(见 deploy-pitfalls P1)
+  miss=""
+  for b in cc-new cc-restore; do
+    p=$(command -v "$b" 2>/dev/null)
+    if [ -z "$p" ]; then miss="$miss $b(脚本不在)"; continue; fi
+    grep -m1 'export PATH=.*\.local/bin' "$p" >/dev/null 2>&1 || miss="$miss $b(无 export PATH=…/.local/bin 行)"
+  done
+  if [ -z "$miss" ]; then pass B2 "cc-new/cc-restore 头部均有 export PATH=…/.local/bin(防 ssh 非交互 127 秒退)" "grep 命中 PATH 行"
+  else fail B2 "缺防-127 的 PATH 行:ssh -t 非交互调用下会找不到 claude→会话秒退 status 127(见 deploy-pitfalls P1)" "缺:$miss"; fi
+
+  # B3 账本同源:cc-slugs-by-tab 必须读 ~/.cloud-sessions,且不能还引用旧的 cc-registry.tsv(见 P4)
+  p=$(command -v cc-slugs-by-tab 2>/dev/null)
+  if [ -z "$p" ]; then
+    fail B3 "cc-slugs-by-tab 不在 PATH,无法核账本同源" "command -v 无"
+  else
+    local hasnew hasold cnnew
+    grep -q 'cloud-sessions' "$p" && hasnew=1 || hasnew=""
+    grep -q 'cc-registry' "$p" && hasold=1 || hasold=""
+    # 顺带核 cc-new 也写 cloud-sessions(bonus,不作判据)
+    cnnew=""; b=$(command -v cc-new 2>/dev/null); [ -n "$b" ] && grep -q 'cloud-sessions' "$b" && cnnew=1
+    if [ -n "$hasnew" ] && [ -z "$hasold" ]; then
+      pass B3 "cc-slugs-by-tab 账本同源(读 ~/.cloud-sessions,无 cc-registry.tsv 旧引用)$([ -n "$cnnew" ] && echo '·cc-new 亦写 cloud-sessions')" "grep cloud-sessions 命中,cc-registry 无"
+    elif [ -n "$hasold" ]; then
+      fail B3 "cc-slugs-by-tab 仍引用旧 cc-registry.tsv(双账本错位,见 P4)" "grep 命中 cc-registry"
+    else
+      fail B3 "cc-slugs-by-tab 未读 ~/.cloud-sessions(账本源不对)" "grep cloud-sessions 无命中"
+    fi
+  fi
+
+  # B4 cc-agents 能出面板:--json 只读秒退,输出须为合法 json 且含 "host" 字段
+  if ! command -v cc-agents >/dev/null 2>&1; then
+    fail B4 "cc-agents 不在 PATH,出不了面板" "command -v 无"
+  else
+    out=$(timeout 8 cc-agents --json 2>&1); rc=$?
+    local host
+    host=$(printf '%s' "$out" | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+assert "host" in d
+print(d["host"])' 2>/dev/null)
+    if [ $rc -eq 0 ] && [ -n "$host" ]; then
+      pass B4 "cc-agents --json 出合法面板,含 host=$host" "timeout 8 cc-agents --json"
+    else
+      fail B4 "cc-agents --json 报错/非法 json/缺 host 字段(面板出不来)" "rc=$rc $(printf '%s' "$out" | one_line)"
+    fi
+  fi
 }
 
 # ====================== S 组 · 断电自愈真测(破坏性,串行) ======================
@@ -473,10 +537,11 @@ done
 
 case "$CMD" in
   core)     run_core ;;
+  deck)     run_deck ;;
   selfheal) run_selfheal ;;
   optional) run_optional ;;
   migrate)  run_migrate ;;
-  all)      run_core; run_selfheal; run_optional
+  all)      run_core; run_deck; run_selfheal; run_optional
             if [ -n "$PROJECTS" ]; then run_migrate; fi ;;
   -h|--help|help) usage; exit 0 ;;
   *) echo "未知子命令: $CMD"; usage; exit 2 ;;
