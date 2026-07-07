@@ -102,7 +102,7 @@ PYEOF
   else fail A3 "有 hook 命令指向不存在/不可执行的路径(换机后写死路径失效?)" "$(printf '%s' "$out" | grep BAD | one_line)"; fi
 
   # A4【最要命】bashrc 与 watchdog.service 的 CLOUD_MODEL 一致,且该模型真能出活
-  #    (客户账号没有作者专属模型时:新建会话 + 断电自愈会"启动即死",这里当场抓出来)
+  #    (客户账号没有该默认模型时:新建会话 + 断电自愈会"启动即死",这里当场抓出来)
   # ★红字:下面的 claude -p 探针必须 env -u TMUX -u TMUX_PANE(见文件头)——否则探针自己的
   #   cc-state 钩子会继承 TMUX_PANE,把正在部署/验收的会话登记表覆写、SessionEnd 标 ended=true,
   #   把被验对象打残。绝对不许去掉。
@@ -120,7 +120,7 @@ PYEOF
     #    "There's an issue with the selected model…" 打到 stdout(非空)——naive 判据会把
     #    启动即死的死模型误判成 PASS。必须按输出签名分类:
     #      dead   = 模型压根用不了(不存在/无权限)→ FAIL(这正是 A4 要抓的「启动即死」)
-    #      flagged= 模型可达但这条 headless 探针被内容分类器拦(如 Fable5 switchModelsOnFlag=false
+    #      flagged= 模型可达但这条 headless 探针被内容分类器拦(某些模型/内容会触发
     #               下 -p 直接拒答)→ SKIP:模型可达、非账号问题,交互会话/断电自愈另由 S 组端到端证
     #      ok     = 干净短回复 → 真能出活
     if [ -z "${out//[[:space:]]/}" ] \
@@ -136,7 +136,7 @@ PYEOF
     elif [ "$BM" != "$SVC" ]; then
       fail A4 "bashrc 与 cloud-watchdog.service 的 CLOUD_MODEL 不一致(交互能开,断电自愈却用另一个模型)" "bashrc=$BM service=${SVC:-空}"
     elif [ "$verdict" = "flagged" ]; then
-      skip A4 "模型 '$BM' 可达但 headless 探针被内容分类器拦(如 Fable5 -p 直接拒答);bashrc==service 一致,交互/自愈另见 S 组" "回复=${reply}"
+      skip A4 "模型 '$BM' 可达但 headless 探针被内容分类器拦(某些模型/内容会触发);bashrc==service 一致,交互/自愈另见 S 组" "回复=${reply}"
     else
       pass A4 "会话模型 '$BM' 可用,且 bashrc 与 watchdog.service 一致" "探针回复=${reply}"
     fi
@@ -306,7 +306,7 @@ PYEOF
     tries=$((tries+1)); [ $((tries % 4)) -eq 0 ] && tmux send-keys -t "$ZNAME" Enter   # 首个 Enter 可能被启动横幅吞 → ~每12s 补发一次
     sleep 3
   done
-  # 顺带探一下模型是否真回了话(bonus,不作判据):Fable5 等被内容分类器拦时只落用户轮、不落 assistant 轮,
+  # 顺带探一下模型是否真回了话(bonus,不作判据):被内容分类器拦时只落用户轮、不落 assistant 轮,
   # 但对话已可 --resume,断电自愈不受影响 —— 所以模型没回话不判 S4 负。
   if [ -n "$submitted" ]; then
     answered=$(python3 - "$jl" "$ZMARK" <<'PYEOF'

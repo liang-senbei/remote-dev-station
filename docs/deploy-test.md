@@ -50,7 +50,7 @@ selfheal ≈ 3–6 分钟(S1 等登记 ≤60s、发暗号 ≤120s、S5 等拉回
 
 1. **建会话 + 模型真可用**——`CLOUD_MODEL` 指的模型在这台机、这个账号上真能出活(不是启动即死)。
    对应 A4(模型探针 + bashrc/service 两处一致)+ S1(真会话起得来)。
-   最高频翻车点:仓里默认模型 `claude-fable-5[1m]` 是作者账号专属,客户账号没有(DEPLOY 阶段一)。
+   最高频翻车点:仓里默认模型 `claude-opus-4-8[1m]` 需 Max+1M、客户账号若无 Opus/1M 会启动即死(DEPLOY 阶段一)。
 2. **cc-state 登记**——会话一有动静,`~/.cloud-sessions/<名>.json` 就有 name/dir/uuid。对应
    A3(钩子接线可执行)+ S1/S2(登记真出现、字段对)。这是一切自愈的地基:登记表恒空 =
    watchdog 无从拉起,还**不报错**。
@@ -108,7 +108,7 @@ selfheal ≈ 3–6 分钟(S1 等登记 ≤60s、发暗号 ≤120s、S5 等拉回
 | **S1** 起真会话 → 恢复登记出现 | 预信任测试目录(照抄 watchdog 的 pretrust,防卡"信任此文件夹?"弹窗)后:`env -u TMUX -u TMUX_PANE tmux new-session -d -s cc-ztest-<ts> "cd /opt/workspace/ztest-<ts> && IS_SANDBOX=1 claude --model $CLOUD_MODEL $CLOUD_OPTS --dangerously-skip-permissions"`(启动命令照抄 bashrc-cloud-snippet 的 `cloud()`,模型/参数与 cloudgo 同源取自 bashrc);轮询 ≤60s | `~/.cloud-sessions/<名>.json` 60s 内非空出现 = 会话活了且 cc-state 钩子链路通。**盯登记文件、不盯 `~/.cloud-status`**:后者是已下线 :8722 看板的产物,当前 cc-state 多半不写;登记文件才是断电自愈真正依赖的 | 前置直接 FAIL 的两种:claude 不在 PATH;`~/.bashrc` 无 `CLOUD_MODEL=`(不猜默认值硬跑)。60s 无登记 → 看 tmux 屏幕尾行:claude 秒退回 A4,没秒退则钩子没接上回 A3 |
 | **S2** 登记表字段正确 | 读登记 json 的 uuid/dir/ended | uuid 非空、dir = 测试目录、ended=false(断电自愈全靠这条记录) | 字段缺/错 = watchdog 将无从恢复 → 打开 `~/.cloud-sessions/<名>.json` 看哪个字段不对,回修 A3/S1 |
 | **S3** 对话存档唯一 | `ls ~/.claude/projects/*/<uuid>.jsonl` 计数(由发暗号那步落盘) | 恰 1 份(`--resume` 的接头暗号恰好一份) | =0 多半是消息没提交进去(看上面发暗号说明);≠1 异常,查 glob 命中了什么 |
-| **S4** 消息真提交(暗号进 jsonl) | 发暗号步骤的轮询结果 | ≤120s 暗号落进 jsonl = 会话既能收指令、对话也可被 resume 接回。"模型已回话"只是加分注记、**不作判据**——被内容分类器拦时(如 Fable5 headless 拒答)只落 user 轮、不落 assistant 轮,但对话已可 `--resume`,自愈不受影响 | 120s 没进 = 消息没提交成功(TUI 卡弹窗/输入没进去/模型起不来)→ 看屏幕尾行。此项 FAIL 则 S5 无从测,脚本清理退出 |
+| **S4** 消息真提交(暗号进 jsonl) | 发暗号步骤的轮询结果 | ≤120s 暗号落进 jsonl = 会话既能收指令、对话也可被 resume 接回。"模型已回话"只是加分注记、**不作判据**——被内容分类器拦时(某些模型 headless 探针被拒)只落 user 轮、不落 assistant 轮,但对话已可 `--resume`,自愈不受影响 | 120s 没进 = 消息没提交成功(TUI 卡弹窗/输入没进去/模型起不来)→ 看屏幕尾行。此项 FAIL 则 S5 无从测,脚本清理退出 |
 | **S5**【头号测试】杀会话 → 按 uuid 拉回 | 正则断言会话名后 `tmux kill-session -t cc-ztest-<ts>`(实测 kill-session **不触发** SessionEnd → 登记 ended 保持 false,忠实模拟「崩溃/断电」而非「主动 /exit」)→ 轮询 ≤90s `tmux has-session` 同名回归 → 再等 30s 复查不是回光返照 + `pgrep -f "resume <uuid>"` 证进程参数真带 `--resume <同一uuid>` + ≤30s capture-pane 看原对话暗号重现 | 三证齐(仍在 + resume 同 uuid + 暗号重现)= PASS;存活 + resume 同 uuid 而屏幕未见暗号 = **降级 PASS**(TUI 可能折叠历史,进程参数已证接回同一段对话) | 90s 无同名回归,或拉回不完整 → **照 §3 定位表从上往下排**。脚本顺带打印 `cc-sessions recoverable` 是否列出它、timer 是否 active、登记 ended 值,都是 §3 的第一手线索 |
 | **S7** 清理并复核零残留 | 顺序必须 **先 forget 再 kill 再 rm**(否则 kill 完 watchdog 15s 后又把尸体复活成僵尸):`cc-sessions forget` → `tmux kill-session` → 删登记/状态 json、对话 jsonl 及编码目录、`/opt/workspace/ztest-*` 工作目录 → 复核 | tmux / `cc-sessions recoverable` / `~/.cloud-sessions/` 三处都无 `cc-ztest-*` | 有残留 → 照 §5 手动清 |
 
@@ -185,7 +185,7 @@ S5 是全链路(登记 → recoverable 过滤 → timer → 内存守卫 → res
 | # | 现象 | 第一查 | 根因 | 修法 |
 |---|---|---|---|---|
 | 1 | 90s 没动静,journal 里连提都没提这会话 | `systemctl is-active cloud-watchdog.timer`;`cc-sessions recoverable` 里有没有它 | timer 没跑;或被 recoverable 滤掉:登记 `ended=true` / `uuid` 空 / 对话 jsonl 不在 / 登记的 dir 已不存在 | timer:`systemctl enable --now cloud-watchdog.timer`;其余打开 `~/.cloud-sessions/<名>.json` 看哪个字段不对,分别回修 A3/S1/S2;jsonl 不在多半是迁移路径编码错(M1/M2) |
-| 2 | journal 有"拉回 …",但会话起了又死、反复,最后打"退避" | `journalctl -u cloud-watchdog --since -10min`;把 unit 那条 resume 命令手跑一遍看真实报错 | **watchdog 用的是 unit 里 `Environment=CLOUD_MODEL`,不是 `~/.bashrc`**——只改了 bashrc 一处,自愈还在用作者专属模型,启动即死 | DEPLOY 阶段一「必改·会话模型」**两处都改** → `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`;然后等退避冷却(600s)或删 `~/.cloud-status/_watchdog.json` 立即重试 |
+| 2 | journal 有"拉回 …",但会话起了又死、反复,最后打"退避" | `journalctl -u cloud-watchdog --since -10min`;把 unit 那条 resume 命令手跑一遍看真实报错 | **watchdog 用的是 unit 里 `Environment=CLOUD_MODEL`,不是 `~/.bashrc`**——只改了 bashrc 一处,自愈还在用另一个(错的)模型,启动即死 | DEPLOY 阶段一「必改·会话模型」**两处都改** → `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`;然后等退避冷却(600s)或删 `~/.cloud-status/_watchdog.json` 立即重试 |
 | 3 | journal 打"内存仅 xxxMB(<4000),暂缓恢复" | `free -m` | 不是 bug:内存守卫在防 OOM 雪崩,空闲 <4G 整轮不拉 | 关几个闲会话后自动继续;真要激进,调 watchdog 里 `MIN_FREE_MB`(自担 OOM 风险) |
 | 4 | journal 打"退避 <名>: 180s 内拉起 3 次仍死,冷却 600s" | 手动跑一遍 resume 命令,看它到底怎么死的 | 会话本身起不来(模型/登录/目录没了),watchdog 按设计退避防狂拉 | 先修死因(多半就是第 2 行),再等冷却或删 `~/.cloud-status/_watchdog.json` |
 | 5 | 会话回来了,但登记 uuid 变了 / 对话是全新的 | `ls ~/.claude/projects/<目录编码>/ \| grep <旧uuid>`;手跑 `env -u TMUX -u TMUX_PANE claude --resume <旧uuid>` 看报错 | 旧 jsonl 没了(被删 / 路径编码不对),resume 失败落成新对话 | 找回/修正 jsonl 位置(M1/M2);实在找不回就接受新对话、让登记随之更新 |

@@ -6,10 +6,10 @@ if [ -f "$FNM_DIR/fnm" ]; then
 fi
 export PATH="$HOME/.local/bin:$PATH"   # cloudgo 辅助脚本 + native claude 都装在这里
 # 侧边栏/cld 默认模型 + 默认参数（最大推理力度）；想改就改这两行。
-# ⚠️ 客户须改：claude-fable-5 是作者账号的特殊模型，普通 Pro/Max 账号大概率用不了 → 换成自己账号可用的
+# ⚠️ 客户按需改：默认 claude-opus-4-8[1m] 需 Max 计划 + 1M 上下文，普通 Pro 账号大概率没有 → 换成自己账号可用的
 #    （如 claude-opus-4-8[1m] / claude-sonnet-4-6），否则新建会话 + 断电自愈全启动即死。另需同步改
 #    /etc/systemd/system/cloud-watchdog.service 的 CLOUD_MODEL（管断电自愈）。见 DEPLOY 阶段一「必改·会话模型」。
-CLOUD_MODEL="claude-fable-5[1m]"
+CLOUD_MODEL="claude-opus-4-8[1m]"
 CLOUD_OPTS="--effort max"
 cloud() {
   local dir="${1:?用法: cloud <工作目录> [claude 参数...]}"; shift

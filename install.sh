@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 # 前置护栏:本脚本假定 Debian/Ubuntu 系(apt)+ x86_64/arm64;可重复运行(各步幂等)
 command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);其它发行版请手动改下面的包管理部分。"; exit 1; }
 case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
-MODEL="${CLOUD_MODEL:-claude-fable-5[1m]}"   # 会话默认模型。客户跑 `CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh` 即全局用该模型(默认 fable-5=作者账号专属,客户多半没有)
+MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"   # 会话默认模型。客户跑 `CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh` 即全局用该模型(默认 opus-4-8[1m] 需 Max+1M;账号无 Opus/1M 就换成自己有的,如 claude-sonnet-4-5)
 
 echo "[1/7] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban python3   # python3:核心自愈(cloud-watchdog/cc-sessions/cc-state/hub)都是 python3,极简镜像可能没有
@@ -39,7 +39,7 @@ cp systemd/moshi-hook.service systemd/moshi-hook-healthcheck.service systemd/mos
 systemctl daemon-reload
 systemctl enable --now cloud-sessions.service cloud-watchdog.timer   # --now:装完即起,不必等重启(否则核心体检当场红)
 systemctl enable --now fail2ban 2>/dev/null || true                  # SSH 防爆破,cloud_infra_check 的核心项
-# 把会话模型写进两处关键位置(默认 fable-5=作者专属;客户 CLOUD_MODEL=... 重跑即换成自己账号可用的)
+# 把会话模型写进两处关键位置(默认 opus-4-8[1m];客户 CLOUD_MODEL=... 重跑即换成自己账号可用的)
 sed -i "s#^CLOUD_MODEL=\"[^\"]*\"#CLOUD_MODEL=\"$MODEL\"#" ~/.bashrc 2>/dev/null || true                                                   # 交互新建会话
 sed -i "s#Environment=\"CLOUD_MODEL=[^\"]*\"#Environment=\"CLOUD_MODEL=$MODEL\"#" /etc/systemd/system/cloud-watchdog.service 2>/dev/null || true   # 断电自愈 --resume
 systemctl daemon-reload
@@ -53,7 +53,7 @@ bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好�
 
 echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac'（Mac 客户端）/'laptop'（Windows 客户端）别名；② git 身份；③ tailscale up"
 echo "注：图形桌面层(noVNC/xfce/Chrome) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
-[ "$MODEL" = "claude-fable-5[1m]" ] && echo "⚠️ 会话模型仍是默认 claude-fable-5[1m]（作者账号专属）。客户账号若无此模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
+[ "$MODEL" = "claude-opus-4-8[1m]" ] && echo "ℹ️ 会话模型为默认 claude-opus-4-8[1m]（需 Max 计划 + 1M 上下文访问）。账号若无 Opus/1M → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=<你有的模型,如 claude-sonnet-4-5> ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 
 set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的核心(避免 set -e 让整脚本非零退出)
 # ---- Shell 增强 (fzf + starship + ble.sh) ----
