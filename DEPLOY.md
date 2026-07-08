@@ -71,6 +71,8 @@
 
 > **⚠️ 先解决"够到旧机"**:跑在新服务器上的 Claude **够不到客户的旧机器**。先用 AskUserQuestion 跟客户定传输方式,二选一:① 客户在**旧机**上 `tar czf /tmp/claude-migrate.tgz -C ~ .claude`(**先删掉 `.claude/.credentials.json` 等密钥再打包**)→ scp / 面板上传到新服务器 → Claude 解包到临时目录按下面判断;② 客户旧机装 Tailscale 进**同一 tailnet** → Claude 经 `ssh` 直接读。没有这一步,迁移无从下手。
 
+> **🔎 够"清单外"的机器 · tailnet 自动发现(配置能力)**:走了上面②(旧机进同 tailnet)、或以后需要够一台**不在静态别名清单里**的设备时,不必逐台手配——让 Claude **动态发现**:`tailscale status` 枚举同 tailnet 的设备 → 逐台 `ssh -o BatchMode=yes -o ConnectTimeout=<秒> <user>@100.x.y.z true`(用已有钥匙 + 约定用户名探活,如 `example-laptop` 用 `<user>`;`BatchMode=yes` 保证不通即刻失败、不卡密码提示)→ **探通的**登记进机器清单(字段:主机名 / tailnet-IP / 用户 / 钥匙 / 默认shell / 探测日期),**幂等去重**(已在清单就跳过),**不通的**只记跳过、不登记。该能力段文档化在 `claude-config/CLAUDE.md`(阶段五 A12 会 grep 校验)。真实主机名 / IP / 用户名**不入库**——进部署参数表或本机记忆。
+
 拿到旧机资料后,Claude 扫描 / 判断:
 
 - **扫 `~/.claude/`**:`CLAUDE.md`、`settings.json`、`skills/`、`commands/`、`hooks/`、`mcpServers.json`、`plugins`、以及项目记忆目录。

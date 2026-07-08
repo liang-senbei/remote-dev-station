@@ -80,6 +80,7 @@ selfheal ≈ 3–6 分钟(S1 等登记 ≤60s、发暗号 ≤120s、S5 等拉回
 | **A9** OOM 硬化在位 | `systemctl is-active earlyoom`;`cat /proc/sys/vm/swappiness`;`cat /proc/sys/vm/overcommit_memory`;`free -m` 看 Swap | earlyoom active、swappiness=60、overcommit=1、swap ≥ 8000MB | 任一缺 = 单会话内存暴涨会拖垮整机 → 重跑 `bash oom/harden.sh`(幂等)。user.slice 软顶那层脚本不查 → H7 |
 | **A10** hub 多会话中控 | `hub ls` | exit 0 | 报错读输出;装坏了重跑 `./install.sh` |
 | **A11** 开机自启 enabled | `systemctl is-enabled cloud-sessions.service cloud-watchdog.timer` | 都 enabled(重启后体系自己站起来的前提) | `systemctl enable` 补上,否则重启后自愈体系起不来;boot 线演练见 H5/H3 |
+| **A12** tailnet 自动发现能力就绪 | `command -v tailscale`;`grep 'tailnet 自动发现' claude-config/CLAUDE.md`(纯只读:查命令 + grep 文档,不枚举真机、不发 ssh 探针) | tailscale 命令可用 **且** CLAUDE.md 文档化了「tailnet 自动发现」能力段(够**清单外**机器:`tailscale status` 枚举 + `ssh -o BatchMode=yes` 探活 + 幂等登记去重) | tailscale 缺 → 装 + `tailscale up`(→ [tailscale-setup.md](tailscale-setup.md));CLAUDE.md 没这段 → 把动态发现流程补进机器/连接相关处(占位符示例 `<user>@100.x.y.z`、`example-laptop`) |
 
 ### 2.2 S · 破坏性自愈(串行独占)
 

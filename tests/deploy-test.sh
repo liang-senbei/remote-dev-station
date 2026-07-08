@@ -197,6 +197,20 @@ PYEOF
   if [ "$e1" = "enabled" ] && [ "$e2" = "enabled" ]; then
     pass A11 "cloud-sessions.service 与 cloud-watchdog.timer 均已 enabled(重启自动到位)" "enabled/enabled"
   else fail A11 "开机自启缺失(重启后自愈体系起不来)" "cloud-sessions=$e1 watchdog.timer=$e2"; fi
+
+  # A12 tailnet 自动发现能力就绪:tailscale 命令可用(枚举 tailnet 设备的前提)+
+  #     claude-config/CLAUDE.md 文档化了「tailnet 自动发现」能力段(够清单外机器:枚举+ssh探活+幂等登记)。
+  #     纯只读:一个命令查 + 一次 grep,不枚举真机、不发 ssh 探针、不碰会话。
+  local tshave doc
+  command -v tailscale >/dev/null 2>&1 && tshave=1 || tshave=""
+  grep -q "tailnet 自动发现" "$REPO/claude-config/CLAUDE.md" 2>/dev/null && doc=1 || doc=""
+  if [ -n "$tshave" ] && [ -n "$doc" ]; then
+    pass A12 "tailnet 自动发现能力就绪(tailscale 命令可用 + CLAUDE.md 文档化)" "grep 命中 'tailnet 自动发现'"
+  elif [ -z "$tshave" ]; then
+    fail A12 "tailscale 命令不可用(自动发现枚举 tailnet 设备的前提没了)" "command -v tailscale 无;恢复: 装 tailscale + tailscale up"
+  else
+    fail A12 "claude-config/CLAUDE.md 未文档化'tailnet 自动发现'能力段(够清单外机器的流程没写)" "grep 未命中关键词"
+  fi
 }
 
 # =========================== B 组 · deck 服务端(只读) ===========================
