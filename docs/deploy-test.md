@@ -50,7 +50,7 @@ selfheal ≈ 3–6 分钟(S1 等登记 ≤60s、发暗号 ≤120s、S5 等拉回
 
 1. **建会话 + 模型真可用**——`CLOUD_MODEL` 指的模型在这台机、这个账号上真能出活(不是启动即死)。
    对应 A4(模型探针 + bashrc/service 两处一致)+ S1(真会话起得来)。
-   最高频翻车点:仓里默认模型 `claude-opus-4-8[1m]` 需 Max+1M、客户账号若无 Opus/1M 会启动即死(DEPLOY 阶段一)。
+   最高频翻车点:仓里默认模型 `claude-sonnet-5`、客户账号若无权限访问会启动即死(DEPLOY 阶段一)。
 2. **cc-state 登记**——会话一有动静,`~/.cloud-sessions/<名>.json` 就有 name/dir/uuid。对应
    A3(钩子接线可执行)+ S1/S2(登记真出现、字段对)。这是一切自愈的地基:登记表恒空 =
    watchdog 无从拉起,还**不报错**。

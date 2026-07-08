@@ -25,9 +25,9 @@
 
 ## 工作偏好
 
-- **【硬规则·不可省略】所有 agent / subagent / Workflow agent / 队友一律用 Opus 4.8（`claude-opus-4-8[1m]`）**（2026-07-07 起 Fable 5 下架、全面换回 Opus 4.8;不得擅自换成 sonnet/haiku）。
-  - Agent 工具显式传 `model: "opus"`；Workflow 的 `agent()` 省略 `model` 即继承会话模型（默认已是 Opus 4.8），别显式传别的。
-  - **Agent teams 队友**：队友**默认不继承 lead 模型**、本版本又无法在 settings.json 锁定，故 spawn 团队时**必须在指令里写明"所有 teammate 用 Opus 4.8"**，否则被降级/跑偏。（显示模式保持 `teammateMode:"in-process"`，别设 auto/tmux——这台是嵌套 tmux，分屏会出 shell 空壳。）
+- **【硬规则·不可省略】所有 agent / subagent / Workflow agent / 队友一律用 Sonnet 5（`claude-sonnet-5`）、effort max**（2026-07-08 起从 Opus 4.8 全面换成 Sonnet 5;不得擅自换成 opus/haiku）。
+  - Agent 工具显式传 `model: "sonnet"`；Workflow 的 `agent()` 省略 `model` 即继承会话模型（默认已是 Sonnet 5），别显式传别的。
+  - **Agent teams 队友**：队友**默认不继承 lead 模型**、本版本又无法在 settings.json 锁定，故 spawn 团队时**必须在指令里写明"所有 teammate 用 Sonnet 5"**，否则被降级/跑偏。（显示模式保持 `teammateMode:"in-process"`，别设 auto/tmux——这台是嵌套 tmux，分屏会出 shell 空壳。）
 - 优先使用 **agent teams / subagents / Workflow** 与 **ultrathink**：能并行委派的尽量并行，能先深度思考的先想透。
 - **跟我说人话（别甩术语墙）**：先给结论 +「这对我啥影响」，再按需展开细节；技术黑话（spool / mosh / 嵌套 tmux 之类）第一次出现用一句大白话解释；**少用表格和 ✓❌⚠️ 符号堆砌**——能用正常句子说清就别做成仪表盘。我要听得懂、不累。
 - **默认用 `AskUserQuestion` 提问（让我点选，别让我手打）**：凡是要和我确认、让我拍板、征求意见/选型，默认给选项让我选——一个问题就问一个、多个一次问多个（最多 4 个），有推荐项放第一个标「(推荐)」；我不满意会自己在「其它」手输。实在收不成选项的开放题才退回文字问。

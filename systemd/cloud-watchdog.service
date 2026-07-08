@@ -7,7 +7,7 @@ Type=oneshot
 TimeoutStartSec=120
 Environment=HOME=/root
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment="CLOUD_MODEL=claude-opus-4-8[1m]"
+Environment="CLOUD_MODEL=claude-sonnet-5"
 Environment="CLOUD_OPTS=--effort max"
 Environment=DISABLE_AUTOUPDATER=1
 ExecStart=/root/.local/bin/cloud-watchdog

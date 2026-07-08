@@ -34,7 +34,7 @@
 
 照 [README.md](README.md) 的「从零部署 Quick Start」执行:**唯一前置 Tailscale**(`tailscale up`,无头授权见 [`docs/tailscale-setup.md`](docs/tailscale-setup.md))→ `git clone` **客户自己的 fork** → `./install.sh`(装依赖 + Claude Code native + 全部会话层 + systemd 自愈 + 防火墙)→ `source ~/.bashrc` → `claude` 登录(无头见 [`docs/headless-login.md`](docs/headless-login.md))。
 
-> **⚠️ 必改·会话模型(最要命)**:仓里默认 `CLOUD_MODEL=claude-opus-4-8[1m]` **需 Max 计划 + 1M 上下文访问**,普通客户 Pro 账号**未必有** → 客户账号若无 Opus/1M,则客户端新建会话 + watchdog 断电自愈 `--resume` **全部启动即死**。装完**核实客户账号**,无 Opus/1M 就改成客户可用的模型(如 `claude-sonnet-4-5`),**两处都改**:① `~/.bashrc` 的 `CLOUD_MODEL`(管交互新建会话);② `/etc/systemd/system/cloud-watchdog.service` 的 `Environment=CLOUD_MODEL=`(管断电自愈)→ 改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`。
+> **⚠️ 必改·会话模型(最要命)**:仓里默认 `CLOUD_MODEL=claude-sonnet-5`,客户账号**未必有权限访问** → 客户端新建会话 + watchdog 断电自愈 `--resume` **全部启动即死**。装完**核实客户账号**,权限不够就改成客户可用的模型(如 `claude-opus-4-8[1m]`),**两处都改**:① `~/.bashrc` 的 `CLOUD_MODEL`(管交互新建会话);② `/etc/systemd/system/cloud-watchdog.service` 的 `Environment=CLOUD_MODEL=`(管断电自愈)→ 改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`。
 
 - ⚠️ **origin 换成客户自己的**:给客户建一份仓(fork 或新建),别让客户长期依赖作者的 origin。
 - ✅ **会话恢复(cc-state 钩子)装完即接线**:install.sh 若客户 `~/.claude/settings.json` **不存在**,会自动铺干净模板 [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions);**客户已有 settings.json 则不覆盖** → 需手动把该模板的 cc-state hooks 合并进去(否则会话恢复静默失效;`cloud_infra_check.sh` 会探这一项)。**别照抄作者的 `claude-config/settings.json`**——它挂了作者专属的 moshi-hook / statusline / hub-gate 等钩子(客户没装对应脚本/第三方二进制会每事件报错)。

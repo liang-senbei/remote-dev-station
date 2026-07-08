@@ -15,7 +15,7 @@ try:
 except Exception:
     pass
 CJSON = os.path.expanduser("~/.claude.json")
-MODEL = os.environ.get("CLOUD_MODEL", "claude-opus-4-8[1m]")
+MODEL = os.environ.get("CLOUD_MODEL", "claude-sonnet-5")
 OPTS  = os.environ.get("CLOUD_OPTS", "--effort max")
 
 WINDOW       = 180    # 观察窗口(秒)

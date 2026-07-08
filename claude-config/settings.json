@@ -9,8 +9,7 @@
       "Bash(hub all *)"
     ]
   },
-  "model": "claude-opus-4-8[1m]",
-  "switchModelsOnFlag": false,
+  "model": "sonnet",
   "hooks": {
     "PermissionRequest": [
       {
@@ -270,7 +269,9 @@
     }
   },
   "alwaysThinkingEnabled": true,
+  "autoUpdatesChannel": "latest",
   "skipDangerousModePermissionPrompt": true,
   "theme": "light",
+  "switchModelsOnFlag": false,
   "teammateMode": "in-process"
 }

@@ -13,9 +13,9 @@
 会话名 `cc-<目录名>`；起名后为 `cc-<目录名>-<名字>`（名字同时进 tmux 名 + Claude `-n` 显示名，列表/恢复处都认得出）。
 
 ## 默认参数（开会话时自动带，命令行可覆盖）
-- 模型 **Opus 4.8 1M**（`claude-opus-4-8[1m]`，改 `~/.bashrc` 里 `CLOUD_MODEL`；2026-07-07 起 Fable 5 下架、换回 Opus 4.8）
+- 模型 **Sonnet 5**（`claude-sonnet-5`，改 `~/.bashrc` 里 `CLOUD_MODEL`；2026-07-08 起从 Opus 4.8 换成 Sonnet 5）
 - **`--effort max`**（改 `CLOUD_OPTS`）
-- 覆盖示例：`cld /opt/workspace/proj --model sonnet --effort medium`
+- 覆盖示例：`cld /opt/workspace/proj --model opus --effort medium`
 
 ## 自动恢复
 开会话即登记进 `~/.cloud-sessions/<会话>.json`。重启/断电后开机服务 `cloud-sessions`(`cloud-boot.sh`)**只启 tmux server + 拉起 `cloud-watchdog.timer`**——**不一次性全恢复**(14 个重会话齐起会 OOM 雪崩)。之后 `cloud-watchdog` 每 ~15s 一轮、看内存、**一次最多 1 个**地把登记会话 `claude --resume <uuid>` 温和拉回(从 jsonl 续上、历史不丢、用当前账号);`/exit` 主动结束(ended=true)的不恢复。几分钟内陆续回齐,Mac/手机端 Wave/Moshi 重连即接回。
