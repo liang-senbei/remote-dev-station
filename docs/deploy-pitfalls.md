@@ -161,3 +161,28 @@
 - **现象**：命令里含 `sleep 0.3`，整条被信号打断、exit 144。
 - **根因**：沙箱拦截前台 `sleep`。
 - **修法**：等条件改用 `timeout N sh -c 'tail -f log | grep -m1 pat'` 或 Monitor 工具，别用 sleep 轮询。
+
+### Mac 端 Wave deck:mosh 报 "Error: vector"(缺 UTF-8 locale)
+- **现象**:Mac 上点"会话"widget,cloudconn 走 mosh 连服务器,报 `Error: vector`;终端手敲 `mosh host` 也一样。
+- **根因**:mosh 客户端要 UTF-8 locale。macOS 的 GUI app(Wave)cmd 块常不带 `LANG/LC_ALL`,非交互/嵌套 ssh 也丢 locale → mosh 挂。
+- **修法**:cloudconn 开头 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`。测试链路时也要带上再 `mosh ... -- echo OK`。
+
+### install.sh 的可选层/配置缺口(新客户部署要手动补)
+- **现象**:部署后 ①服务器 Claude 不知道自己能力(无 `~/.claude/CLAUDE.md`);②临时会话 widget 瘸(缺 `/usr/local/bin/mosh-server-tmout`);③项目看板/服务器桌面 widget 连不上(cloud-dashboards.service / novnc.service 没装)。
+- **根因**:旧版 install.sh 只铺 settings 模板 + 把 `cloud-dashboards.sh/novnc-start.sh` 拷到 /usr/local/bin,但没铺 CLAUDE.md、没装 mosh-server-tmout、没装这两个 service 单元。
+- **修法**:已在 install.sh 补齐(铺 CLAUDE.md、装 mosh-server-tmout、noVNC 必装 + 起 novnc/cloud-dashboards/gen-dashboard)。老部署手动补:`CLAUDE.md`→`~/.claude/`;`bin/mosh-server-tmout`→`/usr/local/bin/`;`systemd/{novnc,cloud-dashboards}.service`→`/etc/systemd/system/`+`enable --now`。
+
+### Wave widgets.json 部署:占位符要全替(不止 <YOUR_HOME>)
+- **现象**:项目看板/服务器桌面 widget 打开报连接错误,URL 里还是 `http://<SERVER_TAILSCALE_IP>:8088/`。
+- **根因**:铺 widgets.json 时只替了 `<YOUR_HOME>`,漏了 `<SERVER_TAILSCALE_IP>`。
+- **修法**:两个占位符都替:`<YOUR_HOME>`→用户家目录、`<SERVER_TAILSCALE_IP>`→服务器 tailscale IP。cloudconn 里的 `<SERVER_TAILSCALE_IP>` 同理。
+
+### 客户端缺 cloud/cloud-pub SSH 别名 → widget 报 lookup cloud: no such host
+- **现象**:Mac Wave 的"服务器文件"widget(或任何用 `root@cloud` 连接的)报 `Connecting to root@cloud, Error: dial tcp: lookup cloud: no such host`。
+- **根因**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub`,但客户端 `~/.ssh/config` 没这两个别名。
+- **修法**:客户端 `~/.ssh/config` 建 `cloud`(HostName=服务器 tailscale IP)+ `cloud-pub`(=公网 IP)别名,User root、IdentityFile 指客户端钥匙、IdentitiesOnly yes;并 `ssh-copy-id` 把客户端公钥推进服务器。
+
+### cloud-dashboards / novnc 只绑 Tailscale IP,别在 127.0.0.1 上测
+- **现象**:服务 `systemctl is-active` 是 active,但 `curl 127.0.0.1:8088` 返回 000 无响应,以为服务坏了。
+- **根因**:`cloud-dashboards.sh`/`novnc-start.sh` 故意 `--bind $(tailscale ip -4)`(tailnet-only 更安全),不监听 127.0.0.1。
+- **修法**:验证用 tailscale IP:`curl http://100.x.y.z:8088/`(widget 也是走这个)。

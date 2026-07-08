@@ -1,0 +1,51 @@
+#!/bin/bash
+# 生成项目看板首页(服务器概览),写到 cloud-dashboards 服务的目录 /root/inbox/dashboards/index.html。
+# 目的:避免 :8088 是空目录时 = 白屏。可重复跑刷新;gen-dashboard.timer 每 5 分钟自动重生成保持实时。
+export PATH=$HOME/.local/bin:$PATH
+OUT=/root/inbox/dashboards/index.html
+mkdir -p /root/inbox/dashboards
+HOST=$(hostname)
+TSIP=$(tailscale ip -4 2>/dev/null | head -1)
+UP=$(uptime -p 2>/dev/null | sed 's/up //')
+MEM=$(free -h 2>/dev/null | awk '/Mem:/{print $3" / "$2}')
+DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $3" / "$2" ("$5")"}')
+LOAD=$(uptime 2>/dev/null | grep -oE 'load average.*' | cut -d: -f2 | xargs)
+MODEL=$(grep -m1 CLOUD_MODEL ~/.bashrc 2>/dev/null | grep -oE 'claude-[a-z0-9-]+\[?1?m?\]?')
+NOW=$(date '+%Y-%m-%d %H:%M:%S')
+SESS=$(tmux ls 2>/dev/null | grep -E '^cc-|^cloud' | awk -F: '{print $1}')
+SESSN=$(echo "$SESS" | grep -c . )
+SESSROWS=""
+if [ -n "$SESS" ]; then
+  while read -r s; do [ -n "$s" ] && SESSROWS="$SESSROWS<tr><td>🖥️ $s</td><td>运行中</td></tr>"; done <<< "$SESS"
+else
+  SESSROWS="<tr><td colspan=2 class=muted>暂无运行中的 cc 会话 —— 用 cloudgo / cloudnew 开一个</td></tr>"
+fi
+cat > "$OUT" <<HTML
+<!doctype html><html lang=zh><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
+<title>项目看板 · $HOST</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0d1117;color:#e6edf3;padding:24px;line-height:1.5}
+h1{font-size:22px;margin-bottom:4px}.sub{color:#8b949e;font-size:13px;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px}
+.card .k{color:#8b949e;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.card .v{font-size:18px;margin-top:6px;font-weight:600;word-break:break-all}
+.sec{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;margin-bottom:16px}
+.sec h2{font-size:15px;margin-bottom:10px}table{width:100%;border-collapse:collapse;font-size:14px}
+td{padding:8px 6px;border-bottom:1px solid #21262d}.muted{color:#8b949e}
+.note{color:#8b949e;font-size:13px;background:#161b22;border:1px dashed #30363d;border-radius:10px;padding:14px}
+code{background:#21262d;padding:2px 6px;border-radius:4px;font-size:13px}.dot{color:#3fb950}</style></head><body>
+<h1>📊 项目看板 · $HOST</h1>
+<div class=sub>服务器概览 · 生成于 $NOW · Tailnet $TSIP</div>
+<div class=grid>
+<div class=card><div class=k>会话模型</div><div class=v>$MODEL</div></div>
+<div class=card><div class=k>运行时长</div><div class=v>$UP</div></div>
+<div class=card><div class=k>负载</div><div class=v>$LOAD</div></div>
+<div class=card><div class=k>内存</div><div class=v>$MEM</div></div>
+<div class=card><div class=k>磁盘 /</div><div class=v>$DISK</div></div>
+<div class=card><div class=k>活跃会话</div><div class=v><span class=dot>●</span> $SESSN 个</div></div>
+</div>
+<div class=sec><h2>🖥️ 运行中的会话</h2><table>$SESSROWS</table></div>
+<div class=note>💡 这是<b>项目看板门户</b>。把任意 HTML 报表/看板丢进服务器的 <code>/root/inbox/dashboards/</code>,刷新这里即可看到并点开。<br>
+想刷新本页服务器状态:在服务器跑 <code>gen-dashboard</code>(或对 Claude 说"刷新项目看板")。</div>
+</body></html>
+HTML
+echo "生成 $OUT ($(wc -c < $OUT) 字节)"

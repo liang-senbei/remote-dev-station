@@ -1,0 +1,7 @@
+[Unit]
+Description=生成项目看板首页(服务器概览 HTML,避免 :8088 空目录白屏)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gen-dashboard

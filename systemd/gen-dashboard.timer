@@ -1,0 +1,9 @@
+[Unit]
+Description=每 5 分钟刷新项目看板首页(保持服务器概览实时)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
