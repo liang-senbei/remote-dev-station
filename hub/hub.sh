@@ -8,6 +8,9 @@
 # 用法：
 #   hub ls                 列出所有 cc-* 会话：项目路径 + git 远端/状态
 #   hub peek <cc> [行数]   看某个 cc 最近 N 行屏幕(默认 40)，知道它在干嘛
+#   hub iam "一句话"       自报本会话在做什么 → 写进 /opt/workspace/会话总览.md(无参=查看自己当前那句)
+#   hub dash <url> [auto|manual]  声明本会话的看板地址(none=清除)→ 同步进 会话总览.md
+#   hub overview           手动重生 会话总览.md(iam/dash 已会各自触发一次，通常不用手跑)
 #   hub say  <cc[,cc2,…]> "消息"  给一个或几个 cc 发消息(逗号分隔=定向群发,非全员、不需 HUB_ALL_OK;自动包 preamble)  ← 默认就用这个
 #   hub ask  <cc[,cc2,…]> "消息"  同 say，但要求对方用 `hub say <我> "..."` 回信
 #   hub all  "消息"        广播给除自己外的所有 cc  ← 慎用!需 HUB_ALL_OK=1 才放行
@@ -33,6 +36,11 @@ _self_label(){ local s; s="$(_self_sess)"; [ -n "$s" ] && echo "${s#$PREFIX}" ||
 # 当前会话(发送方)的工作目录:cc 里跑 = 它的项目路径;否则 = 当前 shell 的 PWD(中控)。
 # 用于把「来源项目路径」写进 preamble,便于多 agent / 多项目并行协作时定位与回复来源。
 _self_path(){ [ -n "${TMUX:-}" ] && tmux display-message -p '#{pane_current_path}' 2>/dev/null || printf '%s' "${PWD:-?}"; }
+
+# 各会话「一句话自报」+「看板声明」的存储(各写各的文件,无并发冲突)。
+SUMDIR="$HOME/.cloud-summaries"
+_summary(){ cat "$SUMDIR/$1.txt" 2>/dev/null; }
+_dash(){ cat "$SUMDIR/$1.dash" 2>/dev/null; }
 
 # 片段 → 唯一 cc-* 会话名(打到 stdout)；失败打错误到 stderr 并返回非 0
 _resolve(){
@@ -216,12 +224,48 @@ case "$cmd" in
     done <<< "$(_sessions)"
     echo "(广播完成，共 $sent 个$( [ "$skipped" -gt 0 ] && printf '，跳过 %s 个未就绪' "$skipped" ))"
     ;;
+  iam)
+    me="$(_self_sess)"; [ -n "$me" ] || { echo "⛔ 不在某个 cc 会话里,无法确定是谁。请在某个 cc 标签里跑 hub iam。" >&2; exit 2; }
+    txt="$*"
+    if [ -z "$txt" ]; then echo "「${me#$PREFIX}」当前一句话: $(_summary "$me" || echo '(空)')"; exit 0; fi
+    mkdir -p "$SUMDIR"; printf '%s' "$(printf '%s' "$txt" | tr '\n' ' ')" > "$SUMDIR/${me}.txt"
+    "$0" overview >/dev/null 2>&1
+    echo "✅ 已更新「${me#$PREFIX}」一句话: $txt"
+    ;;
+  dash)
+    me="$(_self_sess)"; [ -n "$me" ] || { echo "⛔ 不在 cc 会话里。" >&2; exit 2; }
+    url="${1:-}"; mode="${2:-manual}"; mkdir -p "$SUMDIR"
+    if [ -z "$url" ] || [ "$url" = "none" ]; then
+      rm -f "$SUMDIR/${me}.dash"; echo "✅ 「${me#$PREFIX}」声明:无看板"
+    else
+      printf '%s [%s]' "$url" "$mode" > "$SUMDIR/${me}.dash"; echo "✅ 「${me#$PREFIX}」看板: $url [$mode]"
+    fi
+    "$0" overview >/dev/null 2>&1
+    ;;
+  overview)
+    out="${HUB_OVERVIEW:-/opt/workspace/会话总览.md}"
+    {
+      echo "# 会话总览(各 cc 自报 · hub 自动生成,别手编)"
+      echo
+      echo "> 各会话用 \`hub iam \"一句话\"\` 报告在干嘛;有看板的用 \`hub dash <url> [auto|manual]\` 声明。其它会话/中控靠这张表知道彼此在做什么。"
+      echo
+      echo "| 会话 | 在做什么 | 看板 |"
+      echo "|---|---|---|"
+      while IFS= read -r s; do
+        [ -z "$s" ] && continue
+        case "$s" in ${PREFIX}tmp-*) continue ;; esac   # 临时会话不进总览
+        sum="$(_summary "$s")"; dsh="$(_dash "$s")"
+        echo "| ${s#$PREFIX} | ${sum:-—} | ${dsh:-—} |"
+      done <<< "$(_sessions)"
+    } > "$out"
+    echo "✅ 已生成 $out"
+    ;;
   help|-h|--help)
     awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
     ;;
   *)
     echo "未知命令: $cmd" >&2
-    echo "用法: hub {ls|peek|say|ask|all|help}" >&2
+    echo "用法: hub {ls|peek|iam|dash|overview|say|ask|all|help}" >&2
     exit 1
     ;;
 esac
