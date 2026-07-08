@@ -191,3 +191,8 @@
 - **现象**:客户在 noVNC 桌面(systemd 起的 xfce)的终端里直接敲 `claude` → `command not found`;但 cloudgo 交互会话正常。
 - **根因**:claude native 装在 `~/.local/bin`,而桌面终端/systemd 上下文的 `PATH`(`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin`)**不含 `~/.local/bin`**。cloudgo 会话没事是因为 bashrc 里 `export PATH=~/.local/bin:$PATH`。
 - **修法**:`ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude`(/usr/local/bin 在所有 PATH 里,全 shell 可见)。install.sh 装完 claude 后已补这行软链。
+
+### 自建 Wave widget 跑命令缺 controller:cmd → 点了黑屏空白终端
+- **现象**:手搭的「会话/临时会话」widget,点开是**黑色空终端块、什么都不跑**;但在终端里直接 `cloudgo` 完全正常。
+- **根因**:Wave 的 `term` widget 要**执行命令**必须有 `"controller": "cmd"`(配合 `view:"term"` + `cmd`)。只写 `view:term`+`cmd`、漏了 `controller` → Wave 当成空 shell、**不执行 cmd** → 黑屏。仓库 `wave-config/waveterm/widgets.json` 的 cc-go 有这键,**手搭 widget 时容易漏**。
+- **修法**:widget meta 补 `"controller": "cmd"`。手搭前照抄仓库 cc-go 的 meta 结构:`{"view":"term","controller":"cmd","cmd":"...","cmd:interactive":true}`。别只凭记忆搭。
