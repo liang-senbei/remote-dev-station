@@ -1,0 +1,62 @@
+#!/bin/bash
+# 生成「5 小时额度」看板页 → /root/inbox/dashboards/quota.html(由 :8088 门户发布,Wave「额度」widget 打开它)。
+# 数据来自 ccusage(读 ~/.claude/projects 会话日志算 Claude 的 5 小时滚动窗口用量)。cc-quota.timer 每分钟刷。
+export PATH=$HOME/.local/bin:$PATH
+OUT=/root/inbox/dashboards/quota.html
+mkdir -p /root/inbox/dashboards
+command -v ccusage >/dev/null 2>&1 || npm install -g ccusage >/dev/null 2>&1
+ccusage blocks --active --json > /tmp/ccu.json 2>/dev/null
+python3 - > "$OUT" <<'PY'
+import json, datetime
+try:
+    d = json.load(open('/tmp/ccu.json')); blocks = d.get('blocks') or []
+    b = blocks[0] if blocks else None
+except Exception:
+    b = None
+def ftok(n):
+    n = n or 0
+    return f"{n/1e6:.1f}M" if n>=1e6 else (f"{n/1e3:.0f}K" if n>=1e3 else str(int(n)))
+now = datetime.datetime.now(datetime.timezone.utc)
+if b:
+    st = datetime.datetime.fromisoformat(b['startTime'].replace('Z','+00:00'))
+    et = datetime.datetime.fromisoformat(b['endTime'].replace('Z','+00:00'))
+    proj = b.get('projection') or {}
+    rem = proj.get('remainingMinutes')
+    if rem is None: rem = max(0, int((et-now).total_seconds()//60))
+    elapsed = max(0, int((now-st).total_seconds()//60))
+    pct = min(100, max(0, int(elapsed/300*100)))
+    tc = b.get('tokenCounts') or {}
+    io = (tc.get('inputTokens') or 0) + (tc.get('outputTokens') or 0)
+    total = b.get('totalTokens') or 0
+    cost = b.get('costUSD') or 0
+    br = b.get('burnRate') or {}
+    tpm = br.get('tokensPerMinute') or 0; cph = br.get('costPerHour') or 0
+    rh, rm = divmod(int(rem), 60)
+    reset_at = et.astimezone().strftime('%H:%M')
+    body = f'''<div class="big">⏳ 距重置 <b>{rh}h{rm:02d}m</b> <span class=muted>(约 {reset_at})</span></div>
+<div class="bar"><div class="fill" style="width:{pct}%"></div></div>
+<div class="muted" style="text-align:right">本窗口已过 {pct}%</div>
+<div class="row"><span>本窗口用量</span><b>{ftok(io)} 出入token</b></div>
+<div class="row"><span>含缓存总量 / 成本</span><b>{ftok(total)} · ${cost:.1f}</b></div>
+<div class="row"><span>燃烧率</span><b>{ftok(tpm)}/分 · ${cph:.0f}/时</b></div>'''
+    status = "活动中"
+else:
+    body = '<div class="big muted">当前 5 小时窗口空闲(无活动会话)</div>'
+    status = "空闲"
+gen = now.astimezone().strftime('%H:%M:%S')
+print(f'''<!doctype html><html lang=zh><head><meta charset=utf-8>
+<meta http-equiv="refresh" content="60"><meta name=viewport content="width=device-width,initial-scale=1">
+<title>5小时额度</title><style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0d1117;color:#e6edf3;padding:16px;font-size:14px}}
+h1{{font-size:15px;margin-bottom:10px}}.big{{font-size:20px;margin:8px 0}}
+.bar{{height:8px;background:#21262d;border-radius:4px;overflow:hidden;margin:8px 0 2px}}
+.fill{{height:100%;background:linear-gradient(90deg,#3fb950,#d29922)}}
+.row{{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #21262d}}
+.muted{{color:#8b949e;font-size:12px}}</style></head><body>
+<h1>📊 5 小时额度 · <span class=muted>{status}</span></h1>
+{body}
+<div class=muted style="margin-top:10px">刷新于 {gen} · 每60秒自动刷新 · ccusage 读本机会话日志估算</div>
+</body></html>''')
+PY
+echo "生成 $OUT ($(wc -c < $OUT 2>/dev/null) 字节)"

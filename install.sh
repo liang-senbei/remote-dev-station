@@ -25,6 +25,7 @@ install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 桌
 install -m755 bin/mosh-server-tmout /usr/local/bin/   # 临时会话(cloudtmp/cloudconn 用 --server=/usr/local/bin/mosh-server-tmout,关了自动销毁)
 install -m755 bin/gen-dashboard /usr/local/bin/                      # 项目看板首页生成器(gen-dashboard.service/timer 调它)
 install -m755 bin/claude-login-url.sh /usr/local/bin/claude-login-url   # 输出临时公网登录页 URL(客户完成 Claude 无头登录用)
+install -m755 bin/cc-quota /usr/local/bin/                           # 「5小时额度」看板页生成器(ccusage 算 5h 滚动窗口用量;cc-quota.timer 每分钟刷)
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）
 
@@ -56,10 +57,10 @@ echo "[+] noVNC 图形桌面(必装 —— Claude 无头登录 + 服务器桌面
 DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc novnc websockify xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk 2>/dev/null || echo "⚠️ 部分桌面包装失败,可 apt 手动补"
 command -v google-chrome >/dev/null || { curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb; } 2>/dev/null || echo "⚠️ chrome 装失败(登录页要用),可手动补"
 command -v cloudflared >/dev/null || { curl -fsSL -o /tmp/cf.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && apt-get install -y /tmp/cf.deb; } 2>/dev/null || echo "⚠️ cloudflared 装失败(登录临时公网URL要用)"
-cp systemd/novnc.service systemd/cloud-dashboards.service systemd/gen-dashboard.service systemd/gen-dashboard.timer /etc/systemd/system/
+cp systemd/novnc.service systemd/cloud-dashboards.service systemd/gen-dashboard.service systemd/gen-dashboard.timer systemd/cc-quota.service systemd/cc-quota.timer /etc/systemd/system/
 mkdir -p /root/inbox/dashboards; /usr/local/bin/gen-dashboard 2>/dev/null || true   # 先生成看板首页,避免 :8088 空目录=白屏
 systemctl daemon-reload
-systemctl enable --now novnc.service cloud-dashboards.service gen-dashboard.timer 2>/dev/null || echo "⚠️ novnc/dashboards 服务起失败,可 systemctl restart 单独排查"
+systemctl enable --now novnc.service cloud-dashboards.service gen-dashboard.timer cc-quota.timer 2>/dev/null || echo "⚠️ novnc/dashboards 服务起失败,可 systemctl restart 单独排查"
 echo "  → 让客户完成 Claude 登录:跑 claude-login-url 拿到临时公网登录页 URL(登录后 pkill cloudflared 拆掉)。"
 
 echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"

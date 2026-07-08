@@ -52,7 +52,7 @@
 > - **本机用户名 / 家目录**:`widgets.json` 的 `cmd` 里 `<YOUR_HOME>/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `<YOUR_HOME>/…` —— 换成你自己的家目录路径。
 > - 服务器侧的 `bin/novnc-start.sh`(noVNC)与 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改。
 
-- 🎛️ **装哪些 Wave widget:每个客户现场让用户选(Windows / Mac 都是)**。用 **AskUserQuestion** 列出可选项让用户勾,别一套照搬:**核心默认必装** = 会话(`cloudgo`)+ 临时会话(`cloudtmp`);**可选** = 服务器文件(需 wsh,首次连接自动装)、项目看板(:8088)、服务器桌面(:6080 noVNC)、主题(Mac 本地 :8799 `wavetheme-server`)。按用户勾选裁剪 `widgets.json` 再铺。
+- 🎛️ **装哪些 Wave widget:每个客户现场让用户选(Windows / Mac 都是)**。用 **AskUserQuestion** 列出可选项让用户勾,别一套照搬:**核心默认必装** = 会话(`cloudgo`)+ 临时会话(`cloudtmp`);**可选** = 服务器文件(需 wsh,首次连接自动装)、项目看板(:8088)、服务器桌面(:6080 noVNC)、主题(Mac 本地 :8799 `wavetheme-server`)、**额度**(5小时滚动窗口用量/余量,:8088/quota.html,由 `cc-quota` + ccusage 生成)。按用户勾选裁剪 `widgets.json` 再铺。
 - 🔑 **客户端 SSH 别名(否则用 `root@cloud` 连接的 widget 报 `lookup cloud: no such host`)**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub` → 客户端 `~/.ssh/config` **必须建 `cloud`(→服务器 Tailscale IP)+ `cloud-pub`(→服务器公网 IP)别名**(`User root`、`IdentityFile` 指客户端自己钥匙、`IdentitiesOnly yes`)。并把**客户端公钥 `ssh-copy-id` 进服务器**(免密)。
 - ⚙️ **mosh 要 UTF-8 locale**:`cloudconn` 已在开头 `export LANG/LC_ALL=en_US.UTF-8`(否则 macOS/Wave cmd 块里 mosh 报 `Error: vector`)。**主题** widget 要在 Mac 本地跑 `wavetheme-server`(:8799)+ 铺 `termthemes/*.json`,用 **launchd** 自启;**临时会话**要服务器 `/usr/local/bin/mosh-server-tmout`(install.sh 已装)。**noVNC 已改必装**:客户完成 Claude 无头登录跑 `claude-login-url`(输出临时公网登录页 URL,登录后 `pkill cloudflared` 拆掉)。
 
