@@ -186,3 +186,8 @@
 - **现象**:服务 `systemctl is-active` 是 active,但 `curl 127.0.0.1:8088` 返回 000 无响应,以为服务坏了。
 - **根因**:`cloud-dashboards.sh`/`novnc-start.sh` 故意 `--bind $(tailscale ip -4)`(tailnet-only 更安全),不监听 127.0.0.1。
 - **修法**:验证用 tailscale IP:`curl http://100.x.y.z:8088/`(widget 也是走这个)。
+
+### claude 在 ~/.local/bin,noVNC 桌面终端/systemd 上下文敲 claude 报 command not found(exit127)
+- **现象**:客户在 noVNC 桌面(systemd 起的 xfce)的终端里直接敲 `claude` → `command not found`;但 cloudgo 交互会话正常。
+- **根因**:claude native 装在 `~/.local/bin`,而桌面终端/systemd 上下文的 `PATH`(`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin`)**不含 `~/.local/bin`**。cloudgo 会话没事是因为 bashrc 里 `export PATH=~/.local/bin:$PATH`。
+- **修法**:`ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude`(/usr/local/bin 在所有 PATH 里,全 shell 可见)。install.sh 装完 claude 后已补这行软链。

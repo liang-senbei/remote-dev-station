@@ -13,6 +13,7 @@ apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban python3 
 
 echo "[2/7] 安装 Claude Code (native)"
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
+ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude 2>/dev/null || true   # 软链到 /usr/local/bin:noVNC 桌面终端/systemd 上下文 PATH 不含 ~/.local/bin,不软链则桌面里敲 claude 报 command not found(exit127)
 
 echo "[3/7] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
