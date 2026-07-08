@@ -1,6 +1,7 @@
 [Unit]
 Description=Project dashboards portal — serves ONLY /root/inbox/dashboards on :8088 (项目看板门户)
-After=network-online.target
+After=network-online.target tailscaled.service
+Wants=tailscaled.service
 
 [Service]
 ExecStart=/usr/local/bin/cloud-dashboards.sh
