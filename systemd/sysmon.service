@@ -1,0 +1,12 @@
+[Unit]
+Description=Lightweight server status panel (stdlib-only, no persistent collector) on :19998
+After=network-online.target tailscaled.service
+Wants=tailscaled.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/sysmon-server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -21,7 +21,7 @@ chkopt moshi-hook.service           "hub发送+手机审批 daemon"  "moshi-hook
 chkopt moshi-hook-healthcheck.timer "daemon卡死自愈兜底"       "systemctl enable --now moshi-hook-healthcheck.timer"
 chkopt novnc.service                "服务器 GUI 桌面 :6080"    "装图形桌面层(见桌面层文档)"
 chkopt cloud-dashboards.service     "项目看板 :8088"           "systemctl restart cloud-dashboards.service"
-chkopt netdata.service              "服务器监控面板 :19999"    "systemctl restart netdata(装法:kickstart.sh --non-interactive --disable-telemetry;绑定见 /etc/netdata/netdata.conf [web] bind to)"
+chkopt sysmon.service                "服务器状态面板 :19998"    "systemctl restart sysmon.service"
 chkopt earlyoom.service             "RAM见底主动杀最肥claude"  "bash oom/harden.sh 装 OOM 防护层"
 chkopt cloudflared.service          "对外域名隧道(作者专属)"  "作者环境专用,客户一般不需要"
 echo "-- 功能探活 --"
