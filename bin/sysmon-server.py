@@ -86,12 +86,18 @@ def disk_snapshot():
 
 
 def net_snapshot():
+    def is_real_iface(name):
+        # 排除 docker0/网桥/veth 这些容器内部虚拟网卡——它们和物理网卡/tailscale0
+        # 会把同一份流量重复计一遍,只算真正对外的接口。
+        return name != 'lo' and not name.startswith(('docker', 'br-', 'veth'))
+
     def read():
         rx = tx = 0
         with open('/proc/net/dev') as f:
             for line in f.readlines()[2:]:
                 iface, rest = line.split(':')
-                if iface.strip() == 'lo':
+                iface = iface.strip()
+                if not is_real_iface(iface):
                     continue
                 nums = rest.split()
                 rx += int(nums[0]); tx += int(nums[8])
@@ -120,6 +126,22 @@ def top_processes(n=12):
     return procs
 
 
+def docker_snapshot():
+    # 只用 docker ps(~60ms),不用 docker stats(要采样~1.1s,拖慢整个接口不划算)。
+    r = subprocess.run(['docker', 'ps', '-a', '--format', '{{.Names}}|{{.Status}}|{{.Image}}'],
+                        capture_output=True, text=True)
+    if r.returncode != 0:
+        return []  # docker 未装/未运行,静默返回空,不报错
+    out = []
+    for line in r.stdout.splitlines():
+        parts = line.split('|')
+        if len(parts) != 3:
+            continue
+        name, status, image = parts
+        out.append({'name': name, 'status': status, 'image': image, 'up': status.startswith('Up')})
+    return out
+
+
 def snapshot():
     return {
         'time': time.strftime('%H:%M:%S'),
@@ -129,6 +151,7 @@ def snapshot():
         'net': net_snapshot(),
         **load_uptime(),
         'top': top_processes(),
+        'docker': docker_snapshot(),
         'sessions': subprocess.run(['tmux', 'list-sessions'], capture_output=True, text=True)
                     .stdout.count('\n'),
     }
@@ -155,6 +178,10 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}
 td{padding:3px 4px;border-bottom:1px solid #232e42}
 td:nth-child(3),td:nth-child(4){text-align:right;color:#aab8cc}
 .big{font-size:22px;font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}
+.dot.up{background:#5fd97a}
+.dot.down{background:#e05050}
+.mut{color:#8a97ab}
 </style></head><body>
 <h1>📊 echo-j2 服务器状态</h1>
 <div class="sub" id="meta">加载中…</div>
@@ -172,7 +199,10 @@ td:nth-child(3),td:nth-child(4){text-align:right;color:#aab8cc}
     <div class="row"><span>运行时长</span><span id="uptime">—</span></div>
     <div class="row"><span>tmux 会话数</span><span id="sessions">—</span></div></div>
 </div>
-<div class="card"><h2>进程 Top 12(按 CPU)</h2><table><tbody id="procs"></tbody></table></div>
+<div class="grid">
+  <div class="card"><h2>进程 Top 12(按 CPU)</h2><table><tbody id="procs"></tbody></table></div>
+  <div class="card"><h2>Docker 容器</h2><table><tbody id="docker"></tbody></table></div>
+</div>
 <script>
 function barClass(p){return p>=90?'bar crit':p>=70?'bar warn':'bar'}
 async function tick(){
@@ -198,6 +228,10 @@ async function tick(){
   document.getElementById('sessions').textContent = d.sessions;
   document.getElementById('procs').innerHTML = d.top.map(p=>
     `<tr><td>${p.pid}</td><td>${p.name}</td><td>${p.cpu}%</td><td>${p.mem}%</td></tr>`).join('');
+  document.getElementById('docker').innerHTML = d.docker.length
+    ? d.docker.map(c=>
+        `<tr><td><span class="dot ${c.up?'up':'down'}"></span>${c.name}</td><td class="mut">${c.image}</td><td colspan="2" class="mut">${c.status}</td></tr>`).join('')
+    : '<tr><td class="mut">(无容器 / docker 未运行)</td></tr>';
 }
 tick(); setInterval(tick, 3000);
 </script></body></html>"""
