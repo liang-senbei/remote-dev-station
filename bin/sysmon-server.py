@@ -115,14 +115,22 @@ def load_uptime():
 
 
 def top_processes(n=12):
-    out = subprocess.run(['ps', '-eo', 'pid,comm,pcpu,pmem', '--sort=-pcpu', '--no-headers'],
+    # etimes(存活秒数)一起拿:ps 的 %CPU = 用掉的CPU时间/自身存活时间,活不到1秒的
+    # 进程(ps自己/临时起的sshd/一次性脚本...)分母趋零,算出来会飙到100%——不是真负载,
+    # 是自我测量假象。按存活时间过滤这整类噪音,不是照名字一个个排除(排不完)。
+    out = subprocess.run(['ps', '-eo', 'pid,comm,pcpu,pmem,etimes', '--sort=-pcpu', '--no-headers'],
                           capture_output=True, text=True).stdout
     procs = []
-    for line in out.splitlines()[:n]:
-        parts = line.split(None, 3)
-        if len(parts) < 4:
+    for line in out.splitlines():
+        parts = line.split(None, 4)
+        if len(parts) < 5:
             continue
-        procs.append({'pid': parts[0], 'name': parts[1], 'cpu': float(parts[2]), 'mem': float(parts[3])})
+        pid, name, cpu, mem, etimes = parts
+        if int(etimes) < 2:
+            continue
+        procs.append({'pid': pid, 'name': name, 'cpu': float(cpu), 'mem': float(mem)})
+        if len(procs) >= n:
+            break
     return procs
 
 
