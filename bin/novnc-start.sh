@@ -20,7 +20,7 @@ sleep 2
 DISPLAY=:1 google-chrome --no-sandbox --no-first-run --no-default-browser-check \
   --password-store=basic --disable-session-crashed-bubble --start-maximized \
   --user-data-dir=/root/.chrome-vnc "https://claude.ai/code" >/var/log/chrome-vnc.log 2>&1 &
-x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -bg -o /var/log/x11vnc.log 2>/dev/null
+x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -xrandr -bg -o /var/log/x11vnc.log 2>/dev/null
 sleep 1
 # 绑本机自己的 Tailscale IP（自动取、不写死；只在 tailnet 内可达 = 安全边界）
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"; TS_IP="${TS_IP:-127.0.0.1}"
