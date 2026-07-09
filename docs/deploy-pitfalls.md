@@ -196,3 +196,17 @@
 - **现象**:手搭的「会话/临时会话」widget,点开是**黑色空终端块、什么都不跑**;但在终端里直接 `cloudgo` 完全正常。
 - **根因**:Wave 的 `term` widget 要**执行命令**必须有 `"controller": "cmd"`(配合 `view:"term"` + `cmd`)。只写 `view:term`+`cmd`、漏了 `controller` → Wave 当成空 shell、**不执行 cmd** → 黑屏。仓库 `wave-config/waveterm/widgets.json` 的 cc-go 有这键,**手搭 widget 时容易漏**。
 - **修法**:widget meta 补 `"controller": "cmd"`。手搭前照抄仓库 cc-go 的 meta 结构:`{"view":"term","controller":"cmd","cmd":"...","cmd:interactive":true}`。别只凭记忆搭。
+
+### 推文件到 Mac:scp/sftp 卡 → 改 ssh 管道 cat 推(2remote .36 实战)
+- **现象**:往客户 Mac scp/sftp 传文件(widgets.json 等)卡住/超时。
+- **根因**:某些 macOS + 多层 ssh(反向通道)下 sftp 子系统会卡。
+- **修法**:走 ssh 字节流管道推:`ssh mac 'cat > ~/目标文件' < 本地文件`(二进制字节流,不坏编码、不依赖 sftp)。Windows 同理可用 `Set-Content`/base64。
+
+### heredoc 里嵌 ssh 没加 -n 会吞掉 heredoc 的 stdin
+- **现象**:`ssh host <<EOF ... ssh other cmd ... EOF` 这类脚本,内层 ssh 把 heredoc 剩余内容当自己的 stdin 吃掉 → 后续命令错乱。
+- **根因**:ssh 默认从 stdin 读,heredoc 正在喂 stdin。
+- **修法**:heredoc/管道上下文里的**非交互、不需 stdin 的 ssh 都加 `-n`**(`ssh -n host cmd`),让它不读 stdin。
+
+### 客户 Mac 已有 ~/.ssh/config → 追加别名别覆盖
+- **现象**:配 cloud/cloud-pub 别名时整份覆盖了客户已有的 ssh config。
+- **修法**:**追加**(先 `grep -q 'Host cloud$'` 幂等判断,没有才 `>>` 追加),别 `>` 覆盖;客户已有的别名/配置要保留。
