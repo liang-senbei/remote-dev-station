@@ -114,10 +114,23 @@ def load_uptime():
     return {'load': [float(x) for x in load], 'uptime_h': round(uptime_s / 3600, 1)}
 
 
+def claude_session_map():
+    # pid → 会话名,用来把进程榜里光秃秃的 "claude" 标注成"是哪个会话"(今天排查证明很有用)。
+    # 失败/超时不影响整个面板,静默返回空表。
+    try:
+        r = subprocess.run(['/root/.local/bin/claude', 'agents', '--json'],
+                            capture_output=True, text=True, timeout=3)
+        data = json.loads(r.stdout)
+        return {str(x['pid']): x.get('name', '?') for x in data if 'pid' in x}
+    except Exception:
+        return {}
+
+
 def top_processes(n=12):
     # etimes(存活秒数)一起拿:ps 的 %CPU = 用掉的CPU时间/自身存活时间,活不到1秒的
     # 进程(ps自己/临时起的sshd/一次性脚本...)分母趋零,算出来会飙到100%——不是真负载,
     # 是自我测量假象。按存活时间过滤这整类噪音,不是照名字一个个排除(排不完)。
+    sessmap = claude_session_map()
     out = subprocess.run(['ps', '-eo', 'pid,comm,pcpu,pmem,etimes', '--sort=-pcpu', '--no-headers'],
                           capture_output=True, text=True).stdout
     procs = []
@@ -128,10 +141,40 @@ def top_processes(n=12):
         pid, name, cpu, mem, etimes = parts
         if int(etimes) < 2:
             continue
-        procs.append({'pid': pid, 'name': name, 'cpu': float(cpu), 'mem': float(mem)})
+        label = f"{name} ({sessmap[pid]})" if name == 'claude' and pid in sessmap else name
+        procs.append({'pid': pid, 'name': label, 'cpu': float(cpu), 'mem': float(mem)})
         if len(procs) >= n:
             break
     return procs
+
+
+# 今天真实经历过一次 OOM+重启,面板该在第一眼就告诉我"最近有没有再犯"。
+# 全量扫24h日志要10秒,每3秒刷新一次的面板扛不住——启动时全量查一次打底(唯一慢的
+# 一次),之后每次只查"上次查到现在"这一小段增量,快且不丢事件。全局态只留内存里,
+# 服务重启会重新打底,符合"不做持久历史"的设计。
+_oom_cache = {'last_checked': None, 'last_oom_ts': None, 'count_since_start': 0}
+
+def oom_status():
+    now = time.time()
+    try:
+        if _oom_cache['last_checked'] is None:
+            since_arg = '24 hours ago'
+        else:
+            since_arg = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(_oom_cache['last_checked']))
+        r = subprocess.run(
+            ['journalctl', '--since', since_arg, '--no-pager', '-o', 'short-unix'],
+            capture_output=True, text=True, timeout=12)
+        lines = [l for l in r.stdout.splitlines() if 'invoked oom-killer' in l]
+        if lines:
+            _oom_cache['last_oom_ts'] = float(lines[-1].split()[0])
+            _oom_cache['count_since_start'] += len(lines)
+        _oom_cache['last_checked'] = now
+    except Exception:
+        pass  # 这次查询失败就沿用上次结果,不让整个面板挂掉
+    if _oom_cache['last_oom_ts'] is None:
+        return {'count_recent': _oom_cache['count_since_start'], 'hours_since': None}
+    hours_since = round((now - _oom_cache['last_oom_ts']) / 3600, 1)
+    return {'count_recent': _oom_cache['count_since_start'], 'hours_since': hours_since}
 
 
 def docker_snapshot():
@@ -160,6 +203,7 @@ def snapshot():
         **load_uptime(),
         'top': top_processes(),
         'docker': docker_snapshot(),
+        'oom': oom_status(),
         'sessions': subprocess.run(['tmux', 'list-sessions'], capture_output=True, text=True)
                     .stdout.count('\n'),
     }
@@ -205,7 +249,8 @@ td:nth-child(3),td:nth-child(4){text-align:right;color:#aab8cc}
     <div class="row"><span>↑ 上行</span><span id="net-tx">—</span></div>
     <div class="row"><span>负载(1/5/15分)</span><span id="load">—</span></div>
     <div class="row"><span>运行时长</span><span id="uptime">—</span></div>
-    <div class="row"><span>tmux 会话数</span><span id="sessions">—</span></div></div>
+    <div class="row"><span>tmux 会话数</span><span id="sessions">—</span></div>
+    <div class="row"><span><span class="dot" id="oom-dot"></span>近24h OOM</span><span id="oom-status">—</span></div></div>
 </div>
 <div class="grid">
   <div class="card"><h2>进程 Top 12(按 CPU)</h2><table><tbody id="procs"></tbody></table></div>
@@ -234,6 +279,10 @@ async function tick(){
   document.getElementById('load').textContent = d.load.join(' / ');
   document.getElementById('uptime').textContent = d.uptime_h+' 小时';
   document.getElementById('sessions').textContent = d.sessions;
+  const oomDot = document.getElementById('oom-dot'), oomTxt = document.getElementById('oom-status');
+  if (d.oom.count_recent === 0) { oomDot.className = 'dot up'; oomTxt.textContent = '无'; }
+  else if (d.oom.count_recent === null) { oomDot.className = 'dot'; oomTxt.textContent = '查询失败'; }
+  else { oomDot.className = 'dot down'; oomTxt.textContent = `${d.oom.count_recent}次·最近${d.oom.hours_since}h前`; }
   document.getElementById('procs').innerHTML = d.top.map(p=>
     `<tr><td>${p.pid}</td><td>${p.name}</td><td>${p.cpu}%</td><td>${p.mem}%</td></tr>`).join('');
   document.getElementById('docker').innerHTML = d.docker.length
