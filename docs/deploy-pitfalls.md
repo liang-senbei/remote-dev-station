@@ -215,3 +215,13 @@
 - **现象**:ssh 客户服务器密码报错,多试几次后变 `Connection ... Not allowed at this time`(fail2ban 封了本机出口 IP)。
 - **根因**:客户把服务器 IP 给错了(给成另一台),密码自然对不上;失败几次触发那台的 fail2ban 封禁 → 之后连对的机也可能受影响。
 - **修法**:**部署前先核对 IP**(`ssh root@<ip> hostname` 能进+密码对再动手)。已被封:等封禁过期,或换出口/让对方 unban。给错 IP 时别硬试密码,先跟客户确认正确 IP。
+
+### ★客户装 Clash/系统代理:noVNC/看板(:6080/:8088)超时但 SSH/会话正常(代理绕过列表缺 tailnet 100.*)
+- **现象**:客户机上「服务器桌面(:6080)」「项目看板/额度(:8088)」网页 widget 打不开/一直转圈/timeout,但「会话(cloudgo)」这种 **ssh 类 widget 一直好**。极具迷惑性,像 tailscale 掉线又不完全是。
+- **根因**:客户装了 **Clash/V2Ray 等系统代理**(127.0.0.1:7890)。Windows ProxyOverride(或系统代理)的**绕过列表放行了 `10./172./192.168.*` 私网段,却独缺 Tailscale 的 `100.*` 段** → 浏览器/Wave 网页块访问 tailnet IP(`100.x:6080/8088`)走代理 → 代理够不到 tailnet → 超时。而 **SSH 不走 HTTP 代理**,所以会话 widget 照常通 → 让人误以为"tailscale 好着呢"。
+- **诊断**:PowerShell 对比——`(New-Object Net.Sockets.TcpClient).Connect('100.x.y.z',6080)` 直连(通)vs `Invoke-WebRequest http://100.x.y.z:6080`(走代理→timeout),一比就现形。
+- **修法**:① 注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyOverride` 加 `100.*`;或 ② Clash 配置里加 `IP-CIDR,100.64.0.0/10,DIRECT`(tailnet 段直连不走代理)→ 实测 :6080 HTTP200。
+
+### claude 子进程内存泄漏 → 整机 OOM → claude/noVNC 饿死(2remote .178 事故)
+- **现象**:某会话(如大数据任务)claude 子进程内存涨到十几 G → 整机 OOM → claude 起不来 + noVNC 桌面栈被饿死。
+- **修法**:`ps aux --sort=-%mem | head` 揪出跑飞进程,`kill` 释放内存,`systemctl restart novnc.service` 重建桌面栈。install.sh 的 `oom/harden.sh` 是兜底(限单会话),但极端泄漏仍可能击穿——留意大任务会话的内存。
