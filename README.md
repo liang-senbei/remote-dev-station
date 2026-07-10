@@ -181,6 +181,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 **服务器 `~/.bashrc` 函数**:`cloudgo`(入口+自学习)· `cloudattach`(进会话)· `cloudtmp`(临时)· `cloudunbind`(解绑)· `_cloudbind`(记绑)· `cloudnewat`/`cloudnew`/`cloud_resume`(新建/恢复)
 **服务器其它**:`/usr/local/bin/{cloud-boot.sh, novnc-start.sh}` · systemd:`cloud-watchdog.timer/.service`、`cloud-sessions.service`、`novnc.service`、`cloud-dashboards.service`(:8088 项目看板) · 登记 `~/.cloud-sessions/` · 绑定 `~/.cloud-blockbind/` · 对话 `~/.claude/projects/.../<uuid>.jsonl` · 钩子 `~/.claude/settings.json`(cc-state + moshi-hook)· 铃铛 `~/.claude/hooks/{stop,notification}.sh`
 **Mac**:`~/bin/cloudconn` · `~/.zshrc`(proxy 开关;Tailscale 网段 `100.64.0.0/10` 已加代理绕过)· `~/.config/waveterm`(打包版读)/`waveterm-dev`(dev 重建读)· `~/build/waveterm-zh`(自建源码)
+**服务器状态面板(全机聚合,取代原 Netdata)**:源码 `bin/sysmon-server.py`(纯标准库零依赖),侧栏 widget 打 echo-j2 的 `:19998`。echo-j2 自己是 hub:本机直接算 + 并行轮询 HK13/HK14/MacBook Air/Mac mini 各自的 `:19998/api/status` 拼成一页,任一台连不上优雅显示离线、不拖垮整页。HK13/HK14 跑同一份脚本(systemd `sysmon.service`);Mac/mini 是 macOS 适配版(`~/scripts/sysmon-server.py`,launchd `com.sysmon.agent.plist`,用户身份非 root)。改机器列表/IP 改脚本顶部 `PEERS` 表。
 
 ---
 

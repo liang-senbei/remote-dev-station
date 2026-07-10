@@ -1,9 +1,10 @@
 [Unit]
-Description=Lightweight server status panel (stdlib-only) on :19998
+Description=Lightweight server status panel (stdlib-only) on :19998 -- HUB role (echo-j2 only, polls HK13/HK14/Air/mini)
 After=network-online.target tailscaled.service
 Wants=tailscaled.service
 
 [Service]
+Environment="SYSMON_ROLE=hub"
 ExecStart=/usr/bin/python3 /usr/local/bin/sysmon-server.py
 Restart=on-failure
 RestartSec=5
