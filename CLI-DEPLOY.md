@@ -3,8 +3,8 @@
 这一分支是 **纯终端** 版:客户端只用 **SSH**,不装 Wave、不配 widget、无 cloudgo 选单。
 进 Claude 就一条命令:**`ssh cloud`**(claude 自动打开;断线重连接回同一会话)。
 
-保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**。
-砍掉的:Wave GUI deck、cloudgo 选单(换成单一常驻会话 `cloud-enter`)、noVNC 桌面(降级为 `CLOUD_DESKTOP=1` 可选)、看板、mosh/tailscale 硬依赖、手机 Moshi。
+保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**(noVNC 登录桌面**必装**)。
+砍掉的:Wave GUI deck、cloudgo 选单(换成单一常驻会话 `cloud-enter`)、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。
 
 > **怎么做到"ssh 上去 claude 就在"**:`cloud-connect.sh` 给 `~/.ssh/config` 的 `cloud` 别名写了 `RequestTTY yes` + `RemoteCommand cloud-enter`。
 > 于是 `ssh cloud` 自动在服务器跑 `cloud-enter` → 进(或按 uuid 恢复)那个常驻 tmux 会话里的 claude。客户看不到 cloudgo/tmux,韧性照旧。
@@ -40,13 +40,13 @@ CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh          # 极简:装 claude+会话
 
 装完就绪:cloudgo/watchdog 自愈、systemd 开机恢复、ufw+fail2ban、OOM 硬化。
 
-### Claude 登录(无头,不需要 noVNC)
-1. 服务器上跑 `cloud-enter`(或本机已配好后 `ssh cloud`)→ 进 claude;
-2. 首次会打印一条 `https://…/oauth…` URL;
-3. 在**你本机浏览器**打开 → 授权 → 把页面给的 **code 粘回服务器终端**。
+### Claude 登录(noVNC 登录页,必装)
+install.sh 已把 noVNC 桌面必装。让客户完成登录:
+1. 服务器上跑 **`claude-login-url`** → 输出一条**临时公网登录页 URL**(cloudflared 把 noVNC :6080 开个公网口);
+2. 把这条 URL 发给客户 → 客户在**自己浏览器**打开 → 看到服务器桌面的 Chrome → 在里面登录 Claude 账号完成授权;
+3. 登录完 **`pkill cloudflared`** 把公网口拆掉。
 
-> code 交换在服务器完成(密钥留在服务器),浏览器用哪台无所谓。
-> 若某环境这条走不通,`CLOUD_DESKTOP=1` 重跑,改用 `claude-login-url` 的 GUI 登录页。
+> ⚠️ 这是无密码公网暴露,登录完务必 `pkill cloudflared`。
 
 ---
 
@@ -88,9 +88,9 @@ CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh          # 极简:装 claude+会话
 | | 极简 CLI 版(本分支) | 全功能版(main) |
 |---|---|---|
 | 客户端 | `ssh cloud`,零配置(无 cloudgo 选单) | Wave GUI deck |
-| noVNC 桌面 | 默认无(`CLOUD_DESKTOP=1` 可开) | 必装 |
-| 看板/额度 | 无 | 有 |
-| 登录 | 无头终端(默认) | noVNC GUI |
+| noVNC 登录桌面 | **必装**(登录用) | 必装 |
+| 看板/额度(:8088) | 默认无(`CLOUD_DESKTOP=1` 可开) | 有 |
+| 登录 | noVNC 公网登录页(`claude-login-url`) | noVNC GUI |
 | 会话韧性 / 反向隧穿 | **保留** | 保留 |
 
 两者共用同一套 install.sh;极简版靠默认值 + `CLOUD_DESKTOP` 开关裁剪,不是两份代码。

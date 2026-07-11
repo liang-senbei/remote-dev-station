@@ -2,7 +2,7 @@
 
 > **⚡ 本分支 = 极简终端版(cli-deploy):客户端只用 SSH,无 Wave、无 cloudgo 选单。部署看 [`CLI-DEPLOY.md`](CLI-DEPLOY.md)。**
 > 进 Claude 一条命令:`ssh cloud`(claude 自动打开);本机接入用 [`cli/cloud-connect.sh`](cli/cloud-connect.sh)。
-> 会话韧性层(tmux+watchdog,断线/重启不丢)保留但藏起来了(单一常驻会话 `cloud-enter`);反向隧穿保留;noVNC 桌面/看板降级为 `CLOUD_DESKTOP=1` 可选。
+> 会话韧性层(tmux+watchdog,断线/重启不丢)保留但藏起来了(单一常驻会话 `cloud-enter`);反向隧穿 + noVNC 登录桌面保留;看板 :8088 降级为 `CLOUD_DESKTOP=1` 可选。登录:服务器跑 `claude-login-url` 出公网登录页发客户。
 > 下方正文是**全功能版**说明(含 Wave/mosh/Moshi/cloudgo 选单)——本分支已移除这些客户端组件,相关章节仅作背景,按 `CLI-DEPLOY.md` 走。
 
 > 一套"在美国服务器上跑 Claude Code,从中国的 Mac(Wave 自建中文版)和手机(Moshi)远程操作"的体系。
