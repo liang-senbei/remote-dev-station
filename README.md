@@ -1,5 +1,10 @@
 # 远程 Claude 会话体系 · 交接文档
 
+> **⚡ 本分支 = 极简终端版(cli-deploy):客户端只用 SSH,无 Wave。部署看 [`CLI-DEPLOY.md`](CLI-DEPLOY.md)。**
+> 进 Claude 一条命令:`ssh -t cloud cloudgo`;本机接入用 [`cli/cloud-connect.sh`](cli/cloud-connect.sh)。
+> 保留会话韧性层 + 反向隧穿;noVNC 桌面/看板降级为 `CLOUD_DESKTOP=1` 可选。
+> 下方正文是**全功能版**说明(含 Wave/mosh/Moshi 客户端)——本分支已移除 Wave 客户端组件,相关客户端章节仅作背景,按 `CLI-DEPLOY.md` 走。
+
 > 一套"在美国服务器上跑 Claude Code,从中国的 Mac(Wave 自建中文版)和手机(Moshi)远程操作"的体系。
 > 读完应能理解每层、会话怎么管/恢复/退出/删除,以及出问题去哪查。
 

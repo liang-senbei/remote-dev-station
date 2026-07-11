@@ -7,6 +7,11 @@ cd "$(dirname "$0")"
 command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);其它发行版请手动改下面的包管理部分。"; exit 1; }
 case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
 MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"   # 会话默认模型。客户跑 `CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh` 即全局用该模型(默认 claude-opus-4-8[1m]，通用；特殊模型如 fable-5 普通账号未必有)
+DESKTOP="${CLOUD_DESKTOP:-0}"   # 【极简 CLI 版默认 0】= 无头终端登录,不装 noVNC 桌面栈。要 GUI 登录/服务器桌面 widget 才 `CLOUD_DESKTOP=1 ./install.sh`。
+
+echo "== 极简 CLI 版部署 =="
+echo "   客户端只需 SSH:装完在本机跑 cli/cloud-connect.sh 即可(生成密钥→推公钥→ssh+cloudgo)。"
+[ "$DESKTOP" = "1" ] && echo "   CLOUD_DESKTOP=1 → 附带装 noVNC 桌面 + 看板(GUI 登录路径)。" || echo "   登录走无头:装完在服务器跑一次 claude,按提示打开 URL 授权、粘回 code(不需要 noVNC)。"
 
 echo "[1/7] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban python3   # python3:核心自愈(cloud-watchdog/cc-sessions/cc-state/hub)都是 python3,极简镜像可能没有
@@ -28,7 +33,7 @@ install -m755 bin/gen-dashboard /usr/local/bin/                      # 项目看
 install -m755 bin/claude-login-url.sh /usr/local/bin/claude-login-url   # 输出临时公网登录页 URL(客户完成 Claude 无头登录用)
 install -m755 bin/cc-quota /usr/local/bin/                           # 「5小时额度」看板页生成器(ccusage 算 5h 滚动窗口用量;cc-quota.timer 每分钟刷)
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
-install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）
+# (极简 CLI 版已移除 Wave「按标签页恢复终端」的服务器助手 windows/server-side/*——纯终端不需要)
 
 echo "[4/7] 部署 tmux 配置 + .bashrc 函数块"
 cp tmux.conf ~/.tmux.conf
@@ -40,8 +45,7 @@ cmp -s claude-config/settings.client.json ~/.claude/settings.json && sed -i "s#/
 
 echo "[5/7] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
 cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-watchdog.timer /etc/systemd/system/
-# 手机 Moshi 单元一并放好；二进制由 moshi-hook update 装、配对后再 enable（见 phone/README.md）
-cp systemd/moshi-hook.service systemd/moshi-hook-healthcheck.service systemd/moshi-hook-healthcheck.timer /etc/systemd/system/
+# (极简 CLI 版不带手机 Moshi:如需再手动 cp systemd/moshi-hook*.service 并按 phone/README.md 配对)
 systemctl daemon-reload
 systemctl enable --now cloud-sessions.service cloud-watchdog.timer   # --now:装完即起,不必等重启(否则核心体检当场红)
 systemctl enable --now fail2ban 2>/dev/null || true                  # SSH 防爆破,cloud_infra_check 的核心项
@@ -54,21 +58,27 @@ echo "[6/7] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
 ufw --force enable
 
-echo "[+] noVNC 图形桌面(必装 —— Claude 无头登录 + 服务器桌面 widget 都要用)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc novnc websockify xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk 2>/dev/null || echo "⚠️ 部分桌面包装失败,可 apt 手动补"
-command -v google-chrome >/dev/null || { curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb; } 2>/dev/null || echo "⚠️ chrome 装失败(登录页要用),可手动补"
-command -v cloudflared >/dev/null || { curl -fsSL -o /tmp/cf.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && apt-get install -y /tmp/cf.deb; } 2>/dev/null || echo "⚠️ cloudflared 装失败(登录临时公网URL要用)"
-cp systemd/novnc.service systemd/cloud-dashboards.service systemd/gen-dashboard.service systemd/gen-dashboard.timer systemd/cc-quota.service systemd/cc-quota.timer /etc/systemd/system/
-mkdir -p /root/inbox/dashboards; /usr/local/bin/gen-dashboard 2>/dev/null || true   # 先生成看板首页,避免 :8088 空目录=白屏
-systemctl daemon-reload
-systemctl enable --now novnc.service cloud-dashboards.service gen-dashboard.timer cc-quota.timer 2>/dev/null || echo "⚠️ novnc/dashboards 服务起失败,可 systemctl restart 单独排查"
-echo "  → 让客户完成 Claude 登录:跑 claude-login-url 拿到临时公网登录页 URL(登录后 pkill cloudflared 拆掉)。"
+if [ "$DESKTOP" = "1" ]; then
+  echo "[+] noVNC 图形桌面(CLOUD_DESKTOP=1 才装 —— GUI 登录 + 服务器桌面 widget)"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc novnc websockify xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk 2>/dev/null || echo "⚠️ 部分桌面包装失败,可 apt 手动补"
+  command -v google-chrome >/dev/null || { curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb; } 2>/dev/null || echo "⚠️ chrome 装失败(登录页要用),可手动补"
+  command -v cloudflared >/dev/null || { curl -fsSL -o /tmp/cf.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && apt-get install -y /tmp/cf.deb; } 2>/dev/null || echo "⚠️ cloudflared 装失败(登录临时公网URL要用)"
+  cp systemd/novnc.service systemd/cloud-dashboards.service systemd/gen-dashboard.service systemd/gen-dashboard.timer systemd/cc-quota.service systemd/cc-quota.timer /etc/systemd/system/
+  mkdir -p /root/inbox/dashboards; /usr/local/bin/gen-dashboard 2>/dev/null || true   # 先生成看板首页,避免 :8088 空目录=白屏
+  systemctl daemon-reload
+  systemctl enable --now novnc.service cloud-dashboards.service gen-dashboard.timer cc-quota.timer 2>/dev/null || echo "⚠️ novnc/dashboards 服务起失败,可 systemctl restart 单独排查"
+  echo "  → GUI 登录:跑 claude-login-url 拿到临时公网登录页 URL(登录后 pkill cloudflared 拆掉)。"
+else
+  echo "[+] 极简版跳过 noVNC 桌面栈(CLOUD_DESKTOP=1 可开)。登录走【无头终端】:"
+  echo "    → 进一个会话(cloudgo)后跑 claude,首次会打印一条 https://…/oauth… URL;"
+  echo "      在你【本机浏览器】打开→授权→把页面给的 code 粘回服务器终端。code 交换在服务器,浏览器在哪台都行。"
+fi
 
 echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"
 bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
 
-echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac'（Mac 客户端）/'laptop'（Windows 客户端）别名；② git 身份；③ tailscale up"
-echo "注：noVNC 图形桌面层已随本脚本必装并起(novnc.service/:6080 tailnet-only + 项目看板 cloud-dashboards/:8088)。仅 moshi-hook 二进制未装——见 phone/README.md。"
+echo "完成。后续:① 在【本机】跑 cli/cloud-connect.sh <本机IP> 建免密 + 进 cloudgo(反向加 --reverse);② git 身份;③(可选)tailscale up。"
+[ "$DESKTOP" = "1" ] && echo "注:noVNC 桌面已装并起(novnc.service/:6080 tailnet-only + 看板 :8088)。" || echo "注:极简版无 noVNC/看板/mosh 客户端要求;登录走无头终端(见上『[+]』)。要 GUI 层重跑 CLOUD_DESKTOP=1 ./install.sh。"
 [ "$MODEL" = "claude-opus-4-8[1m]" ] && echo "⚠️ 会话模型仍是默认 claude-opus-4-8[1m]（特殊模型、普通账号未必有）。客户账号若无此模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 
 set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的核心(避免 set -e 让整脚本非零退出)

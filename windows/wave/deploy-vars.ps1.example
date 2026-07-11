@@ -1,4 +1,0 @@
-﻿# deploy-vars.ps1 —— Windows 客户端唯一要改的:你的服务器地址。所有 ps1/widget 都从这读 $SRV,不再各自写死。
-# install.ps1 首次把本 .example 拷成 ~/.ssh\deploy-vars.ps1;填好 $SRV 即可。
-# ⚠ 填好的 deploy-vars.ps1 别提交回仓(.gitignore 已排除)。
-$SRV = '<USER@SERVER>'   # 例 ubuntu@1.2.3.4 —— 本次部署要连的服务器(user@host)
