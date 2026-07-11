@@ -54,24 +54,21 @@ run_core(){
   # A1 bashrc 函数块已进用户 shell。注意:不能用 bash -lc —— Ubuntu 默认 ~/.bashrc 顶部有
   #    非交互守卫([ -z "$PS1" ] && return),函数块追加在守卫之后,-lc(非交互)根本执行不到;
   #    bash -ic 才等价于"用户真实打开终端所得"。
-  miss=$(timeout 30 bash -ic '
-      for f in cloudgo cloudattach cloudnew cloud_resume cloudtmp; do
-        type "$f" >/dev/null 2>&1 || echo "$f"
-      done' 2>/dev/null | grep -E '^(cloudgo|cloudattach|cloudnew|cloud_resume|cloudtmp)$' | tr '\n' ' ')
-  if [ -z "$miss" ]; then pass A1 "cloudgo/cloudattach/cloudnew/cloud_resume/cloudtmp 五函数可用(bash -ic)" "type 全命中"
-  else fail A1 "shell 函数缺失(bashrc-cloud-snippet 没进 ~/.bashrc?)" "缺: $miss"; fi
+  miss=$(timeout 30 bash -ic 'type cloud >/dev/null 2>&1 || echo cloud' 2>/dev/null | tr '\n' ' ')
+  command -v cloud-enter >/dev/null 2>&1 || miss="$miss cloud-enter"
+  if [ -z "$miss" ]; then pass A1 "cloud 函数(bash -ic)+ cloud-enter 入口可用(极简版:ssh cloud→cloud-enter→常驻会话)" "命中"
+  else fail A1 "会话入口缺失(bashrc-cloud-snippet 没进 ~/.bashrc?或 cloud-enter 没装?)" "缺: $miss"; fi
 
   # A2 工具链在 PATH + 两个纯输出工具裸跑不报错
   miss=""
   local b
-  for b in cc-state cc-sessions cloud-watchdog cloud-forget cloud-sessmenu cloud-sesslist hub; do
+  for b in cc-state cc-sessions cloud-watchdog cloud-forget cloud-sesslist cloud-enter hub; do
     command -v "$b" >/dev/null 2>&1 || miss="$miss $b"
   done
-  cloud-sessmenu >/dev/null 2>&1; local rc1=$?
   cloud-sesslist >/dev/null 2>&1; local rc2=$?
-  if [ -z "$miss" ] && [ $rc1 -eq 0 ] && [ $rc2 -eq 0 ]; then
-    pass A2 "会话工具链齐备且 cloud-sessmenu/cloud-sesslist 裸跑 exit 0" "PATH=$HOME/.local/bin"
-  else fail A2 "会话工具链不齐/裸跑报错" "缺:${miss:-无} sessmenu=$rc1 sesslist=$rc2"; fi
+  if [ -z "$miss" ] && [ $rc2 -eq 0 ]; then
+    pass A2 "会话工具链齐备(含 cloud-enter)且 cloud-sesslist 裸跑 exit 0" "PATH=$HOME/.local/bin"
+  else fail A2 "会话工具链不齐/裸跑报错" "缺:${miss:-无} sesslist=$rc2"; fi
 
   # A3 settings.json 每个 hook 命令首词必须存在且可执行(专抓"写死 /root 路径、换机后失效")
   out=$(python3 - <<'PYEOF' 2>&1
@@ -323,7 +320,7 @@ with open(tmp, "w") as f: json.dump(d, f)
 os.replace(tmp, p)
 PYEOF
 
-  # 模型/参数取自 bashrc 赋值行(与 cloudgo 新建会话同源;install.sh 的 sed 也锚定这两行)
+  # 模型/参数取自 bashrc 赋值行(与 cloud-enter/新建会话同源;install.sh 的 sed 也锚定这两行)
   CLOUD_MODEL=""; CLOUD_OPTS=""
   eval "$(grep -m1 '^CLOUD_MODEL=' "$HOME/.bashrc" 2>/dev/null)"
   eval "$(grep -m1 '^CLOUD_OPTS='  "$HOME/.bashrc" 2>/dev/null)"

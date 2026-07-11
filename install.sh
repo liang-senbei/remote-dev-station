@@ -10,7 +10,7 @@ MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"   # 会话默认模型。客户跑 `
 DESKTOP="${CLOUD_DESKTOP:-0}"   # 【极简 CLI 版默认 0】= 无头终端登录,不装 noVNC 桌面栈。要 GUI 登录/服务器桌面 widget 才 `CLOUD_DESKTOP=1 ./install.sh`。
 
 echo "== 极简 CLI 版部署 =="
-echo "   客户端只需 SSH:装完在本机跑 cli/cloud-connect.sh 即可(生成密钥→推公钥→ssh+cloudgo)。"
+echo "   客户端只需 SSH:装完在本机跑 cli/cloud-connect.sh 即可(生成密钥→推公钥→ssh cloud 直接进 claude)。"
 [ "$DESKTOP" = "1" ] && echo "   CLOUD_DESKTOP=1 → 附带装 noVNC 桌面 + 看板(GUI 登录路径)。" || echo "   登录走无头:装完在服务器跑一次 claude,按提示打开 URL 授权、粘回 code(不需要 noVNC)。"
 
 echo "[1/7] 安装依赖"
@@ -22,13 +22,14 @@ ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude 2>/dev/null || true   # �
 
 echo "[3/7] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
-mkdir -p /opt/workspace   # 默认工作区根（cloudgo/cloudnewat/cloudtmp 默认在此新建会话）
-# 会话系统 + Mac 桥接 + 工具全部装齐（cloudgo / watchdog 自愈 / 会话恢复都依赖它们）
+mkdir -p /opt/workspace   # 默认工作区根（cloud-enter 默认在此建常驻会话 cc-main）
+# 会话系统 + 工具全部装齐（cloud-enter / watchdog 自愈 / 会话恢复都依赖它们）
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
+install -m755 bin/cloud-enter /usr/local/bin/     # 客户端 ssh 的 RemoteCommand 指它 → `ssh cloud` 直接进 claude;必须在 /usr/local/bin(非交互 PATH 无 ~/.local/bin)
 install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 桌面/看板层 service 的 ExecStart 指这里
-install -m755 bin/mosh-server-tmout /usr/local/bin/   # 临时会话(cloudtmp/cloudconn 用 --server=/usr/local/bin/mosh-server-tmout,关了自动销毁)
+install -m755 bin/mosh-server-tmout /usr/local/bin/   # cloudconn 临时 mosh 会话用 --server=/usr/local/bin/mosh-server-tmout(关了自动销毁);极简 SSH 版用不到,留着不碍事
 install -m755 bin/gen-dashboard /usr/local/bin/                      # 项目看板首页生成器(gen-dashboard.service/timer 调它)
 install -m755 bin/claude-login-url.sh /usr/local/bin/claude-login-url   # 输出临时公网登录页 URL(客户完成 Claude 无头登录用)
 install -m755 bin/cc-quota /usr/local/bin/                           # 「5小时额度」看板页生成器(ccusage 算 5h 滚动窗口用量;cc-quota.timer 每分钟刷)
@@ -70,14 +71,14 @@ if [ "$DESKTOP" = "1" ]; then
   echo "  → GUI 登录:跑 claude-login-url 拿到临时公网登录页 URL(登录后 pkill cloudflared 拆掉)。"
 else
   echo "[+] 极简版跳过 noVNC 桌面栈(CLOUD_DESKTOP=1 可开)。登录走【无头终端】:"
-  echo "    → 进一个会话(cloudgo)后跑 claude,首次会打印一条 https://…/oauth… URL;"
+  echo "    → 本机 ssh cloud 进 claude(或服务器上 cloud-enter),首次会打印一条 https://…/oauth… URL;"
   echo "      在你【本机浏览器】打开→授权→把页面给的 code 粘回服务器终端。code 交换在服务器,浏览器在哪台都行。"
 fi
 
 echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"
 bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
 
-echo "完成。后续:① 在【本机】跑 cli/cloud-connect.sh <本机IP> 建免密 + 进 cloudgo(反向加 --reverse);② git 身份;③(可选)tailscale up。"
+echo "完成。后续:① 在【本机】跑 cli/cloud-connect.sh <服务器IP> 建免密,之后 ssh cloud 直接进 claude(反向加 --reverse);② git 身份;③(可选)tailscale up。"
 [ "$DESKTOP" = "1" ] && echo "注:noVNC 桌面已装并起(novnc.service/:6080 tailnet-only + 看板 :8088)。" || echo "注:极简版无 noVNC/看板/mosh 客户端要求;登录走无头终端(见上『[+]』)。要 GUI 层重跑 CLOUD_DESKTOP=1 ./install.sh。"
 [ "$MODEL" = "claude-opus-4-8[1m]" ] && echo "⚠️ 会话模型仍是默认 claude-opus-4-8[1m]（特殊模型、普通账号未必有）。客户账号若无此模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 

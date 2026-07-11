@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# cloud-enter —— 唯一入口:进(或建)那个常驻 Claude 会话。客户端 ssh 的 RemoteCommand 指向它,
+#   于是 `ssh cloud` 就直接落进 claude(见 cli/cloud-connect.sh 写的 ~/.ssh/config)。
+#
+#   在跑 → attach;离线但有登记 → 连名带 uuid --resume(同名同 uuid,绝不新建);全新 → 新建。
+#   claude 跑在 cc-* 的 tmux 里 + cc-state 钩子登记 → 断线/合盖重连接回、服务器重启 watchdog 自动 --resume。
+#   (这就是"藏起来的会话韧性层":客户看不到 cloudgo 选单,韧性照旧。)
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"   # ssh RemoteCommand / 非交互 PATH 残缺,claude 装在 ~/.local/bin,不加则找不到(exit127)
+CLOUD_SESSION="${CLOUD_SESSION:-cc-main}"   # 单一常驻会话名(cc- 前缀 → cc-state 自动登记 → watchdog 可 --resume)
+CLOUD_DIR="${CLOUD_DIR:-/opt/workspace}"    # 会话工作目录
+# 会话模型:优先环境 → 取 ~/.bashrc 里的 CLOUD_MODEL(与交互/断电自愈同源) → 兜底
+CLOUD_MODEL="${CLOUD_MODEL:-$(sed -n 's/^CLOUD_MODEL="\([^"]*\)".*/\1/p' "$HOME/.bashrc" 2>/dev/null | head -1)}"
+CLOUD_MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"
+CLOUD_OPTS="${CLOUD_OPTS:---effort max}"
+name="$CLOUD_SESSION"; dir="$CLOUD_DIR"
+
+# 已在 tmux 里(管理员手动跑)→ 直接起 claude,不嵌套
+if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; exec env IS_SANDBOX=1 claude --model "$CLOUD_MODEL" $CLOUD_OPTS --dangerously-skip-permissions; fi
+
+# 在跑 → attach
+if tmux has-session -t "$name" 2>/dev/null; then exec env -u TMUX tmux attach -t "$name"; fi
+
+# 离线但有登记 → 连名带 uuid --resume(目录还在才 resume,防死循环)
+res=$(cc-sessions resolve "$name" 2>/dev/null); rdir="${res%%$'\t'*}"; uuid="${res##*$'\t'}"
+if [ -n "$uuid" ] && [ "$rdir" != "$uuid" ] && [ -d "$rdir" ]; then
+  exec env -u TMUX tmux new-session -s "$name" "cd '$rdir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --resume '$uuid' --dangerously-skip-permissions"
+fi
+
+# 全新
+mkdir -p "$dir" 2>/dev/null
+exec env -u TMUX tmux new-session -s "$name" "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions"
