@@ -66,20 +66,34 @@ install.sh 已把 noVNC 桌面必装。让客户完成登录:
 管理员要裸 shell:`ssh cloud -o RemoteCommand=none -t bash`。
 
 ### 反向隧穿(服务器要能反向操作你本机)
-`--reverse` 完成了「服务器公钥→本机」这一半。另一半是让**服务器知道你本机地址**:
 
-1. 本机开 SSH(远程登录):
-   - **Mac**:系统设置 → 通用 → 共享 → 远程登录(需手动授权)。
-   - **Linux**:`sudo systemctl enable --now ssh`。
-   - **Windows**:装 OpenSSH Server,或用 `windows/reverse-tunnel/`(反向 SSH 隧道,穿 NAT)。
-2. 在**服务器** `~/.ssh/config` 建指向本机的别名(内网直连或走反向隧道端口):
-   ```
-   Host laptop
-       HostName <本机IP或100.x tailnet IP>   # 走反向隧道则 HostName 127.0.0.1 + Port 2222
-       User <本机用户名>
-       IdentityFile ~/.ssh/id_ed25519
-   ```
-3. 之后服务器侧 `macget/macput/lapget/lapput`(bin/ 里)即可取送本机文件。
+**这套没有 Tailscale/内网**,所以不能像内网那样服务器直接 ssh 你本机(你本机多半在 NAT 后、没公网 IP)。改用**反向 SSH 隧道**:让**你本机主动**向服务器建一条常驻连接,把服务器的 `127.0.0.1:2222` 转发到你本机的 SSH(22)。之后服务器 `ssh -p 2222 localhost` 就等于 ssh 进你本机。
+
+一条命令的本质就是:`ssh -N -R 2222:localhost:22 root@<服务器IP>`。要**方便 + 持久**(断线重连、开机自启),按平台:
+
+**除了"开 OpenSSH"外还要做的 3 件事:**
+1. **本机开 SSH 服务端**(让服务器能 ssh 进来):
+   - Mac:系统设置 → 通用 → 共享 → 远程登录(手动授权);
+   - Linux:`sudo systemctl enable --now ssh`;
+   - Windows:`Add-WindowsCapability -Online -Name OpenSSH.Server*` 并 `Start-Service sshd; Set-Service sshd -StartupType Automatic`。
+2. **常驻反向隧道**(不是敲一次 `ssh -R` 就完,要它断线自动重连、开机自启):
+   - **Windows**:跑 `windows/install-tunnel.ps1`(管理员)——**一条命令自动搞定**:生成隧道密钥、取服务器 host key、装 NSSM、建 `LaptopReverseTunnel` 服务(`ssh -N -R 2222:localhost:22`,断线重连 + 开机自启)。跑完它会把"服务器侧要加的两条命令"打印给你。
+   - **Mac/Linux**:`autossh -M 0 -N -R 2222:localhost:22 root@<服务器IP>` 包一个 launchd(Mac)/ systemd(Linux)常驻单元。
+3. **服务器侧配好**(install-tunnel.ps1 会打印,或手动):
+   - 把本机隧道公钥加进服务器 `~/.ssh/authorized_keys`(否则隧道连不上);
+   - `~/.ssh/config` 建 `laptop` 别名走隧道端口:
+     ```
+     Host laptop
+         HostName 127.0.0.1
+         Port 2222
+         User <本机用户名>
+         IdentityFile ~/.ssh/id_ed25519
+     ```
+   - sshd 开 keepalive(`ClientAliveInterval 30` / `ClientAliveCountMax 3`),让掉线的反向端口及时释放,不然 2222 会被占成僵尸口。
+
+配好后服务器侧 `lapget/lapput/lapls`(Mac 用 `macget/macput`)即可取送本机文件;服务器上的 Claude 也会用(见部署的 `~/.claude/CLAUDE.md` 第 3 节)。
+
+> `ssh laptop` 报 `Connection refused` = 你本机那头的隧道服务断了(关机/睡眠/换网),重启那个服务即可。
 
 ---
 
