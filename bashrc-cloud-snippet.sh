@@ -21,4 +21,7 @@ cloud() {
   cd "$dir" || return 1
   tmux new-session -A -s "cc-$(basename "$dir")" "cd '$dir' && IS_SANDBOX=1 command claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions $*"
 }
+
+# ssh 登录默认落到工作区根 → 客户可 cd 到不同项目目录、各自敲 claude(每个目录一个对话,像本地)。
+if [[ $- == *i* ]] && shopt -q login_shell 2>/dev/null && [ "$PWD" = "$HOME" ]; then cd /opt/workspace 2>/dev/null || true; fi
 # <<< Moshi-CloudCode setup <<<

@@ -40,11 +40,10 @@
 
 （隧道端口 / 别名 / 用户名在部署时配置，不写死这里。）
 
-## 4. 会话:敲 `claude` 就进受管常驻会话
+## 4. 会话:敲 `claude` 进【当前目录】对应的受管会话
 
-这套极简版**没有 cloudgo 选单**：用户 `ssh cloud` 连上服务器后敲 **`claude`** 就进那个常驻会话 `cc-main`（在跑就接回，断线/重启自动 `--resume`）。这里的 `claude` 已被**包成受管入口**（bashrc 函数 → `cloud-enter`，自动带 `IS_SANDBOX=1` + tmux），和本地敲 `claude` 一个感觉。你平时就在这个会话里，不用管理它。
+这套极简版**没有 cloudgo 选单**：用户 `ssh cloud` 连上后默认落在 `/opt/workspace`，`cd` 到某项目目录敲 **`claude`** 就进/接回**该目录对应的会话**（`/opt/workspace/foo` → `cc-foo`；在跑就接回，断线/重启自动 `--resume`）。**`cd` 到不同目录敲 claude = 不同对话**,和本地一样。`claude` 已被**包成受管入口**（bashrc 函数 → `cloud-enter`，自动带 `IS_SANDBOX=1` + tmux）。
 
-- 要**另开**一个会话干别的活：用 `cloud <目录>`。
 - ⚠️ 本机是 **root**：**原生** `command claude --dangerously-skip-permissions` 会被拦（`cannot be used with root/sudo privileges`），必须带 `IS_SANDBOX=1`。包好的 `claude` / `cloud` / `cloud-enter` 都已带好，直接用它们即可（这跟工作目录在 `/root` 还是 `/opt` 无关，纯粹是 root 身份限制）。
 
 ---

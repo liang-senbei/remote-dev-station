@@ -4,11 +4,11 @@
 进 Claude 两步:**`ssh cloud`** 连上 → 敲 **`claude`** 开始(和本地 Claude Code 一样;断线重连再敲 `claude` 接回同一会话)。
 
 保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**(noVNC 登录桌面**必装**)。
-砍掉的:Wave GUI deck、cloudgo 选单(换成单一常驻会话 `cloud-enter`)、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。
+砍掉的:Wave GUI deck、cloudgo 选单(换成"cd 目录 + 敲 claude"的受管会话)、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。
 
 > **怎么做到"敲 claude 就像本地一样"**:服务器 bashrc 把 `claude` 包成一个函数 → 调 `cloud-enter`,
-> 自动带 `IS_SANDBOX=1`(绕 root 沙盒)进/按 uuid 恢复那个常驻 tmux 会话 `cc-main`。客户不用记 cloudgo/tmux,
-> 就跟本地敲 `claude` 一个感觉,韧性照旧。真要用原生 claude 带参数:`command claude ...`。
+> 自动带 `IS_SANDBOX=1`(绕 root 沙盒)进/按 uuid 恢复**当前目录对应**的受管 tmux 会话(`/opt/workspace/foo` → `cc-foo`)。
+> ssh 登录默认落在 `/opt/workspace`,`cd` 到不同项目目录敲 claude = 不同对话,和本地一样。真要原生 claude 带参:`command claude ...`。
 
 ---
 
@@ -19,13 +19,13 @@
   │                                              │
   │  ①本机公钥 ─────────────────────────────────▶ authorized_keys   (登录:本机→服务器)
   │                                              │
-  │  ssh cloud (→ RemoteCommand cloud-enter) ──▶ tmux 常驻会话 cc-main · Claude Code
+  │  ssh cloud → cd <项目> → claude ──────────▶ tmux 会话 cc-<项目> · Claude Code
   │                                              │   (tmux+watchdog:断线/重启不丢,自动接回)
   │  ◀───────────────────────────────── 服务器公钥  authorized_keys (反向:服务器→本机,--reverse)
 ```
 
 登录方向和反向方向 **公钥交换方向相反**,别搞混:
-- **登录**(`ssh+cloudgo`,本机→服务器):**本机公钥** 放到 **服务器**。
+- **登录**(`ssh cloud`,本机→服务器):**本机公钥** 放到 **服务器**。
 - **反向隧穿**(服务器→本机):**服务器公钥** 放到 **本机**。
 
 ---
