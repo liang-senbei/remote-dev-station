@@ -30,6 +30,17 @@ Write-Host "== [2/5] 生成本机 SSH 密钥（已有则复用） ==" -Foregroun
 New-Item -ItemType Directory -Force -Path $sshUserDir | Out-Null
 if (-not (Test-Path $keyPath)) { & ssh-keygen.exe -t ed25519 -f $keyPath -N '""' -C "client-$env:COMPUTERNAME" -q }
 
+Write-Host "== [+] 写 ssh 'cloud' 别名（以后 ssh cloud 直接连服务器 → 敲 claude） ==" -ForegroundColor Cyan
+$cfg = Join-Path $sshUserDir 'config'
+$hostOnly = $Server.Split('@')[-1]
+$userOnly = if ($Server -match '@') { $Server.Split('@')[0] } else { 'root' }
+if ((Test-Path $cfg) -and (Select-String -Path $cfg -Pattern '^\s*Host\s+cloud\s*$' -Quiet)) {
+  Write-Host "  -> ~/.ssh/config 已有 cloud 别名，不动（要改指向请手动编辑）" -ForegroundColor DarkGray
+} else {
+  Add-Content -Path $cfg -Value "`r`nHost cloud`r`n    HostName $hostOnly`r`n    User $userOnly`r`n    IdentityFile $keyPath`r`n    IdentitiesOnly yes`r`n    ServerAliveInterval 30" -Encoding ascii
+  Write-Host "  -> 已写 cloud 别名 → $hostOnly（ssh cloud 连上 → 敲 claude）" -ForegroundColor Green
+}
+
 Write-Host "== [3/5] 授权服务器回连（服务器公钥 -> administrators_authorized_keys） ==" -ForegroundColor Cyan
 if ($ServerPubKey -ne "") {
   $adminKeys = Join-Path $pdSsh 'administrators_authorized_keys'

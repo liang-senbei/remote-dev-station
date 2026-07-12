@@ -21,6 +21,16 @@ echo "== [2/5] 生成本机 SSH 密钥（已有则复用） =="
 mkdir -p "$HOME/.ssh"; chmod 700 "$HOME/.ssh"
 [ -f "$KEY" ] || ssh-keygen -t ed25519 -f "$KEY" -N "" -C "client-$(hostname -s)"
 
+echo "== [+] 写 ssh 'cloud' 别名（以后 ssh cloud 直接连服务器 → 敲 claude） =="
+CFG="$HOME/.ssh/config"; touch "$CFG"; chmod 600 "$CFG"
+HOSTONLY="${SERVER##*@}"; USERONLY="${SERVER%@*}"; [ "$USERONLY" = "$SERVER" ] && USERONLY=root
+if grep -qE '^[[:space:]]*Host[[:space:]]+cloud[[:space:]]*$' "$CFG"; then
+  echo "  -> 已有 cloud 别名，不动"
+else
+  printf '\nHost cloud\n    HostName %s\n    User %s\n    IdentityFile %s\n    IdentitiesOnly yes\n    ServerAliveInterval 30\n' "$HOSTONLY" "$USERONLY" "$KEY" >> "$CFG"
+  echo "  -> 已写 cloud 别名 → $HOSTONLY（ssh cloud 连上 → 敲 claude）"
+fi
+
 echo "== [3/5] 授权服务器回连（服务器公钥 -> authorized_keys） =="
 if [ -n "$SRVPUB" ]; then
   touch "$HOME/.ssh/authorized_keys"; chmod 600 "$HOME/.ssh/authorized_keys"
