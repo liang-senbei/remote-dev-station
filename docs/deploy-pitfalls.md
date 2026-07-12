@@ -235,3 +235,8 @@
 - **现象**:root 直接跑 `claude --dangerously-skip-permissions` 被拒;易误以为是"工作目录在 /root 有沙盒、/opt 没有"。
 - **根因**:这是 **root 身份**的限制,**跟工作目录在 /root 还是 /opt/workspace 无关**(实测:`env -i` 干净环境下从 /opt/workspace 跑照样被拦)。
 - **修法**:加环境变量 **`IS_SANDBOX=1`** 即放行。`cloud` / `cloud-enter` / bashrc 各函数都已带好,直接用它们、别裸敲 `claude`。
+
+### 够不到客户笔电:tailnet 直连 和 反向隧道 是两条独立通道,别只凭一条超时就判"不可达"
+- **现象**:`tailscale ping <笔电>` / `ssh <tailnet-100.x>` 超时,像笔电离线;但笔电其实还在,反向隧道 `ssh laptop-tunnel`(经服务器 127.0.0.1:2222)照样进得去。
+- **根因**:笔电有**两条到服务器的通道**——① tailscale 直连(100.x);② 反向 SSH 隧道(服务器 :2222 → 笔电 :22)。两条**各自独立掉线**(用户关了 tailscale 或 tailnet 数据面僵死时直连断,反向隧道走公网仍活;反之亦然)。只测一条就判死 = 误判。
+- **修法**:够不到笔电时**两条都试**:先 `ssh laptop-tunnel`(隧道),再 `ssh -i ~/.ssh/reverse_tunnel <user>@100.x`(直连);任一通即可操作,含中文路径的文件操作同理。(实例:2remote 出飞书 docx 全程走隧道完成,当时 tailnet 直连是挂的。)
