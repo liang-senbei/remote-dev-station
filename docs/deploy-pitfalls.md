@@ -250,3 +250,8 @@
 - **现象**:清理测试用的反向隧道时,`Stop-Process` 杀掉 `ssh.exe`(ssh -R)后,几秒钟服务器上那个转发端口又冒出来了;反复杀反复回。以为没清干净,其实是被自动重连了。
 - **根因**:隧道由「计划任务 → `tunnel-run.ps1` 里 `while($true){ ssh -R ...; sleep 5 }` 循环」维持。杀 ssh **子进程**时**循环(powershell)还活着**,5 秒后又把 ssh 拉起 → 端口回来。另外服务器侧那条 ssh -R 死后,sshd 子进程可能**不立即释放**转发监听(留半死 ESTAB / `CLOSE-WAIT` 的孤儿 listener)。
 - **修法**:① 先 `schtasks /delete /tn RemoteDevTunnel /f`(去自启);② **杀循环本身**——`Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ? { $_.CommandLine -match 'tunnel-run' } | % { Stop-Process -Id $_.ProcessId -Force }`,再杀 ssh -R;③ 服务器侧端口仍不释放时,`ss -ltnp | grep :<port>` 找到持有它的 sshd 子进程,**确认非命脉端口、非 master sshd** 后 `kill` 那个孤儿(它服务的反向连接客户端已死)。
+
+### ★客户装隧道被 fail2ban 封:公钥没先上服务器 → 反复失败认证 → IP 被封 → 之后 Connection refused
+- **现象**:客户机跑完一键脚本,隧道死活连不上;服务器上该端口不出现;客户手动 `ssh root@<服务器>` 报 **`Connection refused`(不是 timeout)**。别的客户机好好的,唯独这台。极迷惑,像脚本或网络坏了。
+- **根因**:一键脚本会**立即起隧道循环**反复连服务器,但此刻**客户公钥还没加到服务器**(那步要操作方手动做)→ 每次 pubkey 认证失败 → 攒够几次 **fail2ban 封了客户 IP** → 之后连 22 口直接被拒。**即使你随后把公钥补上,客户仍进不来**(先被封了)。实测:Mac 首测就这么被封,解封后隧道几十秒自己重连成功。
+- **修法**:① 服务器 `fail2ban-client status sshd` 看封禁列表;`journalctl -u ssh --since "35 min ago" | grep -oE 'from [0-9.]+' | sort | uniq -c | sort -rn` 找失败最多的那个客户 IP;② `fail2ban-client set sshd unbanip <客户IP>` 解封 → 公钥已授权的话,隧道几十秒内自己重连(launchd/计划任务的 KeepAlive)。③ **预防**:onboarding 时**先把客户公钥加到服务器、再让客户跑脚本**;或把客户 IP 加进 fail2ban `ignoreip`。④ 判断是 fail2ban 还是网络封 22:解封后客户仍 `refused` 才是网络层问题。
