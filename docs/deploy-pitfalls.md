@@ -240,3 +240,8 @@
 - **现象**:`tailscale ping <笔电>` / `ssh <tailnet-100.x>` 超时,像笔电离线;但笔电其实还在,反向隧道 `ssh laptop-tunnel`(经服务器 127.0.0.1:2222)照样进得去。
 - **根因**:笔电有**两条到服务器的通道**——① tailscale 直连(100.x);② 反向 SSH 隧道(服务器 :2222 → 笔电 :22)。两条**各自独立掉线**(用户关了 tailscale 或 tailnet 数据面僵死时直连断,反向隧道走公网仍活;反之亦然)。只测一条就判死 = 误判。
 - **修法**:够不到笔电时**两条都试**:先 `ssh laptop-tunnel`(隧道),再 `ssh -i ~/.ssh/reverse_tunnel <user>@100.x`(直连);任一通即可操作,含中文路径的文件操作同理。(实例:2remote 出飞书 docx 全程走隧道完成,当时 tailnet 直连是挂的。)
+
+### Windows 目标文件被占用(WPS/Office 打开中):Move-Item -Force 报错误导成"文件已存在"
+- **现象**:后台投递器覆盖笔电上的 docx 时,`Move-Item -Force` 报 `Cannot create a file when that file already exists.`——看着像"目标已存在"的逻辑问题,其实不是。
+- **根因**:目标 docx 正被 **WPS/Office/飞书打开**(目录里有 `~$xxx.docx` 锁文件),文件被占用;`Move-Item -Force` 把真因(占用)掩成了"已存在"。
+- **修法**:① 换 `Copy-Item -Force`(会暴露真因 `The process cannot access the file ... because it is being used by another process.`)+ `Remove-Item`;② 覆盖前先检测目录里的 `~$` 锁文件 / 相关进程(wps/wpp/et/Feishu),被占用就**别硬覆盖**——把新版暂存成 `_新版待覆盖.docx`,等用户关掉文档再覆盖(顺带防覆盖掉用户在 WPS 里的手动改动)。
