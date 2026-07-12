@@ -40,17 +40,12 @@
 
 （隧道端口 / 别名 / 用户名在部署时配置，不写死这里。）
 
-## 4. 会话与"直接敲 claude"的坑
+## 4. 会话:敲 `claude` 就进受管常驻会话
 
-这套极简版**没有 cloudgo 选单**：用户 `ssh cloud` 就经 `cloud-enter` 落进那个常驻会话 `cc-main`（在跑就接回，断线/重启自动 `--resume`）。你平时就在这个会话里，不用管理它。
+这套极简版**没有 cloudgo 选单**：用户 `ssh cloud` 连上服务器后敲 **`claude`** 就进那个常驻会话 `cc-main`（在跑就接回，断线/重启自动 `--resume`）。这里的 `claude` 已被**包成受管入口**（bashrc 函数 → `cloud-enter`，自动带 `IS_SANDBOX=1` + tmux），和本地敲 `claude` 一个感觉。你平时就在这个会话里，不用管理它。
 
-万一你要**另开**一个会话干别的活，用 `cloud <目录>`——**别直接在终端敲 `claude`**，两个原因：
-
-1. 直接敲的会话**不登记**：断线就丢、重启不恢复，等于白干。
-2. 本机是 **root**，直接 `claude --dangerously-skip-permissions` 会被拦：
-   `--dangerously-skip-permissions cannot be used with root/sudo privileges`。
-   必须带 `IS_SANDBOX=1` 才放行（`IS_SANDBOX=1 claude --dangerously-skip-permissions ...`）。
-   `cloud` / `cloud-enter` 已经带好了 `IS_SANDBOX=1`，用它们就不用自己操心。（这跟工作目录在 `/root` 还是 `/opt` 无关，纯粹是 root 身份的限制。）
+- 要**另开**一个会话干别的活：用 `cloud <目录>`。
+- ⚠️ 本机是 **root**：**原生** `command claude --dangerously-skip-permissions` 会被拦（`cannot be used with root/sudo privileges`），必须带 `IS_SANDBOX=1`。包好的 `claude` / `cloud` / `cloud-enter` 都已带好，直接用它们即可（这跟工作目录在 `/root` 还是 `/opt` 无关，纯粹是 root 身份限制）。
 
 ---
 

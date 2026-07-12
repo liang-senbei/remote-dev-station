@@ -10,11 +10,15 @@ export PATH="$HOME/.local/bin:$PATH"   # 会话辅助脚本(cloud-enter 等)+ na
 CLOUD_MODEL="claude-opus-4-8[1m]"
 CLOUD_OPTS="--effort max"
 
-# 极简 CLI 版:客户端 `ssh cloud` 经 RemoteCommand 直接跑 cloud-enter 进那个常驻会话(无 cloudgo 选单)。
-# 下面只是【管理员】偶尔要在别的目录另开 claude 时用;客户用不到。
+# 极简 CLI 版:客户 `ssh cloud` 连上得到命令行,像本地一样敲 `claude` 即开始。
+# 这里把 `claude` 包成「进/接回那个受管常驻会话」——自动带 IS_SANDBOX(绕 root 沙盒)+ tmux(断线不丢)
+# + 断电可 --resume。真要用原生 claude 带参数:`command claude ...`。
+claude() { cloud-enter; }
+
+# 【管理员】偶尔要在别的目录另开一个会话时用;客户用不到。
 cloud() {
   local dir="${1:?用法: cloud <工作目录> [claude 参数...]}"; shift
   cd "$dir" || return 1
-  tmux new-session -A -s "cc-$(basename "$dir")" "cd '$dir' && IS_SANDBOX=1 claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions $*"
+  tmux new-session -A -s "cc-$(basename "$dir")" "cd '$dir' && IS_SANDBOX=1 command claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions $*"
 }
 # <<< Moshi-CloudCode setup <<<

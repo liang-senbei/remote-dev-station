@@ -1,17 +1,12 @@
 # Claude 远程开发服务(终端版)· 使用说明
 
-> 这一版**不用装 Wave、不用 Tailscale**,电脑打开终端、一条命令 `ssh cloud` 就进 Claude。以下按常见问题一步步说。
+> 这一版**不用装 Wave、不用 Tailscale**:打开终端 → `ssh cloud` 连上服务器 → 敲 `claude` 开始,和你平时本地用 Claude Code 一样。以下按常见问题说。
 
 ## 1. 每天怎么进 Claude?
-- **第一步**:打开电脑的终端——
-  - Mac:打开「终端」App;
-  - Windows:打开「Windows PowerShell」或「终端」。
-- **第二步**:输入下面这条,回车:
-  ```
-  ssh cloud
-  ```
-- Claude 会**自动打开**,直接开始对话。
-- 断网 / 合盖 / 换 WiFi 后,再敲一次 `ssh cloud`,会**接回刚才的会话**,对话不丢。
+- **第一步**:打开终端(Mac 用「终端」App;Windows 用「PowerShell」或「终端」)。
+- **第二步**:敲 `ssh cloud` 连上服务器。
+- **第三步**:连上后敲 `claude` 开始对话——**和你本地用 Claude Code 一样**。
+- 断网 / 合盖 / 换 WiFi 后:重新 `ssh cloud` 再敲 `claude`,会**接回刚才的会话**,对话不丢。
 
 ## 2. 第一次怎么开通?(一次性,我们帮你弄)
 - 我们会在你电脑上跑一个一键脚本,帮你配好「免密连接」。

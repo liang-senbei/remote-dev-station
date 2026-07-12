@@ -7,12 +7,12 @@
 #   它做三件事,全部幂等(重复跑安全):
 #     ① 本机没有 SSH 密钥就生成一把(~/.ssh/id_ed25519)
 #     ② 把【本机公钥】推到【服务器】authorized_keys → 以后免密登录       ← 登录靠这个方向
-#     ③ 写 ~/.ssh/config 的 'cloud' 别名(带 RemoteCommand)→ 之后 `ssh cloud` 直接进 claude
+#     ③ 写 ~/.ssh/config 的 'cloud' 别名 → 之后 `ssh cloud` 连上、敲 `claude` 开始(像本地一样)
 #
 #   --reverse 额外做【反向隧穿】的密钥:把【服务器公钥】取回放进【本机】
 #     authorized_keys,并尽量把本机 SSH(远程登录)打开 → 服务器能反向操作你本机。 ← 反向靠这个方向(与①相反)
 #
-#   之后每次进 Claude:直接  ssh cloud   (无需子命令,claude 自动打开;断线重连接回同一会话)
+#   之后每次:  ssh cloud   连上 → 敲  claude  开始(断线重连再敲 claude 接回同一会话)
 set -euo pipefail
 
 SERVER="${1:-}"; USER_="${2:-root}"; REVERSE=0
@@ -55,11 +55,8 @@ else
     echo "    IdentityFile ${KEY}"
     echo "    IdentitiesOnly yes"
     echo "    ServerAliveInterval 30"
-    echo "    RequestTTY yes"
-    echo "    RemoteCommand cloud-enter"
   } >> "$CFG"
-  echo "  → 已写入(RemoteCommand cloud-enter → 以后 ssh ${ALIAS} 直接进 claude)"
-  echo "     管理员要裸 shell:  ssh ${ALIAS} -o RemoteCommand=none -t bash"
+  echo "  → 已写入。以后:ssh ${ALIAS} 连上 → 敲 claude 开始(和本地 Claude Code 一样)"
 fi
 
 if [ "$REVERSE" = "1" ]; then
@@ -82,7 +79,7 @@ if [ "$REVERSE" = "1" ]; then
 fi
 
 echo ""
-echo "✅ 完成。进 Claude:  ssh ${ALIAS}   (claude 自动打开;断线重连接回同一会话)"
-echo "   现在就进 → 回车;不进 → Ctrl-C"
+echo "✅ 完成。用法:  ssh ${ALIAS}   连上服务器 → 敲  claude  开始(和本地 Claude Code 一样)"
+echo "   现在就连 → 回车;不连 → Ctrl-C"
 read -r _ || exit 0
 exec ssh "${ALIAS}"
