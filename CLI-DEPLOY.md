@@ -77,9 +77,9 @@ install.sh 已把 noVNC 桌面必装。让客户完成登录:
    - Linux:`sudo systemctl enable --now ssh`;
    - Windows:`Add-WindowsCapability -Online -Name OpenSSH.Server*` 并 `Start-Service sshd; Set-Service sshd -StartupType Automatic`。
 2. **常驻反向隧道**(不是敲一次 `ssh -R` 就完,要它断线自动重连、开机自启):
-   - **Windows**:跑 `windows/install-tunnel.ps1`(管理员)——**一条命令自动搞定**:生成隧道密钥、取服务器 host key、装 NSSM、建 `LaptopReverseTunnel` 服务(`ssh -N -R 2222:localhost:22`,断线重连 + 开机自启)。跑完它会把"服务器侧要加的两条命令"打印给你。
+   - **Windows**:跑 `cli/win-setup-tunnel.ps1`(管理员)——**一条命令自动搞定**:开 sshd、生成/复用密钥、建「登录自启 + 断线重连」的反向隧道计划任务(`RemoteDevTunnel`),跑完打印本机公钥给你加到服务器。**一把钥匙 = 登录 + 隧道**(不再单独搞隧道钥匙/NSSM)。实测通过。
    - **Mac/Linux**:`autossh -M 0 -N -R 2222:localhost:22 root@<服务器IP>` 包一个 launchd(Mac)/ systemd(Linux)常驻单元。
-3. **服务器侧配好**(install-tunnel.ps1 会打印,或手动):
+3. **服务器侧配好**(cli/win-setup-tunnel.ps1 跑完会提示,或手动):
    - 把本机隧道公钥加进服务器 `~/.ssh/authorized_keys`(否则隧道连不上);
    - `~/.ssh/config` 建 `laptop` 别名走隧道端口:
      ```
