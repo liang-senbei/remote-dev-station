@@ -245,3 +245,8 @@
 - **现象**:后台投递器覆盖笔电上的 docx 时,`Move-Item -Force` 报 `Cannot create a file when that file already exists.`——看着像"目标已存在"的逻辑问题,其实不是。
 - **根因**:目标 docx 正被 **WPS/Office/飞书打开**(目录里有 `~$xxx.docx` 锁文件),文件被占用;`Move-Item -Force` 把真因(占用)掩成了"已存在"。
 - **修法**:① 换 `Copy-Item -Force`(会暴露真因 `The process cannot access the file ... because it is being used by another process.`)+ `Remove-Item`;② 覆盖前先检测目录里的 `~$` 锁文件 / 相关进程(wps/wpp/et/Feishu),被占用就**别硬覆盖**——把新版暂存成 `_新版待覆盖.docx`,等用户关掉文档再覆盖(顺带防覆盖掉用户在 WPS 里的手动改动)。
+
+### 停 Windows 反向隧道:要杀 tunnel-run.ps1 的 while 循环,光杀 ssh 子进程会自己重连
+- **现象**:清理测试用的反向隧道时,`Stop-Process` 杀掉 `ssh.exe`(ssh -R)后,几秒钟服务器上那个转发端口又冒出来了;反复杀反复回。以为没清干净,其实是被自动重连了。
+- **根因**:隧道由「计划任务 → `tunnel-run.ps1` 里 `while($true){ ssh -R ...; sleep 5 }` 循环」维持。杀 ssh **子进程**时**循环(powershell)还活着**,5 秒后又把 ssh 拉起 → 端口回来。另外服务器侧那条 ssh -R 死后,sshd 子进程可能**不立即释放**转发监听(留半死 ESTAB / `CLOSE-WAIT` 的孤儿 listener)。
+- **修法**:① 先 `schtasks /delete /tn RemoteDevTunnel /f`(去自启);② **杀循环本身**——`Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ? { $_.CommandLine -match 'tunnel-run' } | % { Stop-Process -Id $_.ProcessId -Force }`,再杀 ssh -R;③ 服务器侧端口仍不释放时,`ss -ltnp | grep :<port>` 找到持有它的 sshd 子进程,**确认非命脉端口、非 master sshd** 后 `kill` 那个孤儿(它服务的反向连接客户端已死)。
