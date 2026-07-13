@@ -23,6 +23,8 @@
 
 ## 1. 阶段零 · 收集客户参数(用 AskUserQuestion 逐项问,填一张临时"部署参数表",不入库)
 
+> 📄 **每个新客户 → 在你操作端本地建一个以「客户服务器 IP」命名的命令 txt**(如 `23.149.28.51.txt`,放桌面/工作目录)。把**所有要客户/用户手动执行的命令**边部署边写进去、随时更新:Claude 登录 URL、客户端 SSH `cloud`/`cloud-pub` 别名 + `ssh-copy-id` 命令、Mac/Windows 端要跑的、反向通道加公钥等。**一个客户一个文件**,交接时给他这一份即可(含明文命令,**不入库**)。
+
 - **服务器**:有海外云服务器吗?root SSH 通吗?Ubuntu/Debian?内存(建议 ≥16G)?→ 没有,先指导客户开一台。
 - **Tailscale**:有账号吗?→ 服务器 + 电脑 + 手机都要进**同一 tailnet**。
 - **Claude 账号**:客户自己的 Pro/Max —— 部署时**客户自己 `claude` 登录**,你不经手他的凭据。
@@ -42,13 +44,17 @@
 
 ## 3. 阶段二 · 客户端(电脑)
 
-- **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh。`wave-config/` 里含**机器专属值**(README 附二 §🔴,IP / 用户名),**别整份照搬**——拿它当模板,把下列占位符全填成这台机器自己的真值。
+- **Mac**:照 README「电脑(Mac)0→1」——Tailscale + Wave + mosh。⚠️ **Tailscale Mac 版首次要开系统权限(系统扩展 + VPN 配置,在「系统设置→隐私与安全性/登录项与扩展」),不开则一直转圈连不上**——步骤见 [`docs/tailscale-mac-setup.md`](docs/tailscale-mac-setup.md)(顺带含反向通道要开的「远程登录/屏幕录制」)。`wave-config/` 里含**机器专属值**(README 附二 §🔴,IP / 用户名),**别整份照搬**——拿它当模板,把下列占位符全填成这台机器自己的真值。
 - **Windows**:照 [windows/README.md](windows/README.md)。
 
 > **⚠️ 必改的机器专属值**(客户端凡拷 `wave-config/` / `cloudconn` 都要填,否则会连不上你的服务器):
 > - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`(`wave-config` 版还多一个 `HOSTIP=`,探活看守会 nc 它);`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全填成你自己服务器的 Tailscale IP(占位符 `<SERVER_TAILSCALE_IP>`)。
 > - **本机用户名 / 家目录**:`widgets.json` 的 `cmd` 里 `<YOUR_HOME>/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `<YOUR_HOME>/…` —— 换成你自己的家目录路径。
 > - 服务器侧的 `bin/novnc-start.sh`(noVNC)与 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改。
+
+- 🎛️ **装哪些 Wave widget:每个客户现场让用户选(Windows / Mac 都是)**。用 **AskUserQuestion** 列出可选项让用户勾,别一套照搬:**核心默认必装** = 会话(`cloudgo`)+ 临时会话(`cloudtmp`);**可选** = 服务器文件(需 wsh,首次连接自动装)、项目看板(:8088)、服务器桌面(:6080 noVNC)、主题(Mac 本地 :8799 `wavetheme-server`)、**额度**(5小时滚动窗口用量/余量,:8088/quota.html,由 `cc-quota` + ccusage 生成)。按用户勾选裁剪 `widgets.json` 再铺。
+- 🔑 **客户端 SSH 别名(否则用 `root@cloud` 连接的 widget 报 `lookup cloud: no such host`)**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub` → 客户端 `~/.ssh/config` **必须建 `cloud`(→服务器 Tailscale IP)+ `cloud-pub`(→服务器公网 IP)别名**(`User root`、`IdentityFile` 指客户端自己钥匙、`IdentitiesOnly yes`)。并把**客户端公钥 `ssh-copy-id` 进服务器**(免密)。
+- ⚙️ **mosh 要 UTF-8 locale**:`cloudconn` 已在开头 `export LANG/LC_ALL=en_US.UTF-8`(否则 macOS/Wave cmd 块里 mosh 报 `Error: vector`)。**主题** widget 要在 Mac 本地跑 `wavetheme-server`(:8799)+ 铺 `termthemes/*.json`,用 **launchd** 自启;**临时会话**要服务器 `/usr/local/bin/mosh-server-tmout`(install.sh 已装)。**noVNC 已改必装**:客户完成 Claude 无头登录跑 `claude-login-url`(输出临时公网登录页 URL,登录后 `pkill cloudflared` 拆掉)。
 
 ### 可选 · 用魔改版 Wave 客户端(汉化 + 自定义主题)
 

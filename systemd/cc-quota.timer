@@ -1,0 +1,9 @@
+[Unit]
+Description=每 1 分钟刷新「5小时额度」看板页(保持余量实时)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target

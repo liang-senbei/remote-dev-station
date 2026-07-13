@@ -17,9 +17,10 @@ DISPLAY=:1 xfdesktop        >/var/log/xfdesktop.log 2>&1 &
 DISPLAY=:1 xfce4-panel --disable-wm-check >/var/log/xfce4-panel.log 2>&1 &
 sleep 2
 # 自动开 Chrome 到 claude.ai/code(网页版 Claude Code:富文本输入+贴图,从服务器干净 IP 登录、不碰 Mac 环境)
+rm -f "$HOME/.chrome-vnc"/Singleton* 2>/dev/null   # 清旧锁,防重启后 chrome 起不来
 DISPLAY=:1 google-chrome --no-sandbox --no-first-run --no-default-browser-check \
   --password-store=basic --disable-session-crashed-bubble --start-maximized \
-  --user-data-dir=/root/.chrome-vnc "https://claude.ai/code" >/var/log/chrome-vnc.log 2>&1 &
+  --user-data-dir=/root/.chrome-vnc "https://claude.com" >/var/log/chrome-vnc.log 2>&1 &
 x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -bg -o /var/log/x11vnc.log 2>/dev/null
 sleep 1
 # 绑本机自己的 Tailscale IP（自动取、不写死；只在 tailnet 内可达 = 安全边界）

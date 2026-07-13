@@ -161,3 +161,67 @@
 - **现象**：命令里含 `sleep 0.3`，整条被信号打断、exit 144。
 - **根因**：沙箱拦截前台 `sleep`。
 - **修法**：等条件改用 `timeout N sh -c 'tail -f log | grep -m1 pat'` 或 Monitor 工具，别用 sleep 轮询。
+
+### Mac 端 Wave deck:mosh 报 "Error: vector"(缺 UTF-8 locale)
+- **现象**:Mac 上点"会话"widget,cloudconn 走 mosh 连服务器,报 `Error: vector`;终端手敲 `mosh host` 也一样。
+- **根因**:mosh 客户端要 UTF-8 locale。macOS 的 GUI app(Wave)cmd 块常不带 `LANG/LC_ALL`,非交互/嵌套 ssh 也丢 locale → mosh 挂。
+- **修法**:cloudconn 开头 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`。测试链路时也要带上再 `mosh ... -- echo OK`。
+
+### install.sh 的可选层/配置缺口(新客户部署要手动补)
+- **现象**:部署后 ①服务器 Claude 不知道自己能力(无 `~/.claude/CLAUDE.md`);②临时会话 widget 瘸(缺 `/usr/local/bin/mosh-server-tmout`);③项目看板/服务器桌面 widget 连不上(cloud-dashboards.service / novnc.service 没装)。
+- **根因**:旧版 install.sh 只铺 settings 模板 + 把 `cloud-dashboards.sh/novnc-start.sh` 拷到 /usr/local/bin,但没铺 CLAUDE.md、没装 mosh-server-tmout、没装这两个 service 单元。
+- **修法**:已在 install.sh 补齐(铺 CLAUDE.md、装 mosh-server-tmout、noVNC 必装 + 起 novnc/cloud-dashboards/gen-dashboard)。老部署手动补:`CLAUDE.md`→`~/.claude/`;`bin/mosh-server-tmout`→`/usr/local/bin/`;`systemd/{novnc,cloud-dashboards}.service`→`/etc/systemd/system/`+`enable --now`。
+
+### Wave widgets.json 部署:占位符要全替(不止 <YOUR_HOME>)
+- **现象**:项目看板/服务器桌面 widget 打开报连接错误,URL 里还是 `http://<SERVER_TAILSCALE_IP>:8088/`。
+- **根因**:铺 widgets.json 时只替了 `<YOUR_HOME>`,漏了 `<SERVER_TAILSCALE_IP>`。
+- **修法**:两个占位符都替:`<YOUR_HOME>`→用户家目录、`<SERVER_TAILSCALE_IP>`→服务器 tailscale IP。cloudconn 里的 `<SERVER_TAILSCALE_IP>` 同理。
+
+### 客户端缺 cloud/cloud-pub SSH 别名 → widget 报 lookup cloud: no such host
+- **现象**:Mac Wave 的"服务器文件"widget(或任何用 `root@cloud` 连接的)报 `Connecting to root@cloud, Error: dial tcp: lookup cloud: no such host`。
+- **根因**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub`,但客户端 `~/.ssh/config` 没这两个别名。
+- **修法**:客户端 `~/.ssh/config` 建 `cloud`(HostName=服务器 tailscale IP)+ `cloud-pub`(=公网 IP)别名,User root、IdentityFile 指客户端钥匙、IdentitiesOnly yes;并 `ssh-copy-id` 把客户端公钥推进服务器。
+
+### cloud-dashboards / novnc 只绑 Tailscale IP,别在 127.0.0.1 上测
+- **现象**:服务 `systemctl is-active` 是 active,但 `curl 127.0.0.1:8088` 返回 000 无响应,以为服务坏了。
+- **根因**:`cloud-dashboards.sh`/`novnc-start.sh` 故意 `--bind $(tailscale ip -4)`(tailnet-only 更安全),不监听 127.0.0.1。
+- **修法**:验证用 tailscale IP:`curl http://100.x.y.z:8088/`(widget 也是走这个)。
+
+### claude 在 ~/.local/bin,noVNC 桌面终端/systemd 上下文敲 claude 报 command not found(exit127)
+- **现象**:客户在 noVNC 桌面(systemd 起的 xfce)的终端里直接敲 `claude` → `command not found`;但 cloudgo 交互会话正常。
+- **根因**:claude native 装在 `~/.local/bin`,而桌面终端/systemd 上下文的 `PATH`(`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin`)**不含 `~/.local/bin`**。cloudgo 会话没事是因为 bashrc 里 `export PATH=~/.local/bin:$PATH`。
+- **修法**:`ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude`(/usr/local/bin 在所有 PATH 里,全 shell 可见)。install.sh 装完 claude 后已补这行软链。
+
+### 自建 Wave widget 跑命令缺 controller:cmd → 点了黑屏空白终端
+- **现象**:手搭的「会话/临时会话」widget,点开是**黑色空终端块、什么都不跑**;但在终端里直接 `cloudgo` 完全正常。
+- **根因**:Wave 的 `term` widget 要**执行命令**必须有 `"controller": "cmd"`(配合 `view:"term"` + `cmd`)。只写 `view:term`+`cmd`、漏了 `controller` → Wave 当成空 shell、**不执行 cmd** → 黑屏。仓库 `wave-config/waveterm/widgets.json` 的 cc-go 有这键,**手搭 widget 时容易漏**。
+- **修法**:widget meta 补 `"controller": "cmd"`。手搭前照抄仓库 cc-go 的 meta 结构:`{"view":"term","controller":"cmd","cmd":"...","cmd:interactive":true}`。别只凭记忆搭。
+
+### 推文件到 Mac:scp/sftp 卡 → 改 ssh 管道 cat 推(2remote .36 实战)
+- **现象**:往客户 Mac scp/sftp 传文件(widgets.json 等)卡住/超时。
+- **根因**:某些 macOS + 多层 ssh(反向通道)下 sftp 子系统会卡。
+- **修法**:走 ssh 字节流管道推:`ssh mac 'cat > ~/目标文件' < 本地文件`(二进制字节流,不坏编码、不依赖 sftp)。Windows 同理可用 `Set-Content`/base64。
+
+### heredoc 里嵌 ssh 没加 -n 会吞掉 heredoc 的 stdin
+- **现象**:`ssh host <<EOF ... ssh other cmd ... EOF` 这类脚本,内层 ssh 把 heredoc 剩余内容当自己的 stdin 吃掉 → 后续命令错乱。
+- **根因**:ssh 默认从 stdin 读,heredoc 正在喂 stdin。
+- **修法**:heredoc/管道上下文里的**非交互、不需 stdin 的 ssh 都加 `-n`**(`ssh -n host cmd`),让它不读 stdin。
+
+### 客户 Mac 已有 ~/.ssh/config → 追加别名别覆盖
+- **现象**:配 cloud/cloud-pub 别名时整份覆盖了客户已有的 ssh config。
+- **修法**:**追加**(先 `grep -q 'Host cloud$'` 幂等判断,没有才 `>>` 追加),别 `>` 覆盖;客户已有的别名/配置要保留。
+
+### 部署前先核对客户给的 IP(错 IP → 密码错 → fail2ban 封,越试越连不上)
+- **现象**:ssh 客户服务器密码报错,多试几次后变 `Connection ... Not allowed at this time`(fail2ban 封了本机出口 IP)。
+- **根因**:客户把服务器 IP 给错了(给成另一台),密码自然对不上;失败几次触发那台的 fail2ban 封禁 → 之后连对的机也可能受影响。
+- **修法**:**部署前先核对 IP**(`ssh root@<ip> hostname` 能进+密码对再动手)。已被封:等封禁过期,或换出口/让对方 unban。给错 IP 时别硬试密码,先跟客户确认正确 IP。
+
+### ★客户装 Clash/系统代理:noVNC/看板(:6080/:8088)超时但 SSH/会话正常(代理绕过列表缺 tailnet 100.*)
+- **现象**:客户机上「服务器桌面(:6080)」「项目看板/额度(:8088)」网页 widget 打不开/一直转圈/timeout,但「会话(cloudgo)」这种 **ssh 类 widget 一直好**。极具迷惑性,像 tailscale 掉线又不完全是。
+- **根因**:客户装了 **Clash/V2Ray 等系统代理**(127.0.0.1:7890)。Windows ProxyOverride(或系统代理)的**绕过列表放行了 `10./172./192.168.*` 私网段,却独缺 Tailscale 的 `100.*` 段** → 浏览器/Wave 网页块访问 tailnet IP(`100.x:6080/8088`)走代理 → 代理够不到 tailnet → 超时。而 **SSH 不走 HTTP 代理**,所以会话 widget 照常通 → 让人误以为"tailscale 好着呢"。
+- **诊断**:PowerShell 对比——`(New-Object Net.Sockets.TcpClient).Connect('100.x.y.z',6080)` 直连(通)vs `Invoke-WebRequest http://100.x.y.z:6080`(走代理→timeout),一比就现形。
+- **修法**:① 注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyOverride` 加 `100.*`;或 ② Clash 配置里加 `IP-CIDR,100.64.0.0/10,DIRECT`(tailnet 段直连不走代理)→ 实测 :6080 HTTP200。
+
+### claude 子进程内存泄漏 → 整机 OOM → claude/noVNC 饿死(2remote .178 事故)
+- **现象**:某会话(如大数据任务)claude 子进程内存涨到十几 G → 整机 OOM → claude 起不来 + noVNC 桌面栈被饿死。
+- **修法**:`ps aux --sort=-%mem | head` 揪出跑飞进程,`kill` 释放内存,`systemctl restart novnc.service` 重建桌面栈。install.sh 的 `oom/harden.sh` 是兜底(限单会话),但极端泄漏仍可能击穿——留意大任务会话的内存。

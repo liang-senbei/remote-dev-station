@@ -1,4 +1,5 @@
 #!/bin/bash
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8   # mosh 需要 UTF-8 locale,否则 macOS/Wave cmd 块里报 "Error: vector"
 # 韧性连接 Wave 会话:mosh 到云服务器跑指定命令。
 #  · 干净退出(detach / 菜单 Esc / claude 正常退出 → 退出码 0)→ 不重连。
 #  · 真断线(非 0)→ 5 秒自动重连(Ctrl-C 取消)。

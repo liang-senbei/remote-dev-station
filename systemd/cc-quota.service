@@ -1,0 +1,7 @@
+[Unit]
+Description=生成「5小时额度」看板页(ccusage 读会话日志算 Claude 5h 滚动窗口用量)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/cc-quota
