@@ -225,3 +225,33 @@
 ### claude 子进程内存泄漏 → 整机 OOM → claude/noVNC 饿死(2remote .178 事故)
 - **现象**:某会话(如大数据任务)claude 子进程内存涨到十几 G → 整机 OOM → claude 起不来 + noVNC 桌面栈被饿死。
 - **修法**:`ps aux --sort=-%mem | head` 揪出跑飞进程,`kill` 释放内存,`systemctl restart novnc.service` 重建桌面栈。install.sh 的 `oom/harden.sh` 是兜底(限单会话),但极端泄漏仍可能击穿——留意大任务会话的内存。
+
+### ★Windows 反向隧道一键脚本:SSH 会话里 Register-ScheduledTask 静默失效 + 临时进程被会话清理
+- **现象**:经 ssh 远程在客户机跑一键脚本后,"隧道登录自启任务"没建上(`schtasks /query /tn RemoteDevTunnel` 找不到);手动 `Start-Process ssh -R` 起的隧道也一闪就没——服务器端 `ssh -v` 明写 `remote forward success for: listen 2223`,但服务器 `ss` 看不到监听、客户机上 ssh 进程也没了。极迷惑,像转发失败,其实转发是成功的。
+- **根因**:① `Register-ScheduledTask` 在**非交互 SSH 会话上下文**里建"登录触发(Interactive)"任务会**静默失败**(不抛错);② 更关键——**Windows OpenSSH 命令会话里 `Start-Process` 起的子进程,随该 ssh 命令返回被会话 job 清理**,隧道进程一起被杀,所以端口只闪一下。机制本身没问题,是进程没常驻。
+- **修法**:① 任务注册改 **`schtasks /create /tn RemoteDevTunnel /sc ONLOGON /rl LIMITED /f /tr "powershell ...-File <runner>"`**(比 Register-ScheduledTask 在各上下文都稳)+ 自检回显;② 隧道必须**由计划任务(独立会话)拉起**、别从 ssh 会话临时起 → 独立会话不被清、端口持久。实测:改后 `schtasks /run` → 服务器 2223 持久监听 → `ssh -p 2223 localhost` 成功回连进客户机。见 `cli/win-setup-tunnel.ps1`。
+
+### root 下 claude 被拦 `--dangerously-skip-permissions cannot be used with root/sudo` —— 靠 IS_SANDBOX=1 绕过(与目录无关)
+- **现象**:root 直接跑 `claude --dangerously-skip-permissions` 被拒;易误以为是"工作目录在 /root 有沙盒、/opt 没有"。
+- **根因**:这是 **root 身份**的限制,**跟工作目录在 /root 还是 /opt/workspace 无关**(实测:`env -i` 干净环境下从 /opt/workspace 跑照样被拦)。
+- **修法**:加环境变量 **`IS_SANDBOX=1`** 即放行。`cloud` / `cloud-enter` / bashrc 各函数都已带好,直接用它们、别裸敲 `claude`。
+
+### 够不到客户笔电:tailnet 直连 和 反向隧道 是两条独立通道,别只凭一条超时就判"不可达"
+- **现象**:`tailscale ping <笔电>` / `ssh <tailnet-100.x>` 超时,像笔电离线;但笔电其实还在,反向隧道 `ssh laptop-tunnel`(经服务器 127.0.0.1:2222)照样进得去。
+- **根因**:笔电有**两条到服务器的通道**——① tailscale 直连(100.x);② 反向 SSH 隧道(服务器 :2222 → 笔电 :22)。两条**各自独立掉线**(用户关了 tailscale 或 tailnet 数据面僵死时直连断,反向隧道走公网仍活;反之亦然)。只测一条就判死 = 误判。
+- **修法**:够不到笔电时**两条都试**:先 `ssh laptop-tunnel`(隧道),再 `ssh -i ~/.ssh/reverse_tunnel <user>@100.x`(直连);任一通即可操作,含中文路径的文件操作同理。(实例:2remote 出飞书 docx 全程走隧道完成,当时 tailnet 直连是挂的。)
+
+### Windows 目标文件被占用(WPS/Office 打开中):Move-Item -Force 报错误导成"文件已存在"
+- **现象**:后台投递器覆盖笔电上的 docx 时,`Move-Item -Force` 报 `Cannot create a file when that file already exists.`——看着像"目标已存在"的逻辑问题,其实不是。
+- **根因**:目标 docx 正被 **WPS/Office/飞书打开**(目录里有 `~$xxx.docx` 锁文件),文件被占用;`Move-Item -Force` 把真因(占用)掩成了"已存在"。
+- **修法**:① 换 `Copy-Item -Force`(会暴露真因 `The process cannot access the file ... because it is being used by another process.`)+ `Remove-Item`;② 覆盖前先检测目录里的 `~$` 锁文件 / 相关进程(wps/wpp/et/Feishu),被占用就**别硬覆盖**——把新版暂存成 `_新版待覆盖.docx`,等用户关掉文档再覆盖(顺带防覆盖掉用户在 WPS 里的手动改动)。
+
+### 停 Windows 反向隧道:要杀 tunnel-run.ps1 的 while 循环,光杀 ssh 子进程会自己重连
+- **现象**:清理测试用的反向隧道时,`Stop-Process` 杀掉 `ssh.exe`(ssh -R)后,几秒钟服务器上那个转发端口又冒出来了;反复杀反复回。以为没清干净,其实是被自动重连了。
+- **根因**:隧道由「计划任务 → `tunnel-run.ps1` 里 `while($true){ ssh -R ...; sleep 5 }` 循环」维持。杀 ssh **子进程**时**循环(powershell)还活着**,5 秒后又把 ssh 拉起 → 端口回来。另外服务器侧那条 ssh -R 死后,sshd 子进程可能**不立即释放**转发监听(留半死 ESTAB / `CLOSE-WAIT` 的孤儿 listener)。
+- **修法**:① 先 `schtasks /delete /tn RemoteDevTunnel /f`(去自启);② **杀循环本身**——`Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | ? { $_.CommandLine -match 'tunnel-run' } | % { Stop-Process -Id $_.ProcessId -Force }`,再杀 ssh -R;③ 服务器侧端口仍不释放时,`ss -ltnp | grep :<port>` 找到持有它的 sshd 子进程,**确认非命脉端口、非 master sshd** 后 `kill` 那个孤儿(它服务的反向连接客户端已死)。
+
+### ★客户装隧道被 fail2ban 封:公钥没先上服务器 → 反复失败认证 → IP 被封 → 之后 Connection refused
+- **现象**:客户机跑完一键脚本,隧道死活连不上;服务器上该端口不出现;客户手动 `ssh root@<服务器>` 报 **`Connection refused`(不是 timeout)**。别的客户机好好的,唯独这台。极迷惑,像脚本或网络坏了。
+- **根因**:一键脚本会**立即起隧道循环**反复连服务器,但此刻**客户公钥还没加到服务器**(那步要操作方手动做)→ 每次 pubkey 认证失败 → 攒够几次 **fail2ban 封了客户 IP** → 之后连 22 口直接被拒。**即使你随后把公钥补上,客户仍进不来**(先被封了)。实测:Mac 首测就这么被封,解封后隧道几十秒自己重连成功。
+- **修法**:① 服务器 `fail2ban-client status sshd` 看封禁列表;`journalctl -u ssh --since "35 min ago" | grep -oE 'from [0-9.]+' | sort | uniq -c | sort -rn` 找失败最多的那个客户 IP;② `fail2ban-client set sshd unbanip <客户IP>` 解封 → 公钥已授权的话,隧道几十秒内自己重连(launchd/计划任务的 KeepAlive)。③ **预防**:onboarding 时**先把客户公钥加到服务器、再让客户跑脚本**;或把客户 IP 加进 fail2ban `ignoreip`。④ 判断是 fail2ban 还是网络封 22:解封后客户仍 `refused` 才是网络层问题。
