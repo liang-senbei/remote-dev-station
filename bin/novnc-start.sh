@@ -2,6 +2,9 @@
 # 服务器图形桌面(给 AdsPower 等 GUI 用):Xvfb:1 + xfce + x11vnc + noVNC 网页(:6080)。
 # 健壮版:全程 wait 在 Xvfb 上——它一死脚本就退出 → systemd 重启整套,
 #         修掉旧版"Xvfb 死了、websockify 还在 = 打开 :6080 空壳没桌面"的毛病。
+# x11vnc 加 -shared(2026-07-13):不加的话某次连接没正常断开(网络抖动/标签页直接关掉)会
+#         卡成"幽灵已连接客户端",之后所有新连接都被拒、表现成"VNC 断开了",得手动重启 x11vnc
+#         才能清掉。-shared 允许多个客户端并存,新连接不会再被这种残留状态挡住。
 pkill -f "Xvfb :1" 2>/dev/null
 pkill -f "x11vnc .*rfbport 5900" 2>/dev/null
 pkill -f "websockify .*6080" 2>/dev/null
@@ -20,7 +23,7 @@ sleep 2
 DISPLAY=:1 google-chrome --no-sandbox --no-first-run --no-default-browser-check \
   --password-store=basic --disable-session-crashed-bubble --start-maximized \
   --user-data-dir=/root/.chrome-vnc "https://claude.ai/code" >/var/log/chrome-vnc.log 2>&1 &
-x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -bg -o /var/log/x11vnc.log 2>/dev/null
+x11vnc -display :1 -forever -nopw -rfbport 5900 -localhost -shared -bg -o /var/log/x11vnc.log 2>/dev/null
 sleep 1
 # 绑本机自己的 Tailscale IP（自动取、不写死；只在 tailnet 内可达 = 安全边界）
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"; TS_IP="${TS_IP:-127.0.0.1}"

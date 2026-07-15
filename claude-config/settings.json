@@ -2,13 +2,7 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "permissions": {
-    "ask": [
-      "Bash(hub say *)",
-      "Bash(hub ask *)",
-      "Bash(hub all *)"
-    ]
-  },
+  "cleanupPeriodDays": 36500,
   "model": "sonnet",
   "hooks": {
     "PermissionRequest": [
@@ -222,7 +216,9 @@
     "playwright@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true
+    "typescript-lsp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "daymade-claude-code@daymade-skills": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
