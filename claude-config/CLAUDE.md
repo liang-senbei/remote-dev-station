@@ -54,3 +54,4 @@
 
 - **任务/阶段告一段落时，主动问我要不要用 neat-freak 收尾**（同步 docs+CLAUDE.md+记忆；我点头才跑，不自作主张改文件、不挂自动 hook）。
 - 文档分流：散文/对外文案 → `humanizer-zh`；CLAUDE.md/记忆/docs 等技术文档 → 只 neat-freak、**绝不 humanize**。细节见记忆 `skills-neat-freak-humanizer`。
+- **`neat-freak` 和 `claude-md-improver`（官方插件，2026-07 装机）搭配着一起用**：`claude-md-improver` 负责审计打分揪出具体问题（含事实性错误，不只是啰嗦），neat-freak 负责实际动手改（同步+精简+毕业）。CLAUDE.md 明显臃肿时再叫 `claude-md-progressive-disclosurer`（daymade 三方插件）做 L1/L2 路由器化拆分。三者搭配，别只用一个。细节见记忆 `claude-md-maintenance-tools`。
