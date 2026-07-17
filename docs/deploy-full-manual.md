@@ -114,9 +114,9 @@ bash tests/deploy-test.sh all      # 19 PASS / 0 FAIL 基准(含断电自愈真�
 
 ## 2. 客户电脑侧详细流程
 
-### 2.1 Windows(主推:VSCode 方案,cust54 已验证全套)
+### 2.1 Windows(唯一主路线:VSCode —— 座舱+Attach 终端=CLI、「打开」=官方面板;Wave 已砍)
 1. **Tailscale**:装 App → 登客户账号 → `tailscale status` 能看到服务器。
-2. **(若服务器要反向操作这台机)OpenSSH Server**:**从 GitHub 直装**(2remote 的 `win-openssh-setup.ps1`,绕开 Windows Update"可选功能"那条又慢又卡的路);`Get-Service sshd` 确认在跑;⚠️ Windows 侧 **PubkeyAuthentication 同样默认关**要开;服务器公钥进 `~/.ssh/authorized_keys`,**管理员账号还要进 `C:\ProgramData\ssh\administrators_authorized_keys`**;DefaultShell 建议改 PowerShell(注册表 `HKLM\SOFTWARE\OpenSSH\DefaultShell`,否则 lapls/lapimg 的 Get-ChildItem 在 cmd 下报错)。
+2. **OpenSSH Server(必装 —— 反向操作本机是产品核心能力,发图/文档落桌面全靠它)**:**从 GitHub 直装**(主仓 `windows/win-openssh-setup.ps1`,绕开 Windows Update"可选功能"那条又慢又卡的路);`Get-Service sshd` 确认在跑;⚠️ Windows 侧 **PubkeyAuthentication 同样默认关**要开;服务器公钥进 `~/.ssh/authorized_keys`,**管理员账号还要进 `C:\ProgramData\ssh\administrators_authorized_keys`**;DefaultShell 建议改 PowerShell(注册表 `HKLM\SOFTWARE\OpenSSH\DefaultShell`,否则 lapls/lapimg 的 Get-ChildItem 在 cmd 下报错)。
 3. **VSCode + Remote-SSH 扩展**:⚠️ 机器上有 Cursor 时 `code` 命令可能指向 Cursor,**用全路径** `"D:\Microsoft VS Code\bin\code.cmd" --install-extension ms-vscode-remote.remote-ssh`。
 4. **`~/.ssh/config`** 写服务器别名(HostName=服务器 **tailnet IP**)+ **预置 known_hosts**(首连零弹窗):
    ```
@@ -125,17 +125,18 @@ bash tests/deploy-test.sh all      # 19 PASS / 0 FAIL 基准(含断电自愈真�
      User root
    ```
 5. **桌面快捷方式**(一键进座舱):`Code.exe --folder-uri "vscode-remote://ssh-remote+cust-cloud/opt/workspace"`(直开 /opt/workspace,规避 folders.length==0 的 untitled 坑)。
-6. 首连:Remote-SSH 自动装 vscode-server → 官方 Claude 插件自动装(或已预置)→ **Reload Window 一次** → 侧栏出现 FLEET COCKPIT。
+6. 首连四件事:Remote-SSH 自动装 vscode-server → **弹"是否信任此文件夹作者"必须点 Trust**(不点=受限模式把所有扩展整体禁用、座舱图标不出、Reload 无效;cust223 实战坑,补救=点左下"受限模式"徽标→Trust)→ 官方 Claude 插件自动生效(已预置)→ **Reload Window 一次** → 侧栏出现 FLEET COCKPIT。
 7. **(兜底)反向隧道**:tailnet 数据面僵死时的后路。**免装软件版**:Windows 计划任务(`/SC ONSTART /RU SYSTEM`)跑 wrapper:循环 `ssh -N -R 2222:localhost:22 <服务器>`,先 tailnet IP、失败落公网。细节坑:密钥副本放 `C:\ProgramData\ssh\`(SYSTEM 读不了用户 ~/.ssh)+ ACL 收紧;**wrapper 里别写中文注释**(双层 ssh 编码坏);ssh 参数别用 PS `@数组` splat(丢 `-i`);服务器侧配 `ClientAliveInterval 30/CountMax 2`(否则笔电睡醒重连,旧死连接占着 2222 要拖 ~180s)。
-8. **(选装)Wave 层**:`windows/` 目录三脚本 + widgets.json。编码铁律:`.ps1` 要 **UTF-8 带 BOM**、`widgets.json` 要 **无 BOM**;对空 widgets.json 别用插入逻辑(会产尾逗号非法 JSON),直接 scp 完整文件;装完**重启 Wave** 才见按钮。
-9. **多客户机防错**:一台服务器授权多台客户电脑时(如 .54 的寒鹤+杨鑫),别名**认人**(win=寒鹤,yangxin=杨鑫,别复用);任何反向操作先 `ssh <别名> hostname` 核对再动手。
+8. **多客户机防错**:一台服务器授权多台客户电脑时(如 .54 的寒鹤+杨鑫),别名**认人**(win=寒鹤,yangxin=杨鑫,别复用);任何反向操作先 `ssh <别名> hostname` 核对再动手。
 
-### 2.2 Mac(wanglei 已验证)
-1. Tailscale App 登录;装 VSCode 同 2.1(或轻量路线:终端 `ssh cloud`)。
-2. **`ssh cloud` 一键入口**:Mac `~/.ssh/config` 写 `Host cloud` + `RequestTTY force` + `RemoteCommand /usr/local/bin/cloud-enter`;服务器放 `cloud-enter`(`tmux new-session -A -s cc-login`)。客户敲 `ssh cloud` 直接进会话。
-3. ⚠️ **HostName 可能要填公网而非 tailnet**:客户 tailnet 的 **ACL 会方向性拦截**(wanglei 实测 Mac→server:22 超时但 `tailscale ping` 通、反方向通;拦在 tailscaled 层,关服务器防火墙无效)。要么客户后台 Access Controls 放行,要么直接走公网 22(fail2ban 的 ignoreip 记得加客户出口 NAT)。
-4. 反向操作 Mac:服务器公钥进 Mac `authorized_keys` → `ssh mac` 别名 + macget/macput/macls/pullimg。
-5. 反向隧道端口规划:多设备时**每台一个端口**(Win=2222、Mac=2223…),wanglei 家 Mac 抢了 2222 导致 Win flapping。
+(Wave 客户端层已从客户方案砍掉 —— VSCode 内 Attach 终端即 CLI,无需第二套终端;`windows/wave/` 目录仅作存量参考。)
+
+### 2.2 Mac(同一套 VSCode 路线)
+1. Tailscale App 登录(挂代理的绕过 `100.64.0.0/10`);装 VSCode + Remote-SSH 插件、ssh config、首连四件事,全部同 2.1。
+2. ⚠️ **HostName 可能要填公网而非 tailnet**:客户 tailnet 的 **ACL 会方向性拦截**(wanglei 实测 Mac→server:22 超时但 `tailscale ping` 通、反方向通;拦在 tailscaled 层,关服务器防火墙无效)。要么客户后台 Access Controls 放行,要么直接走公网 22(fail2ban 的 ignoreip 记得加客户出口 NAT)。
+3. **反向操作 Mac(必装,同 Windows 的 A2 地位)**:系统设置开"远程登录"→ 服务器公钥进 Mac `authorized_keys` → `ssh mac` 别名 + macget/macput/macls/pullimg。
+4. 反向隧道端口规划:多设备时**每台一个端口**(Win=2222、Mac=2223…),wanglei 家 Mac 抢了 2222 导致 Win flapping。
+5. 备注:不装 VSCode 的场景可用 `ssh cloud` 纯终端入口(服务器 `cloud-enter`,wanglei 家在用),不作为主路线。
 
 ### 2.3 手机(选装)
 Tailscale App + Moshi App(客户账号)→ 配对 → 主机地址改成 **IP**。
