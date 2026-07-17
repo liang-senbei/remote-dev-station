@@ -64,7 +64,7 @@ CLOUD_MODEL='claude-opus-4-8[1m]' ./install.sh     # ← 模型参数必须带!�
 |---|---|---|
 | [1/7] | apt 装 tmux/mosh/git/curl/ufw/fail2ban/python3 | **apt 锁**:新机开机 unattended-upgrades 必抢锁 → 先 `echo 'DPkg::Lock::Timeout "600";' > /etc/apt/apt.conf.d/99lock-timeout`(2remote 在 .24 验证过,主仓 install.sh 待并) |
 | [2/7] | 装 Claude Code(native,免 Node) | 网络慢会久;失败重跑幂等 |
-| [3/7] | bin/* → ~/.local/bin;cloud-boot/novnc-start/看板/hub/windows server-side → /usr/local/bin | — |
+| [3/7] | bin/* → ~/.local/bin;cloud-boot/hub/windows server-side → /usr/local/bin(novnc/看板脚本已随 noVNC 弃用不再铺,桌面层=TigerVNC 按需) | — |
 | [4/7] | tmux.conf + bashrc 函数块 + **settings.client.json 铺 ~/.claude/settings.json**(已有则不覆盖) | 客户已有 settings 时 cc-state 钩子要手动合并,否则**自愈静默失效** |
 | [5/7] | systemd 单元(watchdog/sessions/moshi-hook*)+ enable --now + **CLOUD_MODEL 写入 bashrc + watchdog.service 两处** | daemon-reload 后 `systemctl is-active cloud-watchdog.timer` |
 | [6/7] | ufw 放行 22 + mosh UDP + tailscale0,强制 enable | 若 ssh 端口非 22 先自己加规则再跑 |

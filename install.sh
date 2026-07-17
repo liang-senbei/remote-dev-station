@@ -21,7 +21,6 @@ mkdir -p /opt/workspace   # 默认工作区根（cloudgo/cloudnewat/cloudtmp 默
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
-install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 可选桌面/看板层 service 的 ExecStart 指这里
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）
 
@@ -52,7 +51,7 @@ echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"
 bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
 
 echo "完成。后续手动项：① 配 ~/.ssh 密钥与 ~/.ssh/config 的 'mac'（Mac 客户端）/'laptop'（Windows 客户端）别名；② git 身份；③ tailscale up"
-echo "注：图形桌面层(noVNC/xfce/Chrome) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
+echo "注：图形桌面层(TigerVNC/xfce/Chrome,noVNC 已弃用) 与 moshi-hook 二进制未在此安装——按需分别见后续桌面层文档与 phone/README.md。"
 [ "$MODEL" = "claude-sonnet-5" ] && echo "ℹ️ 会话模型为默认 claude-sonnet-5。账号若无权限访问该模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=<你有的模型,如 claude-opus-4-8[1m]> ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 
 set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的核心(避免 set -e 让整脚本非零退出)
