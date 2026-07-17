@@ -105,8 +105,8 @@ bash tests/deploy-test.sh all      # 19 PASS / 0 FAIL 基准(含断电自愈真�
 - **cloud-watchdog KillMode 检查**:`grep KillMode /etc/systemd/system/cloud-watchdog.service` 应为 `process`。旧版 oneshot 会话随 cgroup 被杀,自愈成摆设(ser4121 抓出的真 bug,只有真 systemd 触发才暴露,手动测不出来)。**主仓已修(2026-07-17),存量机器要手动补 + daemon-reload**。
 - 交接:部署参数表(IP/账号/端口)给客户留档不入库;明确告知 `--dangerously-skip-permissions` 意味着什么(唯一人工闸是 moshi,不装=无闸)。
 
-### 1.9 可选层
-- **桌面**:方向已定 **TigerVNC 为默认**(:1/5901 仅 localhost,ssh 隧道访问;noVNC 弃用趋势,echo-j1 的 noVNC 已删)。不要的卸干净(stop+disable+mask+apt remove)。⚠️ **VNC 密码上限 8 字符**(VncAuth 协议截断,.54 设 12 位实际只前 8 位生效)——一键装机生成密码就按 8 位来。截图排查用的 `scrot` 默认没装,顺手 apt 进模板。
+### 1.9 桌面层(必装:TigerVNC)+ 可选层
+- **TigerVNC 必装**(每台客户服务器标配;claude 首登的 Chrome 页也靠它。noVNC 已弃用,echo-j1 的已删)。:5901 仅 localhost,访问走 ssh 隧道。⚠️ **VNC 密码上限 8 字符**(VncAuth 协议截断,.54 设 12 位实际只前 8 位生效)——一键装机生成密码就按 8 位来。截图排查用的 `scrot` 默认没装,顺手 apt 进模板。
 - **手机 Moshi**:`phone/README.md`,主机地址**填 IP 别填 MagicDNS**(`*.ts.net` 手机常解析不了,"验证失败"头号原因)。
 - **通知**:cc-agents-notify + MOSHI_TOKEN(不填=静默)。
 
@@ -126,7 +126,7 @@ bash tests/deploy-test.sh all      # 19 PASS / 0 FAIL 基准(含断电自愈真�
    ```
 5. **桌面快捷方式**(一键进座舱):`Code.exe --folder-uri "vscode-remote://ssh-remote+cust-cloud/opt/workspace"`(直开 /opt/workspace,规避 folders.length==0 的 untitled 坑)。
 6. 首连四件事:Remote-SSH 自动装 vscode-server → **弹"是否信任此文件夹作者"必须点 Trust**(不点=受限模式把所有扩展整体禁用、座舱图标不出、Reload 无效;cust223 实战坑,补救=点左下"受限模式"徽标→Trust)→ 官方 Claude 插件自动生效(已预置)→ **Reload Window 一次** → 侧栏出现 FLEET COCKPIT。
-7. **(兜底)反向隧道**:tailnet 数据面僵死时的后路。**免装软件版**:Windows 计划任务(`/SC ONSTART /RU SYSTEM`)跑 wrapper:循环 `ssh -N -R 2222:localhost:22 <服务器>`,先 tailnet IP、失败落公网。细节坑:密钥副本放 `C:\ProgramData\ssh\`(SYSTEM 读不了用户 ~/.ssh)+ ACL 收紧;**wrapper 里别写中文注释**(双层 ssh 编码坏);ssh 参数别用 PS `@数组` splat(丢 `-i`);服务器侧配 `ClientAliveInterval 30/CountMax 2`(否则笔电睡醒重连,旧死连接占着 2222 要拖 ~180s)。
+7. **反向隧道(备用参考,默认不配 —— 现网客户全部走 tailnet 直连)**:tailnet 数据面僵死时的后路。**免装软件版**:Windows 计划任务(`/SC ONSTART /RU SYSTEM`)跑 wrapper:循环 `ssh -N -R 2222:localhost:22 <服务器>`,先 tailnet IP、失败落公网。细节坑:密钥副本放 `C:\ProgramData\ssh\`(SYSTEM 读不了用户 ~/.ssh)+ ACL 收紧;**wrapper 里别写中文注释**(双层 ssh 编码坏);ssh 参数别用 PS `@数组` splat(丢 `-i`);服务器侧配 `ClientAliveInterval 30/CountMax 2`(否则笔电睡醒重连,旧死连接占着 2222 要拖 ~180s)。
 8. **多客户机防错**:一台服务器授权多台客户电脑时(如 .54 的寒鹤+杨鑫),别名**认人**(win=寒鹤,yangxin=杨鑫,别复用);任何反向操作先 `ssh <别名> hostname` 核对再动手。
 
 (Wave 客户端层已从客户方案砍掉 —— VSCode 内 Attach 终端即 CLI,无需第二套终端;`windows/wave/` 目录仅作存量参考。)
@@ -201,7 +201,7 @@ Tailscale App + Moshi App(客户账号)→ 配对 → 主机地址改成 **IP**�
 2. 写 ~/.ssh/config + 预置 known_hosts;`code --install-extension ms-vscode-remote.remote-ssh`。
 3. 生成桌面「远程座舱」快捷方式(folder-uri 指 /opt/workspace)。
 4. (勾选)开 OpenSSH Server(GitHub 直装,复用 win-openssh-setup.ps1)+ PubkeyAuth 开 + 收服务器公钥 + DefaultShell=PowerShell。
-5. (勾选)注册反向隧道计划任务(全 ASCII wrapper,端口按设备分配)。
+5. (默认关,备用)注册反向隧道计划任务(全 ASCII wrapper,端口按设备分配;现网客户全走 tailnet,没人配这条)。
 6. 唯一人工:Tailscale 登录点一下(客户账号)。
 
 **永远自动化不了的三件**(一键装机的"README 第一行"):客户 Tailscale 账号登录/授权、客户 Claude 账号登录、客户后台 Disable key expiry。设计上就把这三件做成装机脚本结尾的"最后三步"提示卡。
