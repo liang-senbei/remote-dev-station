@@ -4,6 +4,10 @@ After=cloud-sessions.service
 
 [Service]
 Type=oneshot
+# oneshot 默认 KillMode=control-group:服务退出时 systemd 回收 cgroup,会连坐杀掉
+# watchdog 刚 tmux new-session --resume 拉回的会话 → 自愈成摆设(ser4121 实机抓出,
+# 只在真 systemd 触发路径暴露,手动 ssh 跑测不出)。process = 只管 ExecStart 主进程。
+KillMode=process
 TimeoutStartSec=120
 Environment=HOME=/root
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
