@@ -93,3 +93,13 @@ Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/
 **根因**:`bashrc-shell-enhance.sh` 的 `FZF_DEFAULT_OPTS` 用了 `--info=inline-right`、`separator/label` 配色等 **fzf 0.42+ 语法**;22.04 的 apt 只有 **fzf 0.29**,解析选项即死。报错来自 fzf 而不是 cloudgo 本身,且 `command -v fzf` 有输出,老的"fzf 缺失"检查抓不到它。
 
 **修法**:fzf 低于 0.42 就装官方静态版进 `~/.local/bin`(PATH 前置顶掉 /usr/bin 的):GitHub junegunn/fzf 最新 release 按架构取 `linux_amd64/arm64` tar.gz。已固化进 install.sh 尾段(版本门槛 sort -V 判断,2026-07-18)。验证:`bash -ic 'printf x | fzf --filter=x'` 输出 x = 全部选项被接受。
+
+### 座舱「打开」出 untitled / 官方插件 Local 看不到 cloudgo 建的会话(自动软链失效)
+
+**现象**:座舱面板正常显示 agent 卡片,但点「打开」是空白 untitled,官方插件 Local 列表也没有那个会话。座舱扩展已激活、版本 0.4.15(带自动软链)、poll 每 3s 正常跑(探针可证)。
+
+**两个独立根因,常同时中(cust86 实战)**:
+1. **cc-agents 不吐 jsonl 字段** —— 主仓 `bin/cc-agents` 曾落后于 echo-j1 live 版,不输出 `"jsonl"`;座舱 `ensureSessionLinks` 第一行 `if (!a.uuid || !a.jsonl) continue` → 每个 agent 都跳过,一条链不建。修:回灌 live cc-agents(已进主仓);验 `cc-agents --json | grep jsonl`。
+2. **客户窗口没打开 /opt/workspace 文件夹** —— 客户用 "Remote-SSH: Connect to Host" 进了**空窗口**,`vscode.workspace.workspaceFolders` 为空 → `ensureSessionLinks` 第一行 `if (!folders?.length) return` 直接退出;官方 `editor.open(uuid)` 无工作区根也定位不到 → untitled。判定:`grep -rl opt/workspace ~/.vscode-server/data/User/workspaceStorage/*/workspace.json` 无结果。修:**必须打开 /opt/workspace 文件夹**(用桌面 CloudCockpit 快捷方式=folder-uri 直开,或 File→Open Folder→/opt/workspace),不能只 Connect to Host。
+
+**排查探针**(确认 poll 是否在跑):把 cc-agents 包一层 `echo $(date) >> /tmp/t.log; exec cc-agents.real "$@"`,等 30s 看 /tmp/t.log 有没有记录(有=poll 正常,问题在 jsonl 或 workspaceFolders;无=扩展没激活/窗口关了)。
