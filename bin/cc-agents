@@ -225,7 +225,21 @@ def build():
     for rec in by_uuid.values():
         nm = rec["name"]; uuid = rec.get("uuid","")
         jl = jsonl_by_uuid(uuid)
-        realdir = decode_dir(os.path.basename(os.path.dirname(jl))) if jl else rec.get("dir","")
+        realdir = rec.get("dir","")
+        if not (realdir and os.path.isdir(realdir)) and jl:   # 优先 hook 登记的真实 cwd;失败再从 jsonl 目录名反解(反解还原不了路径里的下划线)
+            realdir = decode_dir(os.path.basename(os.path.dirname(jl)))
+        if not (realdir and os.path.isdir(realdir)) and nm in tmux:   # 仍无:从 tmux 会话当前目录兜底(裸会话/无 hook 登记的活会话)
+            try:
+                cwd = subprocess.check_output(["tmux","display-message","-p","-t",nm,"#{pane_current_path}"], text=True, stderr=subprocess.DEVNULL, timeout=0.4).strip()
+                if cwd and os.path.isdir(cwd): realdir = cwd
+            except Exception: pass
+        if not uuid and realdir and os.path.isdir(realdir):   # 无注册 uuid(裸会话):取该目录 project 下最新会话兜底,让「打开」也能定位
+            pd = os.path.join(PROJ, re.sub(r"[/_.]", "-", realdir))
+            js = glob.glob(os.path.join(pd, "*.jsonl"))
+            js = [p for p in js if not os.path.islink(p)]
+            if js:
+                uuid = os.path.basename(max(js, key=os.path.getmtime))[:-6]
+                jl = jsonl_by_uuid(uuid) or jl
         repo, branch = git_info(realdir)
         st = status_for(nm, uuid)
         state = st.get("state","idle"); detail = st.get("detail","")
@@ -247,6 +261,7 @@ def build():
             "tab": tab, "cat_num": cnum, "cat_name": cname,
             "task": task, "last_ts": last_ts, "last_rel": rel(now-last_ts) if last_ts else "-",
             "tokens_today": toks, "cost_today_usd": round(usd, 2),
+            "jsonl": jl,   # 会话文件真实路径(座舱自动软链用)
         })
     save_cache(cache)
     # 先按分类(WaveTerm标签页)分组,组内按"需要你"排序
