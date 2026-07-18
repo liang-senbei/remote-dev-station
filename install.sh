@@ -64,6 +64,16 @@ set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的�
 echo "[+] 安装 shell 增强"
 add-apt-repository -y universe 2>/dev/null || true
 apt-get update -y && apt-get install -y fzf || true
+# fzf 版本门槛:FZF_DEFAULT_OPTS 用了 0.42+ 的样式(--info=inline-right 等);旧发行版 apt 版
+# (22.04=0.29)会当场报 "invalid info style" 打死 cloudgo → 低于 0.42 就拉官方静态版顶掉(cust86 实战)
+FZFV=$(fzf --version 2>/dev/null | awk '{print $1}')
+if [ -z "$FZFV" ] || [ "$(printf '%s\n0.42.0\n' "$FZFV" | sort -V | head -1)" != "0.42.0" ]; then
+  case "$(uname -m)" in aarch64|arm64) FZFARCH=linux_arm64;; *) FZFARCH=linux_amd64;; esac
+  FZF_URL=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep -o "https://[^\"]*${FZFARCH}\.tar\.gz" | head -1)
+  [ -n "$FZF_URL" ] && curl -fsSL "$FZF_URL" -o /tmp/fzf.tgz && tar xzf /tmp/fzf.tgz -C /tmp fzf \
+    && install -m755 /tmp/fzf ~/.local/bin/fzf \
+    && echo "  [fzf] apt 版过老/缺失,已装静态版 $(~/.local/bin/fzf --version | awk '{print $1}')"
+fi
 command -v starship >/dev/null || curl -fsSL https://starship.rs/install.sh | sh -s -- -y
 if [ ! -d ~/.local/share/blesh ]; then
   curl -fL --retry 5 -o /tmp/blesh.tar.xz https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz \

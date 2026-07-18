@@ -85,3 +85,11 @@ Environment=SHELL=/bin/bash
 Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ```
 做一键装机时此单元模板必须自带这两行(cust86 实战,2026-07-18)。
+
+### cloudgo 一敲就报 "invalid info style (expected: default / inline / hidden)"
+
+**现象**:cust86(Ubuntu 22.04)上 `cloudgo` 直接报此错退出,选择器出不来;echo-j1(24.04)同配置正常。
+
+**根因**:`bashrc-shell-enhance.sh` 的 `FZF_DEFAULT_OPTS` 用了 `--info=inline-right`、`separator/label` 配色等 **fzf 0.42+ 语法**;22.04 的 apt 只有 **fzf 0.29**,解析选项即死。报错来自 fzf 而不是 cloudgo 本身,且 `command -v fzf` 有输出,老的"fzf 缺失"检查抓不到它。
+
+**修法**:fzf 低于 0.42 就装官方静态版进 `~/.local/bin`(PATH 前置顶掉 /usr/bin 的):GitHub junegunn/fzf 最新 release 按架构取 `linux_amd64/arm64` tar.gz。已固化进 install.sh 尾段(版本门槛 sort -V 判断,2026-07-18)。验证:`bash -ic 'printf x | fzf --filter=x'` 输出 x = 全部选项被接受。
