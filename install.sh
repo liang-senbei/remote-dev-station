@@ -20,6 +20,7 @@ mkdir -p /opt/workspace   # 默认工作区根（cloudgo/cloudnewat/cloudtmp 默
 # 会话系统 + Mac 桥接 + 工具全部装齐（cloudgo / watchdog 自愈 / 会话恢复都依赖它们）
 install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
+install -m755 cloud_infra_check.sh ~/.local/bin/   # 体检工具随装(客户机不留仓,deploy-test A0 依赖)
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）

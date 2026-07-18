@@ -46,7 +46,8 @@ run_core(){
   local out rc ev miss
 
   # A0 基建体检脚本本身全绿
-  out=$(bash "$REPO/cloud_infra_check.sh" 2>&1); rc=$?
+  CHK="$REPO/cloud_infra_check.sh"; [ -f "$CHK" ] || CHK="$HOME/.local/bin/cloud_infra_check.sh"   # 客户机不留仓时用随装副本
+  out=$(bash "$CHK" 2>&1); rc=$?
   if [ $rc -eq 0 ]; then pass A0 "cloud_infra_check.sh 全绿" "$(printf '%s' "$out" | tail -1 | one_line)"
   else fail A0 "cloud_infra_check.sh 有红项(rc=$rc)" "$(printf '%s' "$out" | grep '❌' | one_line)"; fi
 
