@@ -56,3 +56,19 @@ ssh -i ~/.ssh/reverse_tunnel dfhzw@100.113.168.94 "powershell -NoProfile -Encode
 **根因**:VSCode 扩展宿主把扩展代码加载进内存后**不会因为磁盘上换了新版而热更新**;已开着的窗口(含 Remote-SSH 的 remote exthost)继续跑旧版直到 Reload。exthost 日志证实:磁盘 0.4.13,窗口实际加载 `cc-cockpit-0.4.11`。数据链路(cc-agents --json 的 jsonl 字段)完全正常,代码就是没被执行。
 
 **修法**:任何 vsix 安装/滚更后,**必须让用户 Reload Window(或重开窗口)**,并用日志验证实际加载版本:`grep -o "cc-cockpit-[0-9.]*" ~/.vscode-server/data/logs/<最新时间戳>/exthost*/remoteexthost.log`。应急补链(等不到 reload 时):`ln -s ~/.claude/projects/<enc-agent-dir>/<uuid>.jsonl ~/.claude/projects/-opt-workspace/<uuid>.jsonl`,尾部 64KB 无 `"customTitle"` 则追加一行 `{"type":"custom-title","sessionId":"<uuid>","customTitle":"<cc名>"}`。
+
+### 往 Windows 笔电推文件：别把文件字节塞进 `-EncodedCommand`，会撞 cmd 8191 命令行上限
+
+**现象**：想把文件写到笔电的中文路径（如 `C:\Users\dfhzw\Desktop\业务\ip`），把文件内容 base64 后整个塞进一条 `ssh laptop "powershell -NoProfile -EncodedCommand <大base64>"` 里一把梭。命令**静默失败 / 返回空**，PowerShell 没报错也没输出。同样写法用小 payload（只查目录、只做逻辑）却完全正常。旧笔电 LAPTOP-3P8NH0IQ（`-i ~/.ssh/reverse_tunnel`，默认壳 cmd）尤其必崩。
+
+**根因**：旧笔电 sshd 默认登录壳是 **cmd.exe，命令行硬上限 8191 字符**。`-EncodedCommand` 里嵌了文件字节的 base64 轻松超（实测一个 2.9KB 的 txt，编码后整条命令 18KB）→ cmd 把命令行**截断** → powershell 收到半截非法 base64 → `FromBase64String` 抛异常 / 无输出。keuury 默认壳是 PowerShell，上限高些（~32KB）但一样有界，大文件照样会中招。
+
+**修法**：**命令行只放逻辑，不放数据**。① `scp` 把文件传到 home 的 ASCII 临时名（scp 走 sftp 子系统，不受 cmd 命令行长度限制，且命令里不含中文路径，绕开中文 GBK 坏那个坑）：`scp -i ~/.ssh/reverse_tunnel a.txt dfhzw@100.113.168.94:a.txt`。② 再来一条**短**的 `-EncodedCommand`（UTF-16LE base64，只有 `New-Item -Force $中文dir` + `Move-Item` + 校验，~1.7KB）把文件挪进中文目录。校验想读回中文就让 PS 端 `[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($out))` 再本地 `base64 -d`。实测：18KB 一把梭失败；scp + 1760 字符 move 命令一次成。经验值：`-EncodedCommand` 别超 ~2KB。
+
+### 装完 claude 终端里却敲不到——root 的 PATH 默认不含 ~/.local/bin
+
+**现象**:install.sh 全绿、`~/.local/bin/claude` 存在且能全路径执行,但客户开终端(ssh/VNC)敲 `claude` 报 command not found,`cloudgo` 也因此起不了会话。安装器其实打过"⚠ Setup notes"警告,滚屏里极易被忽略。
+
+**根因**:Ubuntu **root** 账号的 `~/.profile` 是极简版(只 source .bashrc),**不带**普通用户模板里那段"存在 ~/.local/bin 就加进 PATH"的逻辑;claude native 装到 ~/.local/bin 后仅打印提示不强制接线。cloud-watchdog 不受影响(unit 里显式写了 PATH),所以自愈正常、交互坏——更具迷惑性。
+
+**修法**:`~/.bashrc` 首行插 `export PATH="$HOME/.local/bin:$PATH"`(`.profile` 也补一份,幂等 grep 判重)。已固化进 install.sh [4/7](2026-07-18);存量机器验一句:`bash -lc 'command -v claude'` 有输出才算通。

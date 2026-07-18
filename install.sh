@@ -25,6 +25,10 @@ install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub l
 install -m755 windows/server-side/* /usr/local/bin/  # Windows PS 层按 /usr/local/bin 绝对路径 ssh 调用（「按标签页恢复终端」）
 
 echo "[4/7] 部署 tmux 配置 + .bashrc 函数块"
+# PATH 接线:root 的 .profile/.bashrc 默认不含 ~/.local/bin(claude/全部会话脚本都在这)——
+# 不接的话终端敲 claude/cloudgo 全报 command not found(cust86 实战踩过,装机器警告易被忽略)
+grep -q '\.local/bin' ~/.bashrc || sed -i '1i export PATH="$HOME/.local/bin:$PATH"' ~/.bashrc
+grep -q '\.local/bin' ~/.profile 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
 cp tmux.conf ~/.tmux.conf
 grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.bashrc
 mkdir -p ~/.claude
