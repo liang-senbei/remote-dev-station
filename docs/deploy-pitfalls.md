@@ -72,3 +72,16 @@ ssh -i ~/.ssh/reverse_tunnel dfhzw@100.113.168.94 "powershell -NoProfile -Encode
 **根因**:Ubuntu **root** 账号的 `~/.profile` 是极简版(只 source .bashrc),**不带**普通用户模板里那段"存在 ~/.local/bin 就加进 PATH"的逻辑;claude native 装到 ~/.local/bin 后仅打印提示不强制接线。cloud-watchdog 不受影响(unit 里显式写了 PATH),所以自愈正常、交互坏——更具迷惑性。
 
 **修法**:`~/.bashrc` 首行插 `export PATH="$HOME/.local/bin:$PATH"`(`.profile` 也补一份,幂等 grep 判重)。已固化进 install.sh [4/7](2026-07-18);存量机器验一句:`bash -lc 'command -v claude'` 有输出才算通。
+
+### VNC 桌面里的终端只有光秃秃 "#" 提示符,claude/cloudgo 全敲不到
+
+**现象**:TigerVNC 桌面打开 xfce4-terminal,提示符是孤零零的 `# `,回车只出新 `#`;`cd ~` 能走但 claude/cloudgo 报 command not found。ssh 进来却一切正常。
+
+**根因**:VNC 由 systemd 单元拉起时环境里没有 `SHELL`,xfce 会话默认落 `SHELL=/bin/sh` → xfce4-terminal 开的是 **dash**:bare `#` 提示符、不读 .bashrc,PATH/函数全没有。root 的 /etc/passwd 登录 shell 是 bash 没问题,所以只有"桌面里的终端"坏,极具迷惑性。
+
+**修法**:tigervnc@.service 的 [Service] 加两行后 `daemon-reload && systemctl restart tigervnc@<display>`(会重启桌面,提醒用户重连):
+```
+Environment=SHELL=/bin/bash
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+做一键装机时此单元模板必须自带这两行(cust86 实战,2026-07-18)。
