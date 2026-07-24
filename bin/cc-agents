@@ -33,17 +33,24 @@ def tier_of(model):
 
 # ---- 复用自 cc-sessions 的两个小工具(内联,因 cc-sessions 无 .py 不可 import)----
 def decode_dir(encoded):
+    """编码串还原真实路径。Claude 把 / _ . 一律编成 '-',单看串无法区分,
+    所以拿真实目录条目反向匹配:把每个条目按同样规则编码后跟 token 比,取最长匹配。
+    (旧实现只用 '-' 拼接试 isdir,遇到原本含 '_' 的目录名如 gmail_account_saver 匹配不上,
+     会把余下 token 全用 '/' 拼接 → 错成 gmail/account/saver。)"""
     toks = encoded.split("-"); idx = 1 if toks and toks[0] == "" else 0; path = ""
     while idx < len(toks):
-        best = None; cand = ""; j = idx
-        while j < len(toks):
-            cand = cand + ("-" if cand else "") + toks[j]
-            trial = (path + "/" + cand) if path else "/" + cand
-            if os.path.isdir(trial): best = (j, trial)
-            j += 1
+        try: entries = os.listdir(path or "/")
+        except Exception: entries = []
+        best = None
+        for e in entries:
+            etoks = e.replace("_", "-").replace(".", "-").split("-")
+            n = len(etoks)
+            if toks[idx:idx + n] != etoks: continue
+            trial = (path + "/" + e) if path else "/" + e
+            if os.path.isdir(trial) and (best is None or n > best[0]): best = (n, trial)
         if best is None:
             rest = "/".join(toks[idx:]); return (path + "/" + rest) if path else "/" + rest
-        idx = best[0] + 1; path = best[1]
+        idx += best[0]; path = best[1]
     return path or "/"
 
 def rel(a):
