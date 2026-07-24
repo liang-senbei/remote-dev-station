@@ -13,7 +13,7 @@ CLOUD_MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"
 CLOUD_OPTS="${CLOUD_OPTS:---effort max}"
 
 # 已在 tmux 里 → 直接起 claude,不嵌套
-if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; exec env IS_SANDBOX=1 command claude --model "$CLOUD_MODEL" $CLOUD_OPTS --dangerously-skip-permissions; fi
+if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; export IS_SANDBOX=1; exec "$(type -P claude)" --model "$CLOUD_MODEL" $CLOUD_OPTS --dangerously-skip-permissions; fi
 
 # 在跑 → attach
 if tmux has-session -t "$name" 2>/dev/null; then exec env -u TMUX tmux attach -t "$name"; fi
