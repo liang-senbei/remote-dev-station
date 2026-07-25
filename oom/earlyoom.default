@@ -1,8 +1,12 @@
 # → /etc/default/earlyoom
-# earlyoom：可用 RAM <10% 就主动 SIGTERM/KILL "最肥的 claude"，不等内核硬 OOM
+# earlyoom：内存吃紧就主动 SIGTERM/KILL "最肥的 claude"，不等内核硬 OOM
 # （硬 OOM 常在机器已卡死后才开枪、还可能误杀 ssh/tmux 连累整机）。
-# -s 100 = 只看 RAM 不等 swap 见底（直击 RAM 暴涨型 OOM）；--prefer claude + --avoid 保住 ssh/tmux/systemd。
-# 被杀会话由 cloud-watchdog 每 15s 自动 --resume 拉回（内存够了才拉）。
+# --prefer claude + --avoid 保住 ssh/tmux/systemd；被杀会话由 cloud-watchdog 每 15s 自动 --resume 拉回。
+#
+# -s 5（2026-07 从 -s 100 下调）:只在【RAM<10% 且 swap 也<5%】才开枪。
+#   配合"闲 agent 睡 swap"(swappiness=80,见 sysctl-99-oom.conf):内存尖峰时先让内核把闲 agent
+#   换页进 swap,earlyoom 只在 RAM+swap 双双见底的真·紧急才杀,不再一有 RAM 尖峰就误杀在跑的 agent。
+#   ⚠️ 前提:swap 要够大(建议 ≥RAM)。若 swap 小/无,回退 -s 100(只看 RAM,直击 RAM 暴涨型 OOM)。
 # ⚠️ 【别给正则加单引号】：systemd 从 EnvironmentFile 展开 $EARLYOOM_ARGS 时按空格切词、但【不去引号】，
 #    加引号 --prefer 会拿到字面量 '^claude$'（带引号）→ 匹配不到进程 claude。装后核实：systemctl show -p ExecStart earlyoom
-EARLYOOM_ARGS="-r 60 -m 10 -s 100 --prefer ^claude$ --avoid (^sshd$|^systemd|^init$|dbus-daemon|tmux)"
+EARLYOOM_ARGS="-r 60 -m 10 -s 5 --prefer ^claude$ --avoid (^sshd$|^systemd|^init$|dbus-daemon|tmux)"

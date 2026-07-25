@@ -1,0 +1,4 @@
+# VS Code 远程 server 环境设置(启动前 source)。
+# 重连宽限期 3h→8min:断线残留的僵尸 exthost 快速释放,不再堆积吃内存。
+export VSCODE_RECONNECTION_GRACE_TIME=480000
+export VSCODE_RECONNECTION_SHORT_GRACE_TIME=60000

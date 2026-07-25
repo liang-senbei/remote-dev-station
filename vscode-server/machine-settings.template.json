@@ -1,0 +1,51 @@
+{
+  "__doc__": "VS Code Remote-SSH 服务器侧 Machine settings 模板 → ~/.vscode-server/data/Machine/settings.json。核心目的:防 exthost(扩展宿主)内存膨胀被 OOM。见 ../docs/vscode-remote-oom.md。ccCockpit.* 是本部署的座舱扩展配置,按机器改;没装座舱可删。",
+
+  "ccCockpit.ccAgentsPath": "cc-agents",
+  "ccCockpit.pollIntervalMs": 3000,
+  "security.workspace.trust.enabled": false,
+
+  "__watch__": "关键:不监视/索引重目录。exthost 盯着 node_modules/.venv/.git 几G内容会膨胀到撑爆 Node 堆(实测单 exthost 2h 涨到 4.6G 后崩,报 window terminated oom)。",
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/venv/**": true,
+    "**/__pycache__/**": true,
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/.next/**": true,
+    "**/out/**": true,
+    "**/data/**": true,
+    "**/.chrome-vnc/**": true,
+    "**/*profiles*/**": true,
+    "**/logs/**": true,
+    "**/*.log": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/venv": true,
+    "**/__pycache__": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.next": true,
+    "**/out": true,
+    "**/*.lock": true,
+    "**/package-lock.json": true
+  },
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  },
+  "typescript.tsserver.maxTsServerMemory": 1024,
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "git.autofetch": false,
+  "git.autorefresh": false,
+  "extensions.autoUpdate": false,
+  "telemetry.telemetryLevel": "off",
+  "npm.autoDetect": "off",
+  "task.autoDetect": "off",
+  "typescript.tsc.autoDetect": "off"
+}

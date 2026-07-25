@@ -255,3 +255,8 @@
 - **现象**:客户机跑完一键脚本,隧道死活连不上;服务器上该端口不出现;客户手动 `ssh root@<服务器>` 报 **`Connection refused`(不是 timeout)**。别的客户机好好的,唯独这台。极迷惑,像脚本或网络坏了。
 - **根因**:一键脚本会**立即起隧道循环**反复连服务器,但此刻**客户公钥还没加到服务器**(那步要操作方手动做)→ 每次 pubkey 认证失败 → 攒够几次 **fail2ban 封了客户 IP** → 之后连 22 口直接被拒。**即使你随后把公钥补上,客户仍进不来**(先被封了)。实测:Mac 首测就这么被封,解封后隧道几十秒自己重连成功。
 - **修法**:① 服务器 `fail2ban-client status sshd` 看封禁列表;`journalctl -u ssh --since "35 min ago" | grep -oE 'from [0-9.]+' | sort | uniq -c | sort -rn` 找失败最多的那个客户 IP;② `fail2ban-client set sshd unbanip <客户IP>` 解封 → 公钥已授权的话,隧道几十秒内自己重连(launchd/计划任务的 KeepAlive)。③ **预防**:onboarding 时**先把客户公钥加到服务器、再让客户跑脚本**;或把客户 IP 加进 fail2ban `ignoreip`。④ 判断是 fail2ban 还是网络封 22:解封后客户仍 `refused` 才是网络层问题。
+
+### VS Code Remote-SSH 反复「窗口意外终止(oom)」:exthost 膨胀撑爆 Node 堆,不是系统内存不够
+- **现象**:VS Code 反复弹「窗口意外终止(原因:"oom",代码 "-536870904")」,点重载又过一阵再犯;但 `journalctl -u earlyoom`/`dmesg` 里**没有** OOM 击杀记录。
+- **根因**:Remote-SSH 下真正跑插件的**扩展宿主(exthost)在服务器上**。两条常同时:①把整个 `~/src/workplace`(十几个仓)当一个多根工作区开,exthost 监视/索引所有文件,**实测单 exthost 2h 涨到 4.6G** 撞 Node 堆上限自崩;②断线重连留下的僵尸 exthost 按默认 **3h 宽限期**继续挂着(每个 0.5~2G),越堆越多。
+- **修法**(全服务器侧,详见 [vscode-remote-oom.md](vscode-remote-oom.md)):① Machine settings 铺 `files.watcherExclude`/`search.exclude` 排除 node_modules/.venv/.git 等重目录(模板 [`../vscode-server/machine-settings.template.json`](../vscode-server/machine-settings.template.json));② `~/.vscode-server/server-env-setup` 设 `VSCODE_RECONNECTION_GRACE_TIME=480000`(3h→8min)缩短僵尸存活;③ **两者只在 vscode-server 完整重启时生效**——`F1 → Kill VS Code Server on Host` 重连,或服务器侧按 PID 杀(**别 `pkill -f vscode-server`,会匹配自己命令行自杀 exit 144**);④ 应急:`ps -eo pid,rss,args|grep type=extensionHost|sort -k2 -rn|head` 揪最肥的单杀。⑤ 治本:别一次开整个 workplace,只开当下项目文件夹。
