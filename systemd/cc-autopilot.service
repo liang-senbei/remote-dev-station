@@ -1,0 +1,8 @@
+[Unit]
+Description=cc-autopilot — 任务看板自动督促(空闲提醒 + 定时继续)
+After=network.target
+
+[Service]
+Type=oneshot
+Environment=CC_AGENTS_PATH=/root/.local/bin/cc-agents-filtered
+ExecStart=/root/.local/bin/cc-autopilot

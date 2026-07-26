@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+# cc-autopilot — 任务看板"自动驾驶":给开了开关的 agent 自动督促。
+#   两个独立的、每 agent 单独开关(配置 ~/.cloud-status/cockpit-autopilot.json):
+#     idleNudge      空闲提醒:agent 空闲【且频道有未完成待办】→ 提醒它把待办做完(每个空闲周期最多1次)
+#     hourlyContinue 定时继续:每 ≥1h 发一次"继续"(【不依赖待办】,专治卡住但状态非空闲);
+#                    continueSmartSkip=true 时,这一小时内有活动(在干活)则跳过、不打扰
+#   由 cc-autopilot.timer 每 5min 跑一次。发督促 = tmux send-keys(带明确前缀,让 agent 知道是自动督促非真人)。
+import json, os, time, subprocess
+
+HOME = os.path.expanduser("~")
+CFG   = f"{HOME}/.cloud-status/cockpit-autopilot.json"        # 每 agent 开关(座舱UI写 / 也可手改)
+TODOS = f"{HOME}/.cloud-status/cockpit-todos.json"            # 待办(座舱任务看板)
+STATE = f"{HOME}/.cloud-status/cockpit-autopilot-state.json"  # 上次督促时间 / 空闲周期标记
+CC_AGENTS = os.environ.get("CC_AGENTS_PATH", f"{HOME}/.local/bin/cc-agents")
+HOUR = 3600
+
+def load(p, d):
+    try: return json.load(open(p))
+    except Exception: return d
+
+def save(p, o):
+    try:
+        tmp = p + ".tmp"; json.dump(o, open(tmp, "w"), ensure_ascii=False, indent=2); os.replace(tmp, p)
+    except Exception: pass
+
+def tmux_alive(name):
+    return subprocess.run(["tmux", "has-session", "-t", name], capture_output=True).returncode == 0
+
+def send(name, text):
+    # 模拟"用户输入"发督促;前缀标明是自动督促,agent 不会误当真人对话
+    subprocess.run(["tmux", "send-keys", "-t", name, text, "Enter"], capture_output=True)
+
+def channel_pending(agent_dir, todos):
+    """找这个 agent 频道的【未完成】待办文本。todos 按频道名(≈项目名/目录叶子)存;
+    用宽松匹配:频道名==dir 叶子,或频道名是 dir 的某个路径段。"""
+    comps = [c for c in agent_dir.split("/") if c]
+    leaf = comps[-1] if comps else ""
+    out = []
+    for chan, items in (todos or {}).items():
+        if chan == leaf or chan in comps:
+            for t in (items or []):
+                if isinstance(t, dict) and t.get("status") != "done" and t.get("text"):
+                    out.append(t["text"])
+    return out
+
+def main():
+    cfg = load(CFG, {})
+    active = {n: c for n, c in cfg.items()
+              if isinstance(c, dict) and (c.get("idleNudge") or c.get("hourlyContinue"))}
+    if not active:
+        return
+    todos = load(TODOS, {})
+    state = load(STATE, {})
+    now = time.time()
+    try:
+        j = json.loads(subprocess.check_output([CC_AGENTS, "--json"], text=True, timeout=15))
+    except Exception:
+        return
+    agents = {a["name"]: a for a in j.get("agents", [])}
+
+    for name, c in active.items():
+        a = agents.get(name)
+        if not a or not tmux_alive(name):
+            continue
+        att = a.get("attention", "")
+        last_ts = a.get("last_ts", 0) or 0
+        st = state.setdefault(name, {})
+
+        # === 定时继续(不依赖待办)===
+        if c.get("hourlyContinue"):
+            if now - st.get("lastContinue", 0) >= HOUR:
+                skip = bool(c.get("continueSmartSkip", True)) and last_ts and (now - last_ts < HOUR)
+                if not skip:
+                    send(name, "[任务看板·定时督促] 继续。若卡住了先排查再推进;手头没任务就去座舱任务看板看有没有待办,干完记得更新任务状态。")
+                    st["lastContinue"] = now
+
+        # === 空闲提醒(要有未完成待办)===
+        if c.get("idleNudge") and att in ("idle", "ended"):
+            pending = channel_pending(a.get("dir", ""), todos)
+            if pending and st.get("lastNudgeIdleTs") != last_ts:  # 每个空闲周期(last_ts 不变)只提醒1次
+                lst = "; ".join(pending[:5])
+                more = f"(还有{len(pending)-5}条)" if len(pending) > 5 else ""
+                send(name, f"[任务看板·空闲提醒] 你现在空闲,还有待办没做:{lst}{more}。请继续做完,干完在座舱任务看板勾掉/更新状态。")
+                st["lastNudgeIdleTs"] = last_ts
+                st["lastNudge"] = now
+
+    save(STATE, state)
+
+if __name__ == "__main__":
+    main()

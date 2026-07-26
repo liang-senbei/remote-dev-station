@@ -46,9 +46,11 @@ cmp -s claude-config/settings.client.json ~/.claude/settings.json && sed -i "s#/
 
 echo "[5/7] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
 cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-watchdog.timer /etc/systemd/system/
+cp systemd/cc-autopilot.service systemd/cc-autopilot.timer /etc/systemd/system/   # 任务看板自动督促(空闲提醒/定时继续),空配置=不动作,安全常驻
 # (极简 CLI 版不带手机 Moshi:如需再手动 cp systemd/moshi-hook*.service 并按 phone/README.md 配对)
 systemctl daemon-reload
 systemctl enable --now cloud-sessions.service cloud-watchdog.timer   # --now:装完即起,不必等重启(否则核心体检当场红)
+systemctl enable --now cc-autopilot.timer 2>/dev/null || true        # 每5min 跑 cc-autopilot;没在座舱开任何自动驾驶开关时它静默退出、不会乱发
 systemctl enable --now fail2ban 2>/dev/null || true                  # SSH 防爆破,cloud_infra_check 的核心项
 # 把会话模型写进两处关键位置(默认 claude-opus-4-8[1m];客户 CLOUD_MODEL=... 重跑即换成自己账号可用的)
 sed -i "s#^CLOUD_MODEL=\"[^\"]*\"#CLOUD_MODEL=\"$MODEL\"#" ~/.bashrc 2>/dev/null || true                                                   # 交互新建会话

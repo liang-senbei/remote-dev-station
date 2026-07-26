@@ -1,0 +1,10 @@
+[Unit]
+Description=每5分钟跑一次 cc-autopilot(自动督促)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

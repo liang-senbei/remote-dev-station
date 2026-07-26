@@ -12,9 +12,15 @@
 
 ## 2. 进度
 
-- **已完成**：会话韧性层(tmux+watchdog)、hub 通讯、反向通道(dfhz/mac/lap)、OOM 硬化(earlyoom+swap+swappiness)、cc 座舱扩展(另仓 cc-cockpit)、noVNC/TigerVNC 桌面层、cli-deploy 极简版、CLAUDE.md 第5章建档纪律。
+- **已完成**：会话韧性层(tmux+watchdog)、hub 通讯、反向通道(dfhz/mac/lap)、OOM 硬化(earlyoom+swap+swappiness)、cc 座舱扩展(另仓 cc-cockpit)、noVNC/TigerVNC 桌面层、cli-deploy 极简版、CLAUDE.md 第5章建档纪律、**任务看板自动督促引擎 `cc-autopilot`(bin/ + systemd,配合座舱 v0.4.19 的开关UI)**。
 - **进行中**：无(系统稳定运行)。
 - **待办**：无硬待办。潜在优化见 TROUBLESHOOTING.md 里标注的坑。
+
+### cc-autopilot（任务看板自动督促）速览
+- **引擎**：`bin/cc-autopilot`(Python 守护) + `systemd/cc-autopilot.{service,timer}`(每 5min)。**独立于 VS Code,24h 生效**。
+- **配置接口**：`~/.cloud-status/cockpit-autopilot.json`（座舱 UI 写,引擎读）。每 agent `{idleNudge, hourlyContinue, continueSmartSkip}`。空配置=不动作。
+- **两个行为**：idleNudge=空闲【且频道有待办】时提醒(每空闲周期1次);hourlyContinue=每 ≥1h 发"继续"(【不依赖待办】,治卡住;continueSmartSkip=在干活则跳过)。
+- **发督促**=tmux send-keys(带"[任务看板·…]"前缀,agent 知道是自动督促非真人)。UI 侧在 cc-cockpit 仓 v0.4.19。
 
 ## 3. 读写信息在哪
 
