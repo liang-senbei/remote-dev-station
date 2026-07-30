@@ -44,3 +44,10 @@
 - **症状**：内存一紧张,agent(claude 会话)就掉线,像随机掉。
 - **根因**：`oom/earlyoom.default` 里 `--prefer ^claude$`——内存紧张时 earlyoom **专挑 claude 杀**(为保住机器,拿 agent 当牺牲品)。掉线不是随机是被主动杀的。
 - **修法**：配合"闲 agent 睡 swap"策略:swappiness 调 80 + swap 够大 + earlyoom `-s` 从 100 降到 5(只在 RAM 和 swap 都见底才动手,让内核先把闲 agent 换页进 swap)。被杀的会话 watchdog 会 `--resume` 拉回,uuid 在 `~/.cloud-sessions/<name>.json`。
+
+## cc 座舱点「打开」开成 untitled / 不 resume —— cc-agents 没输出 jsonl（**头号老坑**）
+
+- **症状**：cc-cockpit 里点某 agent 的「打开」,官方 Claude 插件开出**空白 / untitled**,不 resume 那个 agent 的会话。反复出现、修了好几版都没根治。
+- **根因**：官方插件 `editor.open(uuid)` 只在**当前窗口 root 的 project 目录**(`~/.claude/projects/<编码路径>/`)里按 uuid 找会话;cc-cockpit 靠 `ensureSessionLinks` 把会话文件软链进那个目录来补救。但建软链要 agent 的真 `jsonl` 路径(代码读 `a.jsonl`),而 **`cc-agents --json` 从来不输出 `jsonl` 字段** → `a.jsonl` 恒为 undefined → `ensureSessionLinks` 对每个 agent 都 `continue`、**一个软链都不建** → `editor.open` 找不到 → untitled。cc-cockpit v0.4.17 只在**接收端**补了 `jsonl` 透传(`model.ts`),**源头 cc-agents 不产出 → 管子里没水**,自上线起从没真正工作过(全靠手动链)。
+- **修法**：`bin/cc-agents` 输出 dict 加一行 `"jsonl": jl` —— `jl = jsonl_by_uuid(uuid)` 早就算出来了(拿去读 task/cost),只是没塞进 JSON。改完 `install -m755 bin/cc-agents ~/.local/bin/`。cc-cockpit ≥0.4.17 本就消费它 → 座舱下一轮轮询(3s)自动建软链,「打开」即 resume,**不用重打 .vsix / 不用 reload**。`cc-agents-filtered` 是整对象透传,自动带上。
+- **易漏 / 验证**：① **只改接收端(cc-cockpit)不改源头(cc-agents)是空修** —— 两头字段必须都在。② `encProj`(cc-cockpit 把 root 路径的 `/ _ .` 都换 `-`)必须和官方 project 目录编码**一致**(实测一致:`auto_register`→`-…-auto-register`);编码错则软链进错目录、照样 untitled。③ 验证:`cc-agents --json | grep -c jsonl` >0 且路径文件存在;座舱活跃后 `find ~/.claude/projects -maxdepth 2 -type l -name '*.jsonl'` 应出现软链(修复前恒为 0)。④ 无 uuid 的裸会话没有可 resume 的 jsonl,「打开」仍无效属正常(只能 Attach 终端)。

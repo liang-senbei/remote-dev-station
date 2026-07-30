@@ -254,6 +254,7 @@ def build():
             "tab": tab, "cat_num": cnum, "cat_name": cname,
             "task": task, "last_ts": last_ts, "last_rel": rel(now-last_ts) if last_ts else "-",
             "tokens_today": toks, "cost_today_usd": round(usd, 2),
+            "jsonl": jl,   # 真会话文件路径(jsonl_by_uuid 已算出);cc-cockpit 靠它把会话软链进当前窗口 project 目录,让「打开」能 resume——不给则 ensureSessionLinks 跳过、「打开」开成 untitled
         })
     save_cache(cache)
     # 先按分类(WaveTerm标签页)分组,组内按"需要你"排序
