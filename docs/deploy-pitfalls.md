@@ -260,3 +260,36 @@
 - **现象**:VS Code 反复弹「窗口意外终止(原因:"oom",代码 "-536870904")」,点重载又过一阵再犯;但 `journalctl -u earlyoom`/`dmesg` 里**没有** OOM 击杀记录。
 - **根因**:Remote-SSH 下真正跑插件的**扩展宿主(exthost)在服务器上**。两条常同时:①把整个 `~/src/workplace`(十几个仓)当一个多根工作区开,exthost 监视/索引所有文件,**实测单 exthost 2h 涨到 4.6G** 撞 Node 堆上限自崩;②断线重连留下的僵尸 exthost 按默认 **3h 宽限期**继续挂着(每个 0.5~2G),越堆越多。
 - **修法**(全服务器侧,详见 [vscode-remote-oom.md](vscode-remote-oom.md)):① Machine settings 铺 `files.watcherExclude`/`search.exclude` 排除 node_modules/.venv/.git 等重目录(模板 [`../vscode-server/machine-settings.template.json`](../vscode-server/machine-settings.template.json));② `~/.vscode-server/server-env-setup` 设 `VSCODE_RECONNECTION_GRACE_TIME=480000`(3h→8min)缩短僵尸存活;③ **两者只在 vscode-server 完整重启时生效**——`F1 → Kill VS Code Server on Host` 重连,或服务器侧按 PID 杀(**别 `pkill -f vscode-server`,会匹配自己命令行自杀 exit 144**);④ 应急:`ps -eo pid,rss,args|grep type=extensionHost|sort -k2 -rn|head` 揪最肥的单杀。⑤ 治本:别一次开整个 workplace,只开当下项目文件夹。
+
+### ★VS Code Remote-SSH 卡死/终端加载不出:国内客户↔海外服务器,链路劣化 VS Code 扛不住(2026-07-30 客户 86.53.110.95 实测,折腾最久的一个)
+- **现象**:客户 VS Code Remote-SSH 能"连上"(窗口开出来),但**终端加载不出、cc 座舱奇慢、反复掉线重连**;偏偏客户用**命令行 `ssh` 进去 + `cloudgo` 却很流畅**。客户试遍了:关代理、给 tailnet 加绕过、改走公网 —— 还是卡。极其迷惑,像"服务器/插件坏了"。
+- **根因**:客户 Mac 在国内、服务器在海外,**这条直连链路又慢又丢包**。服务器侧 `ss -tni '( sport = :22 )'` 实测:**RTT ~300ms、retrans 10-15% 丢包、拥塞窗口 cwnd 卡在 2**。`raw ssh` 是单向流、对抖动不敏感,能忍;但 **VS Code Remote-SSH 的 exthost 协议一次连接几十个来回**,300ms×丢包 → `resolveAuthority` 花 10 秒(Mac 端日志 `[resolveAuthority] waiting... 10655ms`)、反复 `[ExtensionHostConnection] The client has reconnected.`、终端/座舱起不来。**根子是网络质量,不是服务器(实测 load 0.0、内存充足)、不是插件、不是密码。**
+- **诊断手法(直接上客户 Mac 查,别猜)**:反向通道 ssh 进 Mac →
+  - `route -n get <服务器公网IP>` 看 `interface`:`utunX`(网关 `198.18.x`)=走进代理;`en0`=还是物理直连;
+  - `ps -eo command | grep 'ssh .*cloud'` 看 VS Code 到底连的哪个 host;
+  - `time ssh -o BatchMode=yes <公网host> true` 实测建连耗时(**烂直连实测 26 秒,进代理后 1.6 秒**);
+  - `scutil --proxy` 看系统代理开没开、`ifconfig | grep utun` 看有没有代理的 TUN 接口。
+- **修法(把 SSH 甩进代理的优化线路,下面 4 个条件必须同时满足,缺一个都白搭 —— 这就是折腾这么久的原因)**:
+  1. **代理开 TUN 模式** —— 系统代理模式**抓不住 SSH**(ssh 不认 HTTP/SOCKS 系统代理,直接走物理网卡 en0),只有 TUN 在网络层能把 SSH 捕获进代理。判据:`route -n get <公网IP>` 的 interface 变成 `utunX`。⚠️ 有些客户端(Clash Verge 等)TUN 开关是绿的但**没装 service/helper 就不真捕获**(路由还在 en0),要点"安装服务"。
+  2. **代理切全局模式(Global)** —— 规则模式下服务器公网 IP 常命中 DIRECT 规则(GEOIP/final DIRECT),被判直连绕开代理。实测:仅开 TUN 还不够,`route get` 仍是 en0;**一切全局,立刻变 utun13、建连 26s→1.6s**。
+  3. **VS Code 连公网 IP,别连 tailnet** —— tailnet IP(`100.x`)被 **tailscale 自己的 utun 先截走**、直连服务器(恒 ~300ms),代理是网络层 TUN 也插不进去。**tailnet 这条无论如何加速不了**,只有公网 IP 代理才能提速。给客户的 `~/.ssh/config` 里放两条:`cloud`(公网)+ `cloud-tail`(tailnet),让他连 `cloud`。
+  4. **踢掉旧连接** —— 若 ssh config 配了 `ControlMaster`(连接复用,高延迟本是好事),它会把 VS Code **钉死在"修好之前"建的那条烂连接上**,前 3 步做对了也没用。Mac 上 `ssh -O exit cloud; ssh -O exit cloud-tail; rm -f ~/.ssh/cm-*`,再 VS Code `F1→Kill VS Code Server on Host`/关窗重开。
+- **保持不卡**:客户**别退全局模式**(退回规则模式,公网 IP 又被判直连、退回烂路);想用规则模式就在代理规则里给 `<公网IP>/32` 单加一条走节点。
+- **一句话(教客户)**:国内连海外、VS Code Remote-SSH 卡 → 代理开「TUN + 全局」+ 连公网别连 tailnet + 重连一次。缺一不可。**纯命令行 ssh/mosh 不受此坑影响,要丝滑敲命令用那个。**
+
+### 官方 Claude 插件被 Settings Sync 装成错平台(win32 装到 linux-x64 → "Unsupported platform")
+- **现象**:VS Code Remote-SSH 连上后,官方 Claude 插件的会话选择器**永远转「Loading sessions…」**、会话 resume 不了、停在 Untitled。cc 座舱点「打开」也白搭(它调的就是这个瘫痪的官方插件)。
+- **根因**:vscode-server 里装的 `anthropic.claude-code` 是**错平台构建**(实测装成了 `win32-arm64`:`resources/` 里只有 win 目录、没 linux 二进制)→ 插件每次处理请求报 `Error: Unsupported platform: linux-x64. No compatible Claude Code binary found.`(见 exthost 日志 `.../exthost*/Anthropic.claude-code/Claude VSCode.log`)。多半是**客户 Windows/Mac 端的 Settings Sync 把本机平台的扩展同步到了 linux 远端**。**实测 2/2 客户都中(ser1582018705 + 86.53.110.95)。**
+- **修法**:用 vscode-server 的 code CLI 重装 linux-x64 版:
+  ```bash
+  CLI=$(ls ~/.vscode-server/bin/*/bin/code-server | head -1)
+  "$CLI" --uninstall-extension anthropic.claude-code
+  "$CLI" --install-extension anthropic.claude-code --force
+  ```
+  装完验:`resources/native-binary/claude` 应是 `ELF 64-bit ... x86-64`(`file` 看 / `--version` 能跑);`~/.vscode-server/extensions/extensions.json` 里 claude 的 `targetPlatform` 应是 `linux-x64`、目录带 `-linux-x64` 后缀。**客户端 reload window 才生效**(运行中的 exthost 还挂着旧的,不重载看不到变化)。
+- **防复发**:告诉客户**在远端关掉扩展的 Settings Sync**,否则下次连上又被推回错平台。
+
+### `~/.tmux.conf` 是 Windows 换行(CRLF)→ tmux 刷一堆"值无效"
+- **现象**:`cloudgo`/起会话时刷 `~/.tmux.conf:N: bad value: off` / `unknown value: on` / `value is invalid: 0`(报错的行全是带值的行 1/3/6/7/8/9);会话其实能起(tmux 跳过坏行继续)。
+- **根因**:`~/.tmux.conf` 是 **Windows CRLF 换行**(`file` 报 "with CRLF line terminators"),每行选项值尾多个 `\r` → tmux 把值读成 `off\r`/`on\r`/`latest\r`/`0\r`,判无效。多半是**部署经手了 Windows**(git autocrlf、Windows 编辑器、或经 Windows 中转拷贝)。
+- **修法**:`tr -d '\r' < ~/.tmux.conf > /tmp/t && mv /tmp/t ~/.tmux.conf`(或 `dos2unix`)。**顺手扫其它部署文件**:`for f in ~/.bashrc ~/.local/bin/* /usr/local/bin/cloud-* ~/.claude/settings.json; do [ -f "$f" ] && file "$f" | grep -q CRLF && echo "CRLF: $f"; done`。⚠️ **配置文件 CRLF 只是刷警告不致命;但 SCRIPT(带 `#!` shebang)若 CRLF 会 `bad interpreter: no such file` 直接跑不了**——那是硬故障,必须一并清。(86.53.110.95 实测:只 `.tmux.conf` 中招,脚本都是 LF,万幸。)
