@@ -1,0 +1,44 @@
+#!/bin/bash
+# cloudgo 预览:活会话→tmux 截屏;离线可恢复会话→读其对话 .jsonl 末尾几条消息(看清是哪个对话)。
+name="${1:-}"
+case "$name" in ""|"➕"*|"⟳"*) echo "(菜单项 / 选具体会话看预览)"; exit 0;; esac
+if tmux has-session -t "$name" 2>/dev/null; then
+  echo "🟢 在跑 · 当前屏幕:"; echo "────────────────────────"
+  tmux capture-pane -ep -t "$name" 2>/dev/null | tail -n 60
+  exit 0
+fi
+# 离线 → 解析 dir+uuid,读 jsonl 末尾
+res=$(cc-sessions resolve "$name" 2>/dev/null)
+dir="${res%%$'\t'*}"; uuid="${res##*$'\t'}"
+if [ -n "$uuid" ] && [ "$dir" != "$uuid" ]; then
+  jl=$(ls ~/.claude/projects/*/"$uuid".jsonl 2>/dev/null | head -1)
+  echo "⏸ 离线 · ↵ 连名接回原对话"
+  echo "📁 $dir"
+  echo "──────── 这个对话最近聊了啥 ────────"
+  if [ -n "$jl" ]; then
+    python3 - "$jl" <<'PY'
+import sys, json
+rows = []
+for line in open(sys.argv[1], errors="ignore"):
+    try: o = json.loads(line)
+    except Exception: continue
+    m = o.get("message") or {}
+    role = m.get("role") or o.get("type", "")
+    c = m.get("content")
+    txt = ""
+    if isinstance(c, str): txt = c
+    elif isinstance(c, list):
+        for p in c:
+            if isinstance(p, dict) and p.get("type") == "text": txt += p.get("text", "")
+    if txt.strip(): rows.append((role, " ".join(txt.split())))
+tag = {"user": "你", "assistant": "AI"}
+for role, txt in rows[-7:]:
+    print(f"[{tag.get(role, role)}] {txt[:150]}")
+if not rows: print("(对话存档暂无文本内容)")
+PY
+  else
+    echo "(找不到对话存档文件)"
+  fi
+else
+  echo "(无预览 / 无登记)"
+fi

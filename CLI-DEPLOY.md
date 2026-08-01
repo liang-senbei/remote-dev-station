@@ -1,10 +1,10 @@
 # CLI-DEPLOY —— 极简终端版部署(无 Wave)
 
-这一分支是 **纯终端** 版:客户端只用 **SSH**,不装 Wave、不配 widget、无 cloudgo 选单。
+这一分支是 **纯终端** 版:客户端只用 **SSH**,不装 Wave、不配 widget。会话入口 `cloudgo`(fzf 选单)仍在——服务器侧 bash 函数,在终端里敲即用,纯 SSH 也能用。
 进 Claude 两步:**`ssh cloud`** 连上 → 敲 **`claude`** 开始(和本地 Claude Code 一样;断线重连再敲 `claude` 接回同一会话)。
 
 保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**(noVNC 登录桌面**必装**)。
-砍掉的:Wave GUI deck、cloudgo 选单(换成"cd 目录 + 敲 claude"的受管会话)、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。
+砍掉的:Wave GUI deck、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。**保留** `cloudgo` 会话选单(服务器侧函数,纯 SSH 也能用),外加"cd 目录 + 敲 claude"这条更直接的路。
 
 > **怎么做到"敲 claude 就像本地一样"**:服务器 bashrc 把 `claude` 包成一个函数 → 调 `cloud-enter`,
 > 自动带 `IS_SANDBOX=1`(绕 root 沙盒)进/按 uuid 恢复**当前目录对应**的受管 tmux 会话(`/opt/workspace/foo` → `cc-foo`)。
@@ -101,7 +101,7 @@ install.sh 已把 noVNC 桌面必装。让客户完成登录:
 
 | | 极简 CLI 版(本分支) | 全功能版(main) |
 |---|---|---|
-| 客户端 | `ssh cloud`,零配置(无 cloudgo 选单) | Wave GUI deck |
+| 客户端 | `ssh cloud`,零配置;终端内 `cloudgo` 选单可用 | Wave GUI deck(侧栏「会话」=`cloudgo`) |
 | noVNC 登录桌面 | **必装**(登录用) | 必装 |
 | 看板/额度(:8088) | 默认无(`CLOUD_DESKTOP=1` 可开) | 有 |
 | 登录 | noVNC 公网登录页(`claude-login-url`) | noVNC GUI |
