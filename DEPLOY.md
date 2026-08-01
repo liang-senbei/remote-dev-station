@@ -41,7 +41,7 @@
 - ⚠️ **origin 换成你自己的**:给这台机器建一份仓(fork 或新建),别长期依赖别人的 origin。
 - ✅ **会话恢复(cc-state 钩子)装完即接线**:install.sh 若 `~/.claude/settings.json` **不存在**,会自动铺干净模板 [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions);**已有 settings.json 则不覆盖** → 需手动把该模板的 cc-state hooks 合并进去(否则会话恢复静默失效;`cloud_infra_check.sh` 会探这一项)。⚠️ `claude-config/settings.json` 是一份**较完整的示例配置**(除 cc-state 外还挂了 statusline / hub-gate / typecheck / 铃铛 等钩子,均指向 `~/.claude/` 下随本仓安装的脚本);按需取用即可——某个脚本你没放就删掉对应钩子(否则每次事件报错)。想最省心就用上面那份最小模板 `settings.client.json`(只有 cc-state 钩子)。
 
-- 🚦 **hub 闸门(跨会话发消息前人工确认)要单独接线**:`install.sh` 只铺最小模板、**不装 `hooks/`**,
+- 🚦 **hub 闸门(跨会话发消息前人工确认)—— 可选,默认别开**:`install.sh` 只铺最小模板、**不装 `hooks/`**,
   所以 `hub/来源与说明.md` 里那条「`hub say`/`ask`/`all` 发送前必须人工确认」的硬规则
   **默认是不生效的**(2026-08-01 在自用服务器上核实:`~/.claude/hooks/` 根本不存在,一道拦截都没有)。
   要让它落地,装完跑一次:
@@ -56,8 +56,10 @@
   改前自动备份到 `settings.json.bak-hubgate`,幂等可重复跑。
   ⚠️ 装完**只对新起的会话生效** —— Claude Code 不热重载 settings.json(实测:文件被替换后它
   只用 `O_PATH` 重建 inotify 监听,从不重读内容)。已经在跑的 agent 得重启才受管。
-  ⚠️ 生效后 agent 之间发消息会**弹确认等人点**,自动化流程会被打断 —— 这正是该规则的用意
-  (防 AI 自作主张给别的会话发消息搞乱上下文);不想要就别跑这个脚本。
+  ⚠️ **生效后 agent 之间每发一条消息都要等人点确认,多 agent 协作会被拖死** —— 自用这台
+  常年并行 20+ 个会话、彼此高频对接,启用当天即回退。**除非你的场景是"会话很少、更怕 AI
+  乱发消息",否则别开。** 关掉:`python3 claude-config/disable-hub-gate.py`(同样只增删自己
+  那两项,不碰 env / 模型 / cc-state 钩子)。
 - **验证**:`cloudgo` 能列会话;`systemctl is-active cloud-watchdog.timer` = active;`bash cloud_infra_check.sh` **核心全绿**(可选层未装显示 ⏭ 属正常)。完整功能验收(含破坏性 selfheal 真测)在**阶段五**统一跑,这里别提前跑。
 
 ## 3. 阶段二 · 客户端(电脑)
