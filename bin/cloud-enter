@@ -9,11 +9,12 @@ dir="${CLOUD_DIR:-$PWD}"; case "$dir" in /|"") dir="$HOME";; esac   # 默认当�
 name="${CLOUD_SESSION:-cc-$(basename "$dir")}"        # 会话名按目录:/opt/workspace/foo → cc-foo(cc- 前缀 → cc-state 登记 → watchdog 可 --resume)
 # 会话模型:优先环境 → 取 ~/.bashrc 的 CLOUD_MODEL(与断电自愈同源) → 兜底
 CLOUD_MODEL="${CLOUD_MODEL:-$(sed -n 's/^CLOUD_MODEL="\([^"]*\)".*/\1/p' "$HOME/.bashrc" 2>/dev/null | head -1)}"
-CLOUD_MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"
+CLOUD_MODEL="${CLOUD_MODEL:-}"   # 留空 = 不传 --model,交给 settings.json 的 ANTHROPIC_MODEL(座舱配置页管的那个);想临时指定仍可 CLOUD_MODEL=xxx cloud-enter
+MODEL_ARG=""; [ -n "$CLOUD_MODEL" ] && MODEL_ARG="--model '$CLOUD_MODEL'"   # 命令行 --model 优先级高于 settings.json,所以为空时必须【整个参数都不出现】
 CLOUD_OPTS="${CLOUD_OPTS:---effort max}"
 
 # 已在 tmux 里 → 直接起 claude,不嵌套
-if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; export IS_SANDBOX=1; exec "$(type -P claude)" --model "$CLOUD_MODEL" $CLOUD_OPTS --dangerously-skip-permissions; fi
+if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; export IS_SANDBOX=1; exec "$(type -P claude)" ${CLOUD_MODEL:+--model "$CLOUD_MODEL"} $CLOUD_OPTS --dangerously-skip-permissions; fi
 
 # 在跑 → attach
 if tmux has-session -t "$name" 2>/dev/null; then exec env -u TMUX tmux attach -t "$name"; fi
@@ -21,9 +22,9 @@ if tmux has-session -t "$name" 2>/dev/null; then exec env -u TMUX tmux attach -t
 # 离线但有登记 → 连名带 uuid --resume(目录还在才 resume,防死循环)
 res=$(cc-sessions resolve "$name" 2>/dev/null); rdir="${res%%$'\t'*}"; uuid="${res##*$'\t'}"
 if [ -n "$uuid" ] && [ "$rdir" != "$uuid" ] && [ -d "$rdir" ]; then
-  exec env -u TMUX tmux new-session -s "$name" "cd '$rdir' && IS_SANDBOX=1 command claude --model '$CLOUD_MODEL' $CLOUD_OPTS --resume '$uuid' --dangerously-skip-permissions"
+  exec env -u TMUX tmux new-session -s "$name" "cd '$rdir' && IS_SANDBOX=1 command claude $MODEL_ARG $CLOUD_OPTS --resume '$uuid' --dangerously-skip-permissions"
 fi
 
 # 全新
 mkdir -p "$dir" 2>/dev/null
-exec env -u TMUX tmux new-session -s "$name" "cd '$dir' && IS_SANDBOX=1 command claude --model '$CLOUD_MODEL' $CLOUD_OPTS --dangerously-skip-permissions"
+exec env -u TMUX tmux new-session -s "$name" "cd '$dir' && IS_SANDBOX=1 command claude $MODEL_ARG $CLOUD_OPTS --dangerously-skip-permissions"

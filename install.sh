@@ -28,6 +28,7 @@ install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
 install -m755 bin/cloud-enter /usr/local/bin/     # 客户端 ssh 的 RemoteCommand 指它 → `ssh cloud` 直接进 claude;必须在 /usr/local/bin(非交互 PATH 无 ~/.local/bin)
+install -m755 bin/cc-new /usr/local/bin/        # 与 cloud-enter 同理:noVNC 桌面终端 / systemd 上下文的 PATH 不含 ~/.local/bin
 install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 桌面/看板层 service 的 ExecStart 指这里
 install -m755 bin/mosh-server-tmout /usr/local/bin/   # cloudconn 临时 mosh 会话用 --server=/usr/local/bin/mosh-server-tmout(关了自动销毁);极简 SSH 版用不到,留着不碍事
 install -m755 bin/gen-dashboard /usr/local/bin/                      # 项目看板首页生成器(gen-dashboard.service/timer 调它)

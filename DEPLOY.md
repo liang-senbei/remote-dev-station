@@ -38,6 +38,11 @@
 
 > **⚠️ 必改·会话模型(最要命)**:仓里默认 `CLOUD_MODEL` 可能不是**你账号可用的模型**,普通 Pro/Max 账号**大概率没有特殊模型** → 不改则客户端新建会话 + watchdog 断电自愈 `--resume` **全部启动即死**。装完**立刻**改成你账号可用的模型(如 `claude-opus-4-8[1m]` / `claude-sonnet-4-6`),**两处都改**:① `~/.bashrc` 的 `CLOUD_MODEL`(管交互新建会话);② `/etc/systemd/system/cloud-watchdog.service` 的 `Environment=CLOUD_MODEL=`(管断电自愈)→ 改后 `systemctl daemon-reload && systemctl restart cloud-watchdog.timer`。
 
+> 📌 **模型来源(2026-08-01 起)**:`CLOUD_MODEL` 默认**留空**,起会话时不传 `--model`,模型由 `~/.claude/settings.json` 的 `ANTHROPIC_MODEL` 决定 —— 也就是 cc 座舱「配置」页那个「默认兜底模型」。想改全局模型在座舱里改一处即可。
+>
+> 命令行 `--model` 优先级**高于** settings.json,所以只要 `CLOUD_MODEL` 非空,座舱里怎么配都不生效。曾经它被写死成 `claude-opus-4-8[1m]` 且散落在 6 处(.bashrc 声明 + .bashrc 里 5 处函数、cloud-enter、cc-new、cloud-watchdog、cloud-watchdog.service、**以及 tmux server 的全局环境**),改漏任何一处都会继续生效 —— 尤其最后那条最阴:tmux server 启动时把当时的 `CLOUD_MODEL` 存进了全局环境,新建会话会继承它,光改 `.bashrc` 完全没用,得 `tmux set-environment -gu CLOUD_MODEL` 才清得掉。
+
+
 - ⚠️ **origin 换成你自己的**:给这台机器建一份仓(fork 或新建),别长期依赖别人的 origin。
 - ✅ **会话恢复(cc-state 钩子)装完即接线**:install.sh 若 `~/.claude/settings.json` **不存在**,会自动铺干净模板 [`claude-config/settings.client.json`](claude-config/settings.client.json)(只含 cc-state 钩子 + skip-permissions);**已有 settings.json 则不覆盖** → 需手动把该模板的 cc-state hooks 合并进去(否则会话恢复静默失效;`cloud_infra_check.sh` 会探这一项)。⚠️ `claude-config/settings.json` 是一份**较完整的示例配置**(除 cc-state 外还挂了 statusline / hub-gate / typecheck / 铃铛 等钩子,均指向 `~/.claude/` 下随本仓安装的脚本);按需取用即可——某个脚本你没放就删掉对应钩子(否则每次事件报错)。想最省心就用上面那份最小模板 `settings.client.json`(只有 cc-state 钩子)。
 

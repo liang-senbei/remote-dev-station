@@ -10,7 +10,10 @@ KillMode=process
 TimeoutStartSec=120
 Environment=HOME=/root
 Environment=PATH=/root/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment="CLOUD_MODEL=claude-opus-4-8[1m]"
+# CLOUD_MODEL 不再写死:留空则 watchdog 拉回会话时不传 --model,
+# 由 ~/.claude/settings.json 的 ANTHROPIC_MODEL 决定(cc 座舱「配置」页管的就是它)。
+# 要把自愈钉死在某个模型上,取消下面这行的注释即可。
+#Environment="CLOUD_MODEL=claude-opus-4-8[1m]"
 Environment="CLOUD_OPTS=--effort max"
 Environment=DISABLE_AUTOUPDATER=1
 ExecStart=/root/.local/bin/cloud-watchdog
