@@ -29,10 +29,22 @@ _sessions(){ tmux ls -F '#{session_name}' 2>/dev/null | grep "^${PREFIX}" || tru
 
 # 当前会话名(在某 cc 的 tmux 里跑 = 它；否则空 = 中控/普通 shell)
 _self_sess(){ [ -n "${TMUX:-}" ] && tmux display-message -p '#{session_name}' 2>/dev/null || true; }
-_self_label(){ local s; s="$(_self_sess)"; [ -n "$s" ] && echo "${s#$PREFIX}" || echo "中控"; }
+# HUB_SELF:显式声明「我是谁」,覆盖上面的 tmux 自动判定。
+#   给【不在本机 tmux 里】的参与者用 —— 典型是你笔记本上的 Claude Code:它经 ssh 调本机 hub,
+#   $TMUX 为空会被标成「中控」,于是 ask 生成的回信命令是 `hub say 中控`,而没有 cc-中控 会话
+#   → 对方回不过来。声明 HUB_SELF=local 后 preamble 变成 cc:local,回信落进 cc-local 会话
+#   (那是它的信箱,见 hub-inbox),闭环成立。本机 tmux 里的 agent 不设此变量,行为完全不变。
+_self_label(){
+  [ -n "${HUB_SELF:-}" ] && { printf '%s' "${HUB_SELF#$PREFIX}"; return; }
+  local s; s="$(_self_sess)"; [ -n "$s" ] && echo "${s#$PREFIX}" || echo "中控"
+}
 # 当前会话(发送方)的工作目录:cc 里跑 = 它的项目路径;否则 = 当前 shell 的 PWD(中控)。
 # 用于把「来源项目路径」写进 preamble,便于多 agent / 多项目并行协作时定位与回复来源。
-_self_path(){ [ -n "${TMUX:-}" ] && tmux display-message -p '#{pane_current_path}' 2>/dev/null || printf '%s' "${PWD:-?}"; }
+# HUB_SELF_PATH 同理:远程参与者用它报自己那边的真实路径(否则报的是 ssh 落地的 $PWD)。
+_self_path(){
+  [ -n "${HUB_SELF_PATH:-}" ] && { printf '%s' "$HUB_SELF_PATH"; return; }
+  [ -n "${TMUX:-}" ] && tmux display-message -p '#{pane_current_path}' 2>/dev/null || printf '%s' "${PWD:-?}"
+}
 
 # 片段 → 唯一 cc-* 会话名(打到 stdout)；失败打错误到 stderr 并返回非 0
 _resolve(){

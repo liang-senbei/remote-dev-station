@@ -1,0 +1,14 @@
+[Unit]
+# 每 2 分钟对账一次:信箱会话若被误杀 / 服务器刚起来,自动补上。
+# 比照 cloud-watchdog.timer 的做法,但这里没有 OOM 风险(信箱是个极轻的 bash 循环)。
+Description=定期确保 hub 信箱 cc-%i 活着
+Documentation=https://github.com/liang-senbei/agent-hub
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=2min
+AccuracySec=30s
+Unit=hub-inbox@%i.service
+
+[Install]
+WantedBy=timers.target

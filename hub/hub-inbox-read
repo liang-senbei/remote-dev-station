@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# =====================================================================
+# hub-inbox-read —— 取走 hub 信箱里的消息(给远程 agent 用)。
+# ---------------------------------------------------------------------
+# 默认只吐【未读】的,读完把游标推到末尾 —— 这样远程 agent 每次拿到的都是增量,
+# 不用自己记看到哪了。游标存 ~/.hub/inbox-<名>.cursor(就是个行号)。
+#
+# 用法:
+#   hub-inbox-read [名字]           只看未读(读完标记已读)  ← 默认
+#   hub-inbox-read [名字] --peek    只看未读但【不】推游标(偷看,下次还在)
+#   hub-inbox-read [名字] --all     看全部历史(不动游标)
+#   hub-inbox-read [名字] --json    未读的原始 jsonl(给程序解析用)
+#   hub-inbox-read [名字] --count   只报未读条数
+# =====================================================================
+set -u
+
+NAME="local"; MODE="new"
+for a in "$@"; do
+  case "$a" in
+    --peek)  MODE="peek" ;;
+    --all)   MODE="all" ;;
+    --json)  MODE="json" ;;
+    --count) MODE="count" ;;
+    -*)      echo "未知选项: $a" >&2; exit 2 ;;
+    *)       NAME="${a#cc-}" ;;
+  esac
+done
+
+DIR="$HOME/.hub"
+INBOX="$DIR/inbox-${NAME}.jsonl"
+CURSOR="$DIR/inbox-${NAME}.cursor"
+
+[ -f "$INBOX" ] || { echo "(信箱 cc-${NAME} 还没建过 —— 服务器上跑: tmux new-session -d -s cc-${NAME} 'hub-inbox ${NAME}')"; exit 0; }
+
+total="$(wc -l < "$INBOX" | tr -d ' ')"
+read -r seen 2>/dev/null < "$CURSOR" || seen=0
+case "$seen" in ''|*[!0-9]*) seen=0 ;; esac
+[ "$seen" -gt "$total" ] && seen=0          # 信箱被清空/轮转过 → 游标回零,别漏读
+
+case "$MODE" in
+  count) echo "$((total - seen))"; exit 0 ;;
+  all)   start=0 ;;
+  *)     start="$seen" ;;
+esac
+
+n=$((total - start))
+if [ "$MODE" != "all" ] && [ "$n" -le 0 ]; then
+  echo "(没有新消息;历史共 $total 条,看全部用 --all)"
+  exit 0
+fi
+
+if [ "$MODE" = "json" ]; then
+  tail -n +"$((start + 1))" "$INBOX"
+else
+  # 渲染成人/agent 都好读的样子。用 python3 解 json,免得消息里的引号把 shell 搞乱。
+  # 注意:f-string 里【不要】写 \" 转义 —— Python 3.12 之前不允许,会 SyntaxError 后
+  # 静默回退到原始 jsonl(踩过)。先把值取到变量再插值。
+  tail -n +"$((start + 1))" "$INBOX" | python3 -c '
+import json, sys
+for i, line in enumerate(sys.stdin, 1):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        o = json.loads(line)
+    except Exception:
+        print("  [解析失败] " + line)
+        continue
+    ts = o.get("ts", "")[:19].replace("T", " ")
+    msg = o.get("msg", "")
+    print("")
+    print("[%d] %s" % (i, ts))
+    print(msg)
+' || tail -n +"$((start + 1))" "$INBOX"
+  echo
+  if [ "$MODE" = "all" ]; then
+    echo "── 以上为全部 $total 条(未动已读游标)──"
+  else
+    echo "── 以上 $n 条新消息;历史共 $total 条 ──"
+  fi
+fi
+
+# 只有默认模式才推游标:peek/all/json 都不动,免得"看一眼"就把消息标成读过
+[ "$MODE" = "new" ] && printf '%s\n' "$total" > "$CURSOR"
+exit 0

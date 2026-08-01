@@ -1,0 +1,21 @@
+[Unit]
+# hub 信箱:给【不在本机 tmux 里】的参与者(如笔记本上的 Claude Code)当收件口。
+# 实例名 = 信箱名,例:systemctl enable --now hub-inbox@local
+# 它只是个 `while read` 的 bash,几乎不会自己挂;这个 unit 主要保证【服务器重启后自动回来】,
+# 配套的 hub-inbox@.timer 再兜一层(会话被误杀也能自动补起)。
+Description=hub 信箱 cc-%i —— 远程 agent 的收件口
+After=network.target
+Documentation=https://github.com/liang-senbei/agent-hub
+
+[Service]
+Type=oneshot
+# 【不要】加 RemainAfterExit=yes:那会让本 unit 跑完一次就停在 active,
+# 之后 timer 再触发时 systemd 认为"已经在运行"而跳过 → 会话被杀也补不回来(实测踩过)。
+# 不保持状态,每次触发都真跑一遍;ExecStart 本身是幂等的(has-session 先查)。
+User=root
+Environment=HOME=/root
+# 幂等:已在跑就什么都不做,不会把现有信箱顶掉(顶掉只是清屏,落盘的 jsonl 不受影响)
+ExecStart=/bin/bash -lc 'tmux has-session -t cc-%i 2>/dev/null || tmux new-session -d -s cc-%i "$HOME/.local/bin/hub-inbox %i"'
+
+[Install]
+WantedBy=multi-user.target

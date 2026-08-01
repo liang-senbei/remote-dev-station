@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# =====================================================================
+# hub-inbox —— 让【不在本机 tmux 里】的 agent 也能收 hub 消息。
+# ---------------------------------------------------------------------
+# 场景:你笔记本上的 Claude Code 想和服务器上这一堆 cc-* 互发消息。
+#   发出去容易(经 ssh 调 hub say,配 HUB_SELF=<名> 声明自己是谁);
+#   收进来难 —— hub 靠 `tmux send-keys` 投递,收件人必须是【本机的一个 tmux 会话】。
+#
+# 本脚本就是那个会话里跑的东西:占住 cc-<名> 这个会话名,把 send-keys 送来的每一行
+# 落盘成 jsonl,远端那个 agent 通过 ssh 读文件即可(见 hub-inbox-read)。
+#
+# 两个必须满足的细节:
+#   1. 屏幕上要留 `❯` —— hub 的 _ready() 护栏会 capture-pane 看最后几行有没有它,
+#      没有就判定「对方不在 Claude 输入框」而拒发。所以每收一条就重画一个 ❯ 提示符。
+#   2. `❯` 后面不能跟「数字.」—— 那会被 _ready() 当成选择/权限弹窗而拒发。
+#
+# 用法:
+#   hub-inbox [名字]            前台跑(名字默认 local),通常由下面这行拉起:
+#   tmux new-session -d -s cc-local 'hub-inbox local'
+# =====================================================================
+set -u
+
+NAME="${1:-local}"
+NAME="${NAME#cc-}"                                   # 传 cc-local 也认
+DIR="$HOME/.hub"
+INBOX="$DIR/inbox-${NAME}.jsonl"
+mkdir -p "$DIR"
+touch "$INBOX"
+
+# 用 python3 生成 JSON:消息里带引号/反斜杠/中文都不会把文件写坏(watchdog 也依赖 python3,必有)
+_append(){
+  python3 - "$INBOX" "$1" <<'PY' 2>/dev/null
+import json, sys, time
+path, msg = sys.argv[1], sys.argv[2]
+with open(path, "a", encoding="utf-8") as f:
+    f.write(json.dumps({"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "msg": msg}, ensure_ascii=False) + "\n")
+PY
+}
+
+_count(){ wc -l < "$INBOX" 2>/dev/null | tr -d ' '; }
+
+# 画一个仿 Claude Code 的输入框。
+#
+# 不是为了好看 —— hub 的 _ready() 护栏有两道:①末尾几行要有 `❯`;②同一段里还要能匹配到
+# 输入框特征 `⏵⏵|bypass permissions|────────|╭─|╰─`(用来挡住 starship 那类同样以 ❯ 作
+# 提示符的普通 shell)。只画 ❯ 不画框会被判「不在输入框」而拒发,实测踩过。
+_box(){
+  local w bar
+  w="$(tmux display-message -p '#{pane_width}' 2>/dev/null)"
+  case "$w" in ''|*[!0-9]*) w=72 ;; esac
+  [ "$w" -gt 76 ] && w=76
+  [ "$w" -lt 24 ] && w=24
+  bar=''
+  local i=0
+  while [ "$i" -lt "$((w - 2))" ]; do bar="${bar}─"; i=$((i + 1)); done
+  printf '╭%s╮\n' "$bar"
+  printf '│ ❯ %*s│\n' "$((w - 5))" ''
+  printf '╰%s╯\n' "$bar"
+  printf '  \033[2m⏵⏵ hub 信箱模式 · 收信自动落盘,等对方经 ssh 取走\033[0m\n'
+}
+BOX_LINES=4
+
+clear 2>/dev/null || true
+printf '\033[1m📬 hub 信箱 · cc-%s\033[0m\n' "$NAME"
+printf '\033[2m这不是真的 Claude —— 是【远程 agent】的收件口。收到的消息落盘,由对方经 ssh 取走。\033[0m\n'
+printf '\033[2m文件: %s   已存 %s 条\033[0m\n' "$INBOX" "$(_count)"
+printf '\033[2m给它发信: hub say %s "……"   ｜  对方取信: ssh <host> hub-inbox-read %s\033[0m\n' "$NAME" "$NAME"
+
+# 把输入框顶到屏幕【底部】—— 这步不能省:护栏只 capture-pane 看末尾几行,
+# 框若停在屏幕上方、下面净是空行,一样会被判「不在输入框」(实测踩过)。
+# 之后每收一条消息屏幕自然向上滚,框始终留在最后。
+_h="$(tmux display-message -p '#{pane_height}' 2>/dev/null)"
+case "$_h" in ''|*[!0-9]*) _h=24 ;; esac
+_i=4                                                  # 上面 header 占的行数
+while [ "$_i" -lt "$((_h - BOX_LINES))" ]; do printf '\n'; _i=$((_i + 1)); done
+
+_box
+while IFS= read -r line; do
+  if [ -z "$line" ]; then continue; fi
+  _append "$line"
+  printf '\n\033[2m[%s]\033[0m %s\n' "$(date +%H:%M:%S)" "$line"
+  printf '\033[32m  ✓ 已存(第 %s 条),等对方来取\033[0m\n' "$(_count)"
+  _box
+done
+
+# read 拿到 EOF(会话被 kill / pane 关闭)才会走到这
+printf '\n\033[31m信箱退出(stdin 关闭)。重开: tmux new-session -d -s cc-%s "hub-inbox %s"\033[0m\n' "$NAME" "$NAME"
