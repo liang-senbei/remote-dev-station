@@ -44,11 +44,40 @@ def decode_dir(encoded):
         idx = best[0] + 1; path = best[1]
     return path or "/"
 
+def cwd_from_jsonl(jl, limit=50):
+    """从会话存档头部读 cwd(Claude Code 每条记录都带),取第一个真实存在的目录。"""
+    try:
+        with open(jl, encoding="utf-8", errors="replace") as f:
+            for i, line in enumerate(f):
+                if i >= limit: break
+                try: o = json.loads(line)
+                except Exception: continue
+                c = o.get("cwd")
+                if c and os.path.isdir(c): return c
+    except Exception:
+        pass
+    return None
+
+def real_dir(r, jl):
+    """定位会话的真实工作目录:登记的 dir → 存档的 cwd → 才轮到按目录名反猜。
+
+    前两个是【记录下来的事实】,最后一个是启发式。decode_dir 猜不准:目录编码把
+    '/'、'_'、'.' 统统换成 '-',反解无法区分;匹配不到真目录时它会把剩余段用 '/'
+    拼起来,于是 damai_ticket 被猜成 damai/ticket(不存在)→ watchdog 那句
+    `if not os.path.isdir(realdir): continue` 静默跳过 → 该会话【永远】恢复不了。
+    实测 6 个待恢复里 5 个栽在这,而登记文件里的 dir 本来就是对的。
+    """
+    d = r.get("dir")
+    if d and os.path.isdir(d): return d
+    c = cwd_from_jsonl(jl)
+    if c: return c
+    return decode_dir(os.path.basename(os.path.dirname(jl)))
+
 def resolve(r):
     # -> (name, realdir, uuid) 若对话存档还在;否则 None
     uuid = r.get("uuid", ""); jl = jsonl_by_uuid(uuid)
     if not jl: return None
-    return (r["name"], decode_dir(os.path.basename(os.path.dirname(jl))), uuid)
+    return (r["name"], real_dir(r, jl), uuid)
 
 def live():
     try:
