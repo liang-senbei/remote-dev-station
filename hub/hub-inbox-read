@@ -30,7 +30,13 @@ DIR="$HOME/.hub"
 INBOX="$DIR/inbox-${NAME}.jsonl"
 CURSOR="$DIR/inbox-${NAME}.cursor"
 
-[ -f "$INBOX" ] || { echo "(信箱 cc-${NAME} 还没建过 —— 服务器上跑: tmux new-session -d -s cc-${NAME} 'hub-inbox ${NAME}')"; exit 0; }
+[ -f "$INBOX" ] || {
+  # --count / --json 是给程序消费的:没信箱就输出「空」的合法值,别塞人话进去
+  [ "$MODE" = "count" ] && { echo 0; exit 0; }
+  [ "$MODE" = "json" ] && exit 0
+  echo "(信箱 cc-${NAME} 还没收过消息 —— 若会话也不在,服务器上跑: tmux new-session -d -s cc-${NAME} 'hub-inbox ${NAME}')"
+  exit 0
+}
 
 total="$(wc -l < "$INBOX" | tr -d ' ')"
 read -r seen 2>/dev/null < "$CURSOR" || seen=0
