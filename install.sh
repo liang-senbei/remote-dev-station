@@ -42,7 +42,8 @@ grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.b
 mkdir -p ~/.claude
 [ -f ~/.claude/settings.json ] || cp claude-config/settings.client.json ~/.claude/settings.json   # 无则铺干净模板(接上 cc-state 自愈钩子,否则会话恢复静默失效);已有则不覆盖
 cmp -s claude-config/settings.client.json ~/.claude/settings.json && sed -i "s#/root/\.local/bin/cc-state#$HOME/.local/bin/cc-state#g" ~/.claude/settings.json || true   # 非 root 部署:刚铺的模板里 cc-state 钩子路径写死 /root,换成实际 $HOME(root 下无操作;仅当文件确为我们的模板才动,客户已有配置不碰)
-[ -f ~/.claude/CLAUDE.md ] || cp claude-config/CLAUDE.md ~/.claude/CLAUDE.md   # 让服务器上的 Claude 开工前就知道自己能力(hub 通讯 / 反向操作客户本机文件 / 桌面访问 / 会话管理);无则铺,已有不覆盖
+[ -f ~/.claude/CLAUDE.md ] || cp claude-config/CLAUDE.md ~/.claude/CLAUDE.md
+mkdir -p ~/.claude/hooks && for h in claude-config/hooks/*; do [ -f "$h" ] && [ ! -f ~/.claude/hooks/"$(basename "$h")" ] && install -m755 "$h" ~/.claude/hooks/; done   # 铺钩子脚本(已有的不覆盖)。注意:只放脚本、【不动 settings.json】——接线是显式动作,hub 闸门跑 `python3 claude-config/enable-hub-gate.py` 才生效(见 DEPLOY.md)   # 让服务器上的 Claude 开工前就知道自己能力(hub 通讯 / 反向操作客户本机文件 / 桌面访问 / 会话管理);无则铺,已有不覆盖
 
 echo "[5/7] 安装 systemd 服务（开机恢复 + 每 15s 自愈守护）"
 cp systemd/cloud-sessions.service systemd/cloud-watchdog.service systemd/cloud-watchdog.timer /etc/systemd/system/
