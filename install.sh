@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 # 前置护栏:本脚本假定 Debian/Ubuntu 系(apt)+ x86_64/arm64;可重复运行(各步幂等)
 command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);其它发行版请手动改下面的包管理部分。"; exit 1; }
 case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
-MODEL="${CLOUD_MODEL:-claude-opus-4-8[1m]}"   # 会话默认模型。客户跑 `CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh` 即全局用该模型(默认 claude-opus-4-8[1m]，通用；特殊模型如 fable-5 普通账号未必有)
+MODEL="${CLOUD_MODEL-}"   # 会话模型。【默认留空 = 不钉死】,交给座舱配置(~/.claude/settings.json 的 ANTHROPIC_MODEL)决定 —— 命令行 --model 优先级高于 settings.json,这里一非空,座舱里怎么配都不生效。只有要把全机会话钉死在某个模型上,才 `CLOUD_MODEL=xxx ./install.sh`。
 DESKTOP="${CLOUD_DESKTOP:-0}"   # noVNC(登录用)【必装】;此开关只控【看板/额度 :8088】等非登录 GUI:CLOUD_DESKTOP=1 才装。
 
 echo "== 极简 CLI 版部署 =="
@@ -54,9 +54,15 @@ systemctl daemon-reload
 systemctl enable --now cloud-sessions.service cloud-watchdog.timer   # --now:装完即起,不必等重启(否则核心体检当场红)
 systemctl enable --now cc-autopilot.timer 2>/dev/null || true        # 每5min 跑 cc-autopilot;没在座舱开任何自动驾驶开关时它静默退出、不会乱发
 systemctl enable --now fail2ban 2>/dev/null || true                  # SSH 防爆破,cloud_infra_check 的核心项
-# 把会话模型写进两处关键位置(默认 claude-opus-4-8[1m];客户 CLOUD_MODEL=... 重跑即换成自己账号可用的)
-sed -i "s#^CLOUD_MODEL=\"[^\"]*\"#CLOUD_MODEL=\"$MODEL\"#" ~/.bashrc 2>/dev/null || true                                                   # 交互新建会话
-sed -i "s#Environment=\"CLOUD_MODEL=[^\"]*\"#Environment=\"CLOUD_MODEL=$MODEL\"#" /etc/systemd/system/cloud-watchdog.service 2>/dev/null || true   # 断电自愈 --resume
+# 模型只在【显式指定 CLOUD_MODEL】时才钉死进两处关键位置;默认留空 = 两处都保持空,模型由座舱配置(settings.json 的 ANTHROPIC_MODEL)说了算。
+# ⚠️ 曾经这里无条件 sed 成 claude-opus-4-8[1m],把 bashrc-cloud-snippet.sh 里的空值又改回写死 —— 座舱配置页因此对新装的机器一律不生效(2026-08-03 在三台现网客户机实测坐实)。
+if [ -n "$MODEL" ]; then
+  sed -i "s#^CLOUD_MODEL=\"[^\"]*\"#CLOUD_MODEL=\"$MODEL\"#" ~/.bashrc 2>/dev/null || true                                                   # 交互新建会话
+  sed -i "s@^#\?Environment=\"CLOUD_MODEL=[^\"]*\"@Environment=\"CLOUD_MODEL=$MODEL\"@" /etc/systemd/system/cloud-watchdog.service 2>/dev/null || true   # 断电自愈 --resume;`#\?` 连注释态那行一起匹配并【取消注释】——否则只改到注释里的字样,watchdog 实际根本没拿到该模型
+  echo "  → 会话模型已钉死为 $MODEL(座舱配置页将不生效)"
+else
+  echo "  → 会话模型未钉死,由座舱配置(~/.claude/settings.json 的 ANTHROPIC_MODEL)决定"
+fi
 systemctl daemon-reload
 
 echo "[6/7] 防火墙基线（放行必要端口并启用）"
@@ -85,7 +91,8 @@ bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好�
 echo "完成。后续:① 服务器跑 claude-login-url 拿公网登录页链接发客户,完成 Claude 登录(登录后 pkill cloudflared);② 在【本机】跑 cli/cloud-connect.sh <服务器IP> 建免密,之后 ssh cloud 直接进 claude(反向加 --reverse);③ git 身份;④(可选)tailscale up。"
 if [ "$DESKTOP" = "1" ]; then echo "注:noVNC 登录桌面已装并起(novnc.service/:6080 tailnet-only);看板 :8088 已装。"
 else echo "注:noVNC 登录桌面已装并起(novnc.service/:6080 tailnet-only);看板 :8088 未装,CLOUD_DESKTOP=1 可加。"; fi
-[ "$MODEL" = "claude-opus-4-8[1m]" ] && echo "⚠️ 会话模型仍是默认 claude-opus-4-8[1m]（特殊模型、普通账号未必有）。客户账号若无此模型 → 新建会话/断电自愈会启动即死。改法:CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh 重跑,或手改后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
+if [ -n "$MODEL" ]; then echo "⚠️ 会话模型被钉死为 $MODEL —— 座舱配置页改模型将【不生效】(命令行 --model 优先级高于 settings.json)。客户账号若无此模型 → 新建会话/断电自愈启动即死。解开:把 ~/.bashrc 的 CLOUD_MODEL 改回空 + 注释掉 cloud-watchdog.service 里的 Environment=CLOUD_MODEL,然后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
+else echo "注:会话模型未钉死 —— 在座舱「配置」页设【默认兜底模型】(写进 ~/.claude/settings.json 的 ANTHROPIC_MODEL)即全局生效,改一处即可。"; fi   # 注意用 if 而非 `[ ] && echo`:后者条件不成立时返回 1,在 set -e 下会让脚本【就此退出】,后面的 shell 增强全装不上
 
 set +e   # 以下 shell 增强尽力而为,弱网失败也不影响已装好的核心(避免 set -e 让整脚本非零退出)
 # ---- Shell 增强 (fzf + starship + ble.sh) ----
