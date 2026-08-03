@@ -7,18 +7,18 @@ cd "$(dirname "$0")"
 command -v apt-get >/dev/null || { echo "❌ 需要 Debian/Ubuntu 系(apt-get);其它发行版请手动改下面的包管理部分。"; exit 1; }
 case "$(uname -m)" in x86_64|aarch64|arm64) ;; *) echo "⚠️ 未在 $(uname -m) 上验证过(设计针对 x86_64/arm64),继续风险自负。";; esac
 MODEL="${CLOUD_MODEL-}"   # 会话模型。【默认留空 = 不钉死】,交给座舱配置(~/.claude/settings.json 的 ANTHROPIC_MODEL)决定 —— 命令行 --model 优先级高于 settings.json,这里一非空,座舱里怎么配都不生效。只有要把全机会话钉死在某个模型上,才 `CLOUD_MODEL=xxx ./install.sh`。
-DESKTOP="${CLOUD_DESKTOP:-0}"   # noVNC(登录用)【必装】;此开关只控【看板/额度 :8088】等非登录 GUI:CLOUD_DESKTOP=1 才装。
+DESKTOP="${CLOUD_DESKTOP:-0}"   # TigerVNC 登录桌面【必装】,不受此开关控;此开关只控【看板/额度 :8088】等非登录 GUI:CLOUD_DESKTOP=1 才装。
 
 echo "== 极简 CLI 版部署 =="
 echo "   客户端只需 SSH:装完在本机跑 cli/cloud-connect.sh 即可(生成密钥→推公钥→ssh cloud 直接进 claude)。"
-echo "   登录:noVNC 必装;装完在服务器跑 claude-login-url 拿【公网登录页链接】发给客户,客户浏览器打开登录。CLOUD_DESKTOP=1 额外装看板(:8088)。"
+echo "   登录:TigerVNC 桌面必装;客户连 <公网IP>:5901 在服务器桌面的 Chrome 里登录,或跑 claude-login-url 拿【临时公网登录页链接】发给客户。CLOUD_DESKTOP=1 额外装看板(:8088)。"
 
 echo "[1/7] 安装依赖"
 apt-get update -y && apt-get install -y tmux mosh git curl ufw fail2ban python3   # python3:核心自愈(cloud-watchdog/cc-sessions/cc-state/hub)都是 python3,极简镜像可能没有
 
 echo "[2/7] 安装 Claude Code (native)"
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash
-ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude 2>/dev/null || true   # 软链到 /usr/local/bin:noVNC 桌面终端/systemd 上下文 PATH 不含 ~/.local/bin,不软链则桌面里敲 claude 报 command not found(exit127)
+ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude 2>/dev/null || true   # 软链到 /usr/local/bin:VNC 桌面终端/systemd 上下文 PATH 不含 ~/.local/bin,不软链则桌面里敲 claude 报 command not found(exit127)
 
 echo "[3/7] 部署脚本到 ~/.local/bin 和 /usr/local/bin"
 mkdir -p ~/.local/bin
@@ -28,8 +28,8 @@ install -m755 bin/* ~/.local/bin/
 install -m755 cc-state ~/.local/bin/
 install -m755 bin/cloud-boot.sh /usr/local/bin/   # cloud-sessions.service 的 ExecStart 指这里
 install -m755 bin/cloud-enter /usr/local/bin/     # 客户端 ssh 的 RemoteCommand 指它 → `ssh cloud` 直接进 claude;必须在 /usr/local/bin(非交互 PATH 无 ~/.local/bin)
-install -m755 bin/cc-new /usr/local/bin/        # 与 cloud-enter 同理:noVNC 桌面终端 / systemd 上下文的 PATH 不含 ~/.local/bin
-install -m755 bin/novnc-start.sh bin/cloud-dashboards.sh /usr/local/bin/   # 桌面/看板层 service 的 ExecStart 指这里
+install -m755 bin/cc-new /usr/local/bin/        # 与 cloud-enter 同理:VNC 桌面终端 / systemd 上下文的 PATH 不含 ~/.local/bin
+install -m755 bin/cloud-dashboards.sh /usr/local/bin/   # 看板层 service 的 ExecStart 指这里(桌面层已改用 TigerVNC,由 vncserver 自己拉起,不再需要启动脚本)
 install -m755 bin/mosh-server-tmout /usr/local/bin/   # cloudconn 临时 mosh 会话用 --server=/usr/local/bin/mosh-server-tmout(关了自动销毁);极简 SSH 版用不到,留着不碍事
 install -m755 bin/gen-dashboard /usr/local/bin/                      # 项目看板首页生成器(gen-dashboard.service/timer 调它)
 install -m755 bin/claude-login-url.sh /usr/local/bin/claude-login-url   # 输出临时公网登录页 URL(客户完成 Claude 无头登录用)
@@ -67,15 +67,28 @@ systemctl daemon-reload
 
 echo "[6/7] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
+ufw allow 5901/tcp comment 'tigervnc public'   # 登录桌面走公网:客户 Tailscale 还没配好时也够得着(靠 ~/.vnc/passwd 的 VncAuth 挡)
 ufw --force enable
 
-echo "[+] noVNC 图形桌面(【必装】—— Claude 登录要用:客户在自己浏览器里操作服务器桌面登录)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y xvfb x11vnc novnc websockify xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk 2>/dev/null || echo "⚠️ 部分桌面包装失败,可 apt 手动补"
+echo "[+] TigerVNC 图形桌面(【必装】—— Claude 登录要用:客户在自己浏览器里操作服务器桌面登录)"
+DEBIAN_FRONTEND=noninteractive apt-get install -y tigervnc-standalone-server tigervnc-common tigervnc-tools xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk 2>/dev/null || echo "⚠️ 部分桌面包装失败,可 apt 手动补"
 command -v google-chrome >/dev/null || { curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb; } 2>/dev/null || echo "⚠️ chrome 装失败(登录页要用),可手动补"
 command -v cloudflared >/dev/null || { curl -fsSL -o /tmp/cf.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && apt-get install -y /tmp/cf.deb; } 2>/dev/null || echo "⚠️ cloudflared 装失败(登录临时公网URL要用)"
-cp systemd/novnc.service /etc/systemd/system/
+# ~/.vnc/:几何/安全类型 + 会话脚本(开 xfce 并把 Chrome 停在 claude.com)。已有则不覆盖,免踩客户自己调过的设置。
+mkdir -p ~/.vnc
+[ -f ~/.vnc/config ]   || cp vnc/config ~/.vnc/config
+[ -f ~/.vnc/xstartup ] || install -m755 vnc/xstartup ~/.vnc/xstartup
+# VncAuth 密码::5901 走公网,【必须】有密码。无则随机生成一个并打印(客户连桌面时要用);已有不动。
+if [ ! -f ~/.vnc/passwd ]; then
+  VNCPW="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 8)"
+  printf '%s\n' "$VNCPW" | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd
+  echo "  ★ VNC 密码(连 <公网IP>:5901 用,请记下并发给客户): $VNCPW"
+else
+  echo "  → ~/.vnc/passwd 已存在,沿用原密码(忘了就 vncpasswd 重设)"
+fi
+cp systemd/cloud-vnc.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable --now novnc.service 2>/dev/null || echo "⚠️ novnc 服务起失败,可 systemctl restart novnc 单独排查"
+systemctl enable --now cloud-vnc.service 2>/dev/null || echo "⚠️ cloud-vnc 服务起失败,可 systemctl restart cloud-vnc 单独排查(日志在 ~/.vnc/*.log)"
 if [ "$DESKTOP" = "1" ]; then   # 看板/额度(:8088)非登录必需,仅 CLOUD_DESKTOP=1 装
   echo "  [+] 附加:项目看板 + 额度页(:8088)"
   cp systemd/cloud-dashboards.service systemd/gen-dashboard.service systemd/gen-dashboard.timer systemd/cc-quota.service systemd/cc-quota.timer /etc/systemd/system/
@@ -89,8 +102,8 @@ echo "[7/7] OOM 硬化（防单个会话内存暴涨拖垮整机）"
 bash oom/harden.sh || echo "⚠️ OOM 硬化部分失败（不影响已装好的核心），可单独重跑：bash oom/harden.sh"
 
 echo "完成。后续:① 服务器跑 claude-login-url 拿公网登录页链接发客户,完成 Claude 登录(登录后 pkill cloudflared);② 在【本机】跑 cli/cloud-connect.sh <服务器IP> 建免密,之后 ssh cloud 直接进 claude(反向加 --reverse);③ git 身份;④(可选)tailscale up。"
-if [ "$DESKTOP" = "1" ]; then echo "注:noVNC 登录桌面已装并起(novnc.service/:6080 tailnet-only);看板 :8088 已装。"
-else echo "注:noVNC 登录桌面已装并起(novnc.service/:6080 tailnet-only);看板 :8088 未装,CLOUD_DESKTOP=1 可加。"; fi
+if [ "$DESKTOP" = "1" ]; then echo "注:TigerVNC 登录桌面已装并起(cloud-vnc.service/公网 :5901,VncAuth 密码见上);看板 :8088 已装。"
+else echo "注:TigerVNC 登录桌面已装并起(cloud-vnc.service/公网 :5901,VncAuth 密码见上);看板 :8088 未装,CLOUD_DESKTOP=1 可加。"; fi
 if [ -n "$MODEL" ]; then echo "⚠️ 会话模型被钉死为 $MODEL —— 座舱配置页改模型将【不生效】(命令行 --model 优先级高于 settings.json)。客户账号若无此模型 → 新建会话/断电自愈启动即死。解开:把 ~/.bashrc 的 CLOUD_MODEL 改回空 + 注释掉 cloud-watchdog.service 里的 Environment=CLOUD_MODEL,然后 systemctl daemon-reload && systemctl restart cloud-watchdog.timer。"
 else echo "注:会话模型未钉死 —— 在座舱「配置」页设【默认兜底模型】(写进 ~/.claude/settings.json 的 ANTHROPIC_MODEL)即全局生效,改一处即可。"; fi   # 注意用 if 而非 `[ ] && echo`:后者条件不成立时返回 1,在 set -e 下会让脚本【就此退出】,后面的 shell 增强全装不上
 

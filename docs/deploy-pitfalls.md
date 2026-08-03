@@ -170,7 +170,8 @@
 ### install.sh 的可选层/配置缺口(新客户部署要手动补)
 - **现象**:部署后 ①服务器 Claude 不知道自己能力(无 `~/.claude/CLAUDE.md`);②临时会话 widget 瘸(缺 `/usr/local/bin/mosh-server-tmout`);③项目看板/服务器桌面 widget 连不上(cloud-dashboards.service / novnc.service 没装)。
 - **根因**:旧版 install.sh 只铺 settings 模板 + 把 `cloud-dashboards.sh/novnc-start.sh` 拷到 /usr/local/bin,但没铺 CLAUDE.md、没装 mosh-server-tmout、没装这两个 service 单元。
-- **修法**:已在 install.sh 补齐(铺 CLAUDE.md、装 mosh-server-tmout、noVNC 必装 + 起 novnc/cloud-dashboards/gen-dashboard)。老部署手动补:`CLAUDE.md`→`~/.claude/`;`bin/mosh-server-tmout`→`/usr/local/bin/`;`systemd/{novnc,cloud-dashboards}.service`→`/etc/systemd/system/`+`enable --now`。
+- **修法**:已在 install.sh 补齐(铺 CLAUDE.md、装 mosh-server-tmout、登录桌面必装 + 起 cloud-vnc/cloud-dashboards/gen-dashboard)。老部署手动补:`CLAUDE.md`→`~/.claude/`;`bin/mosh-server-tmout`→`/usr/local/bin/`;`systemd/{cloud-vnc,cloud-dashboards}.service`→`/etc/systemd/system/`+`enable --now`。
+- **注**:桌面层已于 2026-08 由 noVNC(`:6080` tailnet-only)换成 **TigerVNC(`:5901` 公网 + VncAuth)**,`novnc.service`/`novnc-start.sh` 已不在仓里;上面提到 novnc 的地方按 `cloud-vnc.service` 理解。换的原因见 [desktop-layer.md](desktop-layer.md) §0。
 
 ### Wave widgets.json 部署:占位符要全替(不止 <YOUR_HOME>)
 - **现象**:项目看板/服务器桌面 widget 打开报连接错误,URL 里还是 `http://<SERVER_TAILSCALE_IP>:8088/`。
@@ -182,13 +183,13 @@
 - **根因**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub`,但客户端 `~/.ssh/config` 没这两个别名。
 - **修法**:客户端 `~/.ssh/config` 建 `cloud`(HostName=服务器 tailscale IP)+ `cloud-pub`(=公网 IP)别名,User root、IdentityFile 指客户端钥匙、IdentitiesOnly yes;并 `ssh-copy-id` 把客户端公钥推进服务器。
 
-### cloud-dashboards / novnc 只绑 Tailscale IP,别在 127.0.0.1 上测
+### cloud-dashboards 只绑 Tailscale IP,别在 127.0.0.1 上测
 - **现象**:服务 `systemctl is-active` 是 active,但 `curl 127.0.0.1:8088` 返回 000 无响应,以为服务坏了。
-- **根因**:`cloud-dashboards.sh`/`novnc-start.sh` 故意 `--bind $(tailscale ip -4)`(tailnet-only 更安全),不监听 127.0.0.1。
+- **根因**:`cloud-dashboards.sh` 故意 `--bind $(tailscale ip -4)`(tailnet-only 更安全),不监听 127.0.0.1。(桌面层 TigerVNC 不同:它**故意绑 `0.0.0.0:5901`** 走公网,靠 VncAuth 密码挡 —— 别拿这条去套桌面。)
 - **修法**:验证用 tailscale IP:`curl http://100.x.y.z:8088/`(widget 也是走这个)。
 
-### claude 在 ~/.local/bin,noVNC 桌面终端/systemd 上下文敲 claude 报 command not found(exit127)
-- **现象**:客户在 noVNC 桌面(systemd 起的 xfce)的终端里直接敲 `claude` → `command not found`;但 cloudgo 交互会话正常。
+### claude 在 ~/.local/bin,VNC 桌面终端/systemd 上下文敲 claude 报 command not found(exit127)
+- **现象**:客户在 VNC 桌面(systemd 起的 xfce)的终端里直接敲 `claude` → `command not found`;但 cloudgo 交互会话正常。
 - **根因**:claude native 装在 `~/.local/bin`,而桌面终端/systemd 上下文的 `PATH`(`/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin`)**不含 `~/.local/bin`**。cloudgo 会话没事是因为 bashrc 里 `export PATH=~/.local/bin:$PATH`。
 - **修法**:`ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude`(/usr/local/bin 在所有 PATH 里,全 shell 可见)。install.sh 装完 claude 后已补这行软链。
 
@@ -216,15 +217,15 @@
 - **根因**:客户把服务器 IP 给错了(给成另一台),密码自然对不上;失败几次触发那台的 fail2ban 封禁 → 之后连对的机也可能受影响。
 - **修法**:**部署前先核对 IP**(`ssh root@<ip> hostname` 能进+密码对再动手)。已被封:等封禁过期,或换出口/让对方 unban。给错 IP 时别硬试密码,先跟客户确认正确 IP。
 
-### ★客户装 Clash/系统代理:noVNC/看板(:6080/:8088)超时但 SSH/会话正常(代理绕过列表缺 tailnet 100.*)
-- **现象**:客户机上「服务器桌面(:6080)」「项目看板/额度(:8088)」网页 widget 打不开/一直转圈/timeout,但「会话(cloudgo)」这种 **ssh 类 widget 一直好**。极具迷惑性,像 tailscale 掉线又不完全是。
+### ★客户装 Clash/系统代理:tailnet 网页服务(看板 :8088)超时但 SSH/会话正常(代理绕过列表缺 tailnet 100.*)
+- **现象**:客户机上「项目看板/额度(:8088)」这类**走 tailnet 的网页 widget** 打不开/一直转圈/timeout,但「会话(cloudgo)」这种 **ssh 类 widget 一直好**。(当年桌面还是 noVNC `:6080` tailnet-only 时,它也一起中招;现在桌面走公网 `:5901`,不受这条影响。)极具迷惑性,像 tailscale 掉线又不完全是。
 - **根因**:客户装了 **Clash/V2Ray 等系统代理**(127.0.0.1:7890)。Windows ProxyOverride(或系统代理)的**绕过列表放行了 `10./172./192.168.*` 私网段,却独缺 Tailscale 的 `100.*` 段** → 浏览器/Wave 网页块访问 tailnet IP(`100.x:6080/8088`)走代理 → 代理够不到 tailnet → 超时。而 **SSH 不走 HTTP 代理**,所以会话 widget 照常通 → 让人误以为"tailscale 好着呢"。
 - **诊断**:PowerShell 对比——`(New-Object Net.Sockets.TcpClient).Connect('100.x.y.z',6080)` 直连(通)vs `Invoke-WebRequest http://100.x.y.z:6080`(走代理→timeout),一比就现形。
 - **修法**:① 注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` 的 `ProxyOverride` 加 `100.*`;或 ② Clash 配置里加 `IP-CIDR,100.64.0.0/10,DIRECT`(tailnet 段直连不走代理)→ 实测 :6080 HTTP200。
 
-### claude 子进程内存泄漏 → 整机 OOM → claude/noVNC 饿死(2remote .178 事故)
-- **现象**:某会话(如大数据任务)claude 子进程内存涨到十几 G → 整机 OOM → claude 起不来 + noVNC 桌面栈被饿死。
-- **修法**:`ps aux --sort=-%mem | head` 揪出跑飞进程,`kill` 释放内存,`systemctl restart novnc.service` 重建桌面栈。install.sh 的 `oom/harden.sh` 是兜底(限单会话),但极端泄漏仍可能击穿——留意大任务会话的内存。
+### claude 子进程内存泄漏 → 整机 OOM → claude/桌面栈 饿死(2remote .178 事故)
+- **现象**:某会话(如大数据任务)claude 子进程内存涨到十几 G → 整机 OOM → claude 起不来 + VNC 桌面栈被饿死。
+- **修法**:`ps aux --sort=-%mem | head` 揪出跑飞进程,`kill` 释放内存,`systemctl restart cloud-vnc.service` 重建桌面栈。install.sh 的 `oom/harden.sh` 是兜底(限单会话),但极端泄漏仍可能击穿——留意大任务会话的内存。
 
 ### ★Windows 反向隧道一键脚本:SSH 会话里 Register-ScheduledTask 静默失效 + 临时进程被会话清理
 - **现象**:经 ssh 远程在客户机跑一键脚本后,"隧道登录自启任务"没建上(`schtasks /query /tn RemoteDevTunnel` 找不到);手动 `Start-Process ssh -R` 起的隧道也一闪就没——服务器端 `ssh -v` 明写 `remote forward success for: listen 2223`,但服务器 `ss` 看不到监听、客户机上 ssh 进程也没了。极迷惑,像转发失败,其实转发是成功的。
@@ -293,3 +294,13 @@
 - **现象**:`cloudgo`/起会话时刷 `~/.tmux.conf:N: bad value: off` / `unknown value: on` / `value is invalid: 0`(报错的行全是带值的行 1/3/6/7/8/9);会话其实能起(tmux 跳过坏行继续)。
 - **根因**:`~/.tmux.conf` 是 **Windows CRLF 换行**(`file` 报 "with CRLF line terminators"),每行选项值尾多个 `\r` → tmux 把值读成 `off\r`/`on\r`/`latest\r`/`0\r`,判无效。多半是**部署经手了 Windows**(git autocrlf、Windows 编辑器、或经 Windows 中转拷贝)。
 - **修法**:`tr -d '\r' < ~/.tmux.conf > /tmp/t && mv /tmp/t ~/.tmux.conf`(或 `dos2unix`)。**顺手扫其它部署文件**:`for f in ~/.bashrc ~/.local/bin/* /usr/local/bin/cloud-* ~/.claude/settings.json; do [ -f "$f" ] && file "$f" | grep -q CRLF && echo "CRLF: $f"; done`。⚠️ **配置文件 CRLF 只是刷警告不致命;但 SCRIPT(带 `#!` shebang)若 CRLF 会 `bad interpreter: no such file` 直接跑不了**——那是硬故障,必须一并清。(86.53.110.95 实测:只 `.tmux.conf` 中招,脚本都是 LF,万幸。)
+
+### VNC 桌面里的终端只有光秃秃 "#" 提示符,claude/cloudgo 全敲不到
+- **现象**:TigerVNC 桌面里打开 xfce4-terminal,提示符是孤零零的 `# `,回车只出新 `#`;`cd ~` 能走但 `claude`/`cloudgo` 报 command not found。**ssh 进同一台机器却一切正常**。
+- **根因**:VNC 由 systemd 单元拉起时环境里没有 `SHELL`,xfce 会话默认落 `SHELL=/bin/sh` → xfce4-terminal 开的是 **dash**:bare `#` 提示符、不读 `.bashrc`,PATH 和 shell 函数全没有。root 在 `/etc/passwd` 里的登录 shell 是 bash 没问题,所以**只有"桌面里的终端"坏**,极具迷惑性。
+- **修法**:`cloud-vnc.service` 的 `[Service]` 段加这两行,然后 `systemctl daemon-reload && systemctl restart cloud-vnc`(会重启桌面,提前告知客户重连):
+  ```
+  Environment=SHELL=/bin/bash
+  Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  ```
+  仓库的 `systemd/cloud-vnc.service` 已自带这两行;验收 O4 也会检查(缺了直接 FAIL)。**别删。**

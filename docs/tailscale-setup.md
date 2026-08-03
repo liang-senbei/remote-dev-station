@@ -11,7 +11,7 @@
 ## 0. 两个概念(先内化)
 
 - **tailnet** = 绑在**一个 Tailscale 账号**下的那张私有网。三台设备**登同一个账号**,就自动进同一个 tailnet,彼此可见、可直连。
-- **Tailscale IP** = 每台机器入网后分到的一个 `100.x.y.z`(CGNAT 段 `100.64.0.0/10`),**跨重启不变**,是这套体系里一切内网服务(noVNC `:6080`、看板 `:8088`、`cloudconn` 的 mosh)寻址用的地址。
+- **Tailscale IP** = 每台机器入网后分到的一个 `100.x.y.z`(CGNAT 段 `100.64.0.0/10`),**跨重启不变**,是这套体系里一切内网服务(看板 `:8088`、`cloudconn` 的 mosh)寻址用的地址。(登录桌面 TigerVNC `:5901` 是**公网**口、不走 tailnet —— 客户第一次要用桌面正是为了登录、那时 Tailscale 还没配好。)
 
 > 部署给客户时:**客户用他自己的 Tailscale 账号**组他自己的 tailnet,不是加进别人的。仓里出现的
 > `<SERVER_TAILSCALE_IP>` 是占位符(服务器的 Tailscale IP),客户处一律换成**自己服务器**的(见 §3 的「必改清单」)。
@@ -76,16 +76,16 @@ tailscale ip -4         # 只打印【本机】的 IPv4(那个 100.x.y.z)—— 
 ### 这套仓里谁在用这个 IP(部署时对照)
 
 **服务器侧——自动适配(不用改)**:
-- [`../bin/novnc-start.sh`](../bin/novnc-start.sh) 第 26–27 行**自己**跑 `tailscale ip -4 | head -1` 取本机 IP,把 noVNC 桌面绑到 `${TS_IP}:6080`(取不到回落 `127.0.0.1`)。所以桌面层换机**无需手改 IP**。
+- [`../bin/cloud-dashboards.sh`](../bin/cloud-dashboards.sh) **自己**跑 `tailscale ip -4 | head -1` 取本机 IP,把看板绑到 `${TS_IP}:8088`(取不到回落 `127.0.0.1`)。所以看板层换机**无需手改 IP**;桌面层(TigerVNC 公网 `:5901`)压根不涉及 tailnet IP。
 
 **服务器侧——已全部自动取本机 IP(无需手改)**:
-- [`../bin/novnc-start.sh`](../bin/novnc-start.sh)(noVNC)与 [`../bin/cloud-dashboards.sh`](../bin/cloud-dashboards.sh)(看板 `:8088`)都在脚本内 `tailscale ip -4 | head -1` 自动绑本机 IP;`systemd/cloud-dashboards.service` 的 `ExecStart` 已指向那个 wrapper、不再写死 IP。**服务器侧不用改 IP。**
+- [`../bin/cloud-dashboards.sh`](../bin/cloud-dashboards.sh)(看板 `:8088`)在脚本内 `tailscale ip -4 | head -1` 自动绑本机 IP;`systemd/cloud-dashboards.service` 的 `ExecStart` 已指向那个 wrapper、不再写死 IP。**服务器侧不用改 IP。**
 
 **电脑(Mac)侧——含服务器 IP 占位符(客户必改,DEPLOY 已列)**:
 - [`../cloudconn`](../cloudconn) 与 `../wave-config/cloudconn` 里的 `HOST="root@<SERVER_TAILSCALE_IP>"`(后者还多一个 `HOSTIP=`)——mosh 连服务器用。
 - `../wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080`(桌面)和 `:8088`(看板)两处 URL。
 
-> 一句话:**服务器侧(noVNC + 看板 service)都自动认本机 IP、无需改;只有 Mac 端的 cloudconn / widgets 是写死的,换机必改成客户自己服务器的 `tailscale ip -4`。**
+> 一句话:**服务器侧(看板 service)自动认本机 IP、无需改;只有 Mac 端的 cloudconn / widgets 是写死的,换机必改成客户自己服务器的 `tailscale ip -4`。**
 
 ### 防火墙:为什么绑到内网 IP 就安全
 
@@ -125,7 +125,7 @@ Tailscale 有个 **MagicDNS**:开了之后每台机器还有个域名式的名�
 1. **两端不在同一 tailnet** → 两边各 `tailscale status`,确认能互相看到;看不到 = 有一台没登、或登错账号。
 2. **客户端填了 MagicDNS 名** → 改成 `100.x` IP(§4)。手机端最常见。
 3. **服务器 node key 过期** → `tailscale status` 看本机状态,`tailscale up` 重认证或后台 Disable key expiry(§5)。
-4. **IP 写错了地方** → 检查 `cloudconn` 的 `HOST`、`widgets.json` 的 URL,是不是还留着没填的占位符 `<SERVER_TAILSCALE_IP>`(§3 必改清单)。服务器侧 novnc/看板已自动取本机 IP、不用查。
+4. **IP 写错了地方** → 检查 `cloudconn` 的 `HOST`、`widgets.json` 的 URL,是不是还留着没填的占位符 `<SERVER_TAILSCALE_IP>`(§3 必改清单)。服务器侧看板已自动取本机 IP、不用查。
 5. **代理没绕过 tailnet 段** → Mac 代理里放行 `100.64.0.0/10`(§4 坑)。
 6. **`tailscaled` 没在跑** → `systemctl is-active tailscaled`,不行 `systemctl restart tailscaled` 再 `tailscale up`。
 

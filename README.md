@@ -2,7 +2,7 @@
 
 > **⚡ 本分支 = 极简终端版(cli-deploy):客户端只用 SSH,无 Wave GUI(会话选单 `cloudgo` 仍在,终端内敲即用)。部署看 [`CLI-DEPLOY.md`](CLI-DEPLOY.md)。**
 > 进 Claude 两步:`ssh cloud` 连上 → 敲 `claude`(和本地 Claude Code 一样);本机接入用 [`cli/cloud-connect.sh`](cli/cloud-connect.sh)。
-> 会话韧性层(tmux+watchdog,断线/重启不丢)保留但藏起来了(`cd 目录 + 敲 claude` = 按目录的受管会话);反向隧穿 + noVNC 登录桌面保留;看板 :8088 降级为 `CLOUD_DESKTOP=1` 可选。登录:服务器跑 `claude-login-url` 出公网登录页发客户。
+> 会话韧性层(tmux+watchdog,断线/重启不丢)保留但藏起来了(`cd 目录 + 敲 claude` = 按目录的受管会话);反向隧穿 + TigerVNC 登录桌面保留(必装);看板 :8088 降级为 `CLOUD_DESKTOP=1` 可选。登录:客户连 `<公网IP>:5901` 在服务器桌面的 Chrome 里登录,或跑 `claude-login-url` 出临时公网登录页发客户。
 > 下方正文是**全功能版**说明(含 Wave/mosh/Moshi 客户端)——本分支已移除这些**客户端**组件,相关章节仅作背景,按 `CLI-DEPLOY.md` 走。注:`cloudgo` 会话选单是**服务器侧**功能,两版都有(全功能版从 Wave 侧栏点,极简版在终端里敲)。
 
 > 一套"在美国服务器上跑 Claude Code,从中国的 Mac(Wave 自建中文版)和手机(Moshi)远程操作"的体系。
@@ -82,7 +82,7 @@ claude
    ║  tmux ─┬─ cc-中控 ─ claude ─ <uuid>.jsonl                        ║
    ║        └─ cc-…  ─ claude ─ <uuid>.jsonl                          ║
    ║  后台:cc-state(登记) · cloud-watchdog(15s自愈) · 完成铃铛       ║
-   ║  桌面:noVNC :6080(Xvfb+xfce,给 AdsPower 等 GUI)               ║
+   ║  桌面:TigerVNC :5901(xfce+Chrome,给登录/AdsPower 等 GUI)     ║
    ╚══════════════════════════════════════════════════════════════════╝
 ```
 
@@ -167,16 +167,16 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 - 🔵 **会话**(`cloudgo`):核心入口(自学习/新建/恢复/改绑/临时/分级删除)。
 - 🟣 **主题**(`wavetheme` → 本机 `:8799` 色卡网页):点色卡**一键换整套主题**(终端+画框+边栏+文字+图标联动,13 套:8 浅 5 深,浅色在前)。
 - 🩵 **项目看板**(`:8088/` 门户):列各项目自己的看板(读 `/root/inbox/dashboards/registry.json`;`cloud-dashboards.service` 只服务该目录)。
-- 🟢 **服务器桌面**(noVNC `:6080`):服务器 GUI(AdsPower 等)。见 §9。
+- 🟢 **服务器桌面**(TigerVNC `:5901`):服务器 GUI(Claude 登录 / AdsPower 等)。见 §9。
 - 🟡 **服务器文件**:浏览服务器 `/opt/workspace`。
 - 🔴 **临时会话**(`cloudtmp` → `cc-tmp-*`):关标签 ~60s 自动清(`mosh-server-tmout` 超时 → `destroy-unattached`);不进恢复体系,对话 jsonl 仍留。
 > 终端配色含 13 主题的 **cursor 光标色**(每主题对比背景,浅色=深光标),靠 `termthemes/*.json` 的 `cursor` 字段。
 
-## 9. 服务器桌面(noVNC)
-- `novnc.service` → `novnc-start.sh`:`Xvfb:1` + xfce + `x11vnc` + `websockify :6080`。
-- **健壮版**:全程 `wait` 在 Xvfb 上,它一死脚本退出 → systemd 自动重启(不再出现"空壳无桌面")。
-- 用途:在服务器开图形界面(如 **AdsPower**)。点侧栏「服务器桌面」打开 `:6080/vnc.html`。
-- 注意:① 跨太平洋链路看图形桌面**会卡**(物理限制);② `:6080` 在自己 tailnet 内**不鉴权**;③ 另有个 `Xvfb:99` 是给 `chrome-devtools-mcp` 的**独立显示**,与本桌面无关、勿混。
+## 9. 服务器桌面(TigerVNC)
+- `cloud-vnc.service` → `vncserver :1 -fg`,配置在 `~/.vnc/{config,xstartup,passwd}`(仓库模板在 `vnc/`)。
+- **必装层**:`install.sh` 装好即起。头号用途是**让客户完成 Claude 登录** —— 桌面里 Chrome 已停在 `claude.com`,走服务器的干净 IP 登录(国内 IP 直连常被拦);其次才是 AdsPower 等 GUI。
+- 客户用任意 VNC 客户端连 `<服务器公网IP>:5901`,密码是 `install.sh` 装完打印的那串(存 `~/.vnc/passwd`)。
+- 注意:① 跨太平洋看图形桌面**会卡**(物理限制);② **`:5901` 开在公网**,唯一屏障是 VncAuth 密码,且 VNC 画面/键盘**明文过网** —— 登录是一次性动作,之后日常走 SSH;要更稳见 [`docs/desktop-layer.md`](docs/desktop-layer.md) §3;③ 单元里的 `Environment=SHELL=/bin/bash` **不能删**,否则桌面里的终端变 dash(光秃秃 `#`、敲不到 claude);④ 另有个 `Xvfb:99` 是给 `chrome-devtools-mcp` 的**独立显示**,与本桌面无关、勿混。
 
 ---
 
@@ -184,7 +184,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 
 **服务器 `~/.local/bin/`**:`cc-state`(登记钩子)· `cc-sessions`(解析:list/resolve/recoverable/resumable/forget/prune)· `cloud-watchdog`(自愈)· `cloud-forget`(删)· `cloud-delmenu`(分级删除)· `cloud-sessmenu`/`cloud-sesslist`/`cloud-sesspreview`(选择器)
 **服务器 `~/.bashrc` 函数**:`cloudgo`(入口+自学习)· `cloudattach`(进会话)· `cloudtmp`(临时)· `cloudunbind`(解绑)· `_cloudbind`(记绑)· `cloudnewat`/`cloudnew`/`cloud_resume`(新建/恢复)
-**服务器其它**:`/usr/local/bin/{cloud-boot.sh, novnc-start.sh}` · systemd:`cloud-watchdog.timer/.service`、`cloud-sessions.service`、`novnc.service`、`cloud-dashboards.service`(:8088 项目看板) · 登记 `~/.cloud-sessions/` · 绑定 `~/.cloud-blockbind/` · 对话 `~/.claude/projects/.../<uuid>.jsonl` · 钩子 `~/.claude/settings.json`(cc-state 等自愈/状态钩子)· 铃铛 `~/.claude/hooks/{stop,notification}.sh`
+**服务器其它**:`/usr/local/bin/cloud-boot.sh` · `~/.vnc/{config,xstartup,passwd}`(桌面层)· systemd:`cloud-watchdog.timer/.service`、`cloud-sessions.service`、`cloud-vnc.service`(:5901 登录桌面)、`cloud-dashboards.service`(:8088 项目看板) · 登记 `~/.cloud-sessions/` · 绑定 `~/.cloud-blockbind/` · 对话 `~/.claude/projects/.../<uuid>.jsonl` · 钩子 `~/.claude/settings.json`(cc-state 等自愈/状态钩子)· 铃铛 `~/.claude/hooks/{stop,notification}.sh`
 **Mac**:`~/bin/cloudconn` · `~/.zshrc`(proxy 开关;Tailscale 网段 `100.64.0.0/10` 已加代理绕过)· `~/.config/waveterm`(打包版读)/`waveterm-dev`(dev 重建读)
 
 ---
@@ -207,7 +207,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 
 ## 附:仓库部署 / 备份 / 还原
 
-**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/moshi-hook/novnc/cloud-dashboards)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知/部署验收)· `tests/`(部署后验收脚本 `deploy-test.sh`)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
+**仓库结构**:`bin/`(服务器脚本,含 mosh-server-tmout / mac·lap 跨机桥 / cc-agents)· `systemd/`(服务单元:watchdog/sessions/moshi-hook/cloud-vnc/cloud-dashboards)· `vnc/`(TigerVNC 桌面层的 config/xstartup 模板)· `oom/`(OOM 硬化:harden.sh + earlyoom/sysctl/user-slice 配置)· `docs/`(专题:无头登录/Tailscale/桌面层/Mac·Windows 反向通道/agent 通知/部署验收)· `tests/`(部署后验收脚本 `deploy-test.sh`)· `phone/`(手机 Moshi 从零配置)· `windows/`(Windows 笔电接入:反向隧道/服务器侧脚本/Wave)· `cloudconn`(Mac 端连接器)· `cc-state` · `bashrc-cloud-snippet.sh` · `wave-config/`(Mac Wave 客户端配置)· `README.md`
 
 **Wave 客户端配置 `wave-config/`**:
 - `wave-config/{waveterm,waveterm-dev}/` = Mac `~/.config/waveterm{,-dev}` 整套:`settings.json`(term:theme/waveai)· `widgets.json`(6 widget + 颜色)· `termthemes/*.json`(13 主题配色 + **cursor 光标色**)· `waveai.json`(GLM 走本地代理,无真 key)· backgrounds/presets/connections。
@@ -224,7 +224,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 本仓 = **一套可复用的「远程 Claude 工作站」骨架**。部署到你自己的机器时:**🟢 骨架照搬,🔴 少数带机器专属值的地方换成自己的**(见 [DEPLOY.md](DEPLOY.md) 阶段二「必改清单」)。
 
 **🟢 骨架层(换谁都能用,是这套系统本体)**
-- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/`(cloud-*/moshi-hook*/novnc)· `oom/`(OOM 硬化:swap/sysctl/earlyoom/内存软顶)· `install.sh` · `bashrc-*.sh`
+- 会话系统:`cloudconn` · `cc-state` · `bin/cloud-*`(watchdog/sessions/delmenu/sesslist…)· `tmux.conf` · `systemd/`(cloud-*/moshi-hook*/cloud-vnc)· `vnc/`(桌面层模板)· `oom/`(OOM 硬化:swap/sysctl/earlyoom/内存软顶)· `install.sh` · `bashrc-*.sh`
 - 多 agent:`hub/` · `bin/cc-agents`(agent 指挥中心,一屏看全部会话状态)
 - 跨机桥接:`bin/{macget,macput,macls,pullimg}`(Mac)· `bin/{lapget,lapput,lapls,lapimg}`(Windows 笔电,ssh 别名 `laptop`)
 - Wave 工具:`wavetheme` · `wavetheme-server` · `statusline.py` · `com.wavetheme.ui.plist`
@@ -232,7 +232,7 @@ Moshi App(登录账号 → 配对主机 → SSH/mosh 进服务器)
 - 可选(通用但不配也不影响核心):`bin/cc-agents-notify` + `cloud-tts.conf.example`(agent 状态跃迁推手机/笔电语音;要自填 MOSHI_TOKEN,不填=静默不推)
 
 **🔴 要自定义 / 替换的部分**
-- **机器专属值**:`cloudconn` · `wave-config/*/widgets.json` · `com.wavetheme.ui.plist` 里的**服务器 Tailscale IP、本机用户名 / 家目录路径**——仓里都写成 `<SERVER_TAILSCALE_IP>` / `<YOUR_HOME>` 之类占位符,部署时按 [DEPLOY.md](DEPLOY.md) 阶段二「必改清单」填真值。`bin/novnc-start.sh` 已改为自动取本机 IP、无需手改。
+- **机器专属值**:`cloudconn` · `wave-config/*/widgets.json` · `com.wavetheme.ui.plist` 里的**服务器 Tailscale IP、本机用户名 / 家目录路径**——仓里都写成 `<SERVER_TAILSCALE_IP>` / `<YOUR_HOME>` 之类占位符,部署时按 [DEPLOY.md](DEPLOY.md) 阶段二「必改清单」填真值。桌面层(TigerVNC)不含机器专属值、无需手改;`bin/cloud-dashboards.sh`(看板)自动取本机 IP。
 - **仓库地址**:`install.sh` 及文档里的 `<YOUR_GITHUB>/…` 换成你自己的仓库。
 - **你自己的 Claude 叠加层**:插件 / MCP / skills / 记忆等因人而异,按需自行安装,不随本仓走。
 - **Wave 主题源码**:中文化 + 自定义主题需改 Wave 前端源码并重新构建 `.app`,不含在本仓(见附一 / [DEPLOY.md](DEPLOY.md) 阶段二);运行时配置(`wave-config/` 里的 termtheme/widgets)可直接 `cp` 生效。

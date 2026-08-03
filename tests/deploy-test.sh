@@ -6,7 +6,7 @@
 #   bash tests/deploy-test.sh core                      # A组·核心链路(只读探测,不碰现有会话)
 #   bash tests/deploy-test.sh deck                      # B组·deck 服务端(只读:脚本齐/防127 PATH行/账本同源/面板出)
 #   bash tests/deploy-test.sh selfheal                  # S组·断电自愈真测(破坏性,只碰 cc-ztest-* 自建会话)
-#   bash tests/deploy-test.sh optional                  # O组·可选层(moshi手机审批/noVNC桌面/看板;未装=SKIP)
+#   bash tests/deploy-test.sh optional                  # O组·可选层(moshi手机审批/TigerVNC桌面/看板;未装=SKIP)
 #   bash tests/deploy-test.sh migrate --projects /opt/workspace/a,/opt/workspace/b   # M组·迁移验收
 #   bash tests/deploy-test.sh all [--projects ...]      # 全部(migrate 仅在传了 --projects 时跑)
 #
@@ -476,20 +476,20 @@ run_optional(){
     else fail O1 "moshi 装了但链路不通(手机收不到审批)" "缺:$bad"; fi
   fi
 
-  # O4 noVNC 图形桌面(:6080,只应绑 tailscale 内网 IP)
-  if ! systemctl list-unit-files novnc.service --no-legend 2>/dev/null | grep -q "^novnc\.service"; then
-    skip O4 "novnc.service 未装(图形桌面层可选)" "unit 不存在"
+  # O4 TigerVNC 登录桌面(:5901,公网口 + VncAuth)
+  if ! systemctl list-unit-files cloud-vnc.service --no-legend 2>/dev/null | grep -q "^cloud-vnc\.service"; then
+    skip O4 "cloud-vnc.service 未装" "unit 不存在 —— 桌面层 2026-08 起已是【必装】,没有多半是这台没跑过新版 install.sh"
   else
     bad=""
-    [ "$(systemctl is-active novnc.service 2>/dev/null)" = "active" ] || bad="$bad service不active"
-    pgrep -x Xvfb >/dev/null 2>&1        || bad="$bad Xvfb没跑"
-    pgrep -x x11vnc >/dev/null 2>&1      || bad="$bad x11vnc没跑"
-    pgrep -f websockify >/dev/null 2>&1  || bad="$bad websockify没跑"
-    code=$(curl -s -o /dev/null -m 8 -w '%{http_code}' "http://$ip:6080/vnc.html" 2>/dev/null)
-    [ "$code" = "200" ] || bad="$bad vnc.html=$code"
-    ss -ltn 2>/dev/null | grep -q "$ip:6080" || bad="$bad 6080未绑tailscale-IP($ip)"
-    if [ -z "$bad" ]; then pass O4 "noVNC 桌面全链路(service+Xvfb/x11vnc/websockify+HTTP200+只绑内网IP)" "http://$ip:6080/vnc.html=200"
-    else fail O4 "noVNC 装了但不健康(打开 :6080 会是空壳/打不开)" "缺:$bad"; fi
+    [ "$(systemctl is-active cloud-vnc.service 2>/dev/null)" = "active" ] || bad="$bad service不active"
+    pgrep -x Xtigervnc >/dev/null 2>&1   || bad="$bad Xtigervnc没跑"
+    ss -ltn 2>/dev/null | grep -q ":5901" || bad="$bad 5901没监听"
+    [ -f ~/.vnc/passwd ] || bad="$bad 缺~/.vnc/passwd(公网口没密码!)"
+    [ -x ~/.vnc/xstartup ] || bad="$bad ~/.vnc/xstartup缺失或没执行位"
+    # 单元缺 SHELL 会让桌面里的终端变 dash(光秃秃 # / 敲不到 claude),ssh 进来却正常 —— 极隐蔽,必须查
+    grep -q 'Environment=SHELL=' /etc/systemd/system/cloud-vnc.service 2>/dev/null || bad="$bad 单元缺Environment=SHELL(桌面终端会变dash)"
+    if [ -z "$bad" ]; then pass O4 "TigerVNC 登录桌面全链路(service+Xtigervnc+5901+VncAuth+xstartup+SHELL环境)" "0.0.0.0:5901 已监听"
+    else fail O4 "TigerVNC 桌面装了但不健康(客户连上会黑屏/终端敲不到 claude)" "缺:$bad"; fi
   fi
 
   # O5 项目看板(:8088)

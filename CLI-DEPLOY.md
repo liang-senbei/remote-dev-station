@@ -3,7 +3,7 @@
 这一分支是 **纯终端** 版:客户端只用 **SSH**,不装 Wave、不配 widget。会话入口 `cloudgo`(fzf 选单)仍在——服务器侧 bash 函数,在终端里敲即用,纯 SSH 也能用。
 进 Claude 两步:**`ssh cloud`** 连上 → 敲 **`claude`** 开始(和本地 Claude Code 一样;断线重连再敲 `claude` 接回同一会话)。
 
-保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**(noVNC 登录桌面**必装**)。
+保留的:**会话韧性层**(断线/重启不丢会话,只是藏起来了)、**反向隧穿**(服务器反向操作客户本机)、**Claude 登录**(TigerVNC 登录桌面**必装**)。
 砍掉的:Wave GUI deck、看板/额度(:8088,降级为 `CLOUD_DESKTOP=1` 可选)、mosh/tailscale 硬依赖、手机 Moshi。**保留** `cloudgo` 会话选单(服务器侧函数,纯 SSH 也能用),外加"cd 目录 + 敲 claude"这条更直接的路。
 
 > **怎么做到"敲 claude 就像本地一样"**:服务器 bashrc 把 `claude` 包成一个函数 → 调 `cloud-enter`,
@@ -34,15 +34,16 @@
 
 ```bash
 git clone <this-repo> && cd remote-dev-station
-CLOUD_MODEL=claude-opus-4-8[1m] ./install.sh          # 极简:装 claude+会话层+韧性+反向+cloudgo,不装 noVNC
+./install.sh          # 装 claude+会话层+韧性+反向+cloudgo+TigerVNC 登录桌面;模型不钉死,交给座舱配置(要钉死才 CLOUD_MODEL=xxx ./install.sh)
 # 想要 GUI 登录/服务器桌面:  CLOUD_DESKTOP=1 CLOUD_MODEL=... ./install.sh
 ```
 
 装完就绪:cloudgo/watchdog 自愈、systemd 开机恢复、ufw+fail2ban、OOM 硬化。
 
-### Claude 登录(noVNC 登录页,必装)
-install.sh 已把 noVNC 桌面必装。让客户完成登录:
-1. 服务器上跑 **`claude-login-url`** → 输出一条**临时公网登录页 URL**(cloudflared 把 noVNC :6080 开个公网口);
+### Claude 登录(TigerVNC 登录桌面,必装)
+install.sh 已把 TigerVNC 桌面必装并起在 `:5901`。让客户完成登录,两条路任选:
+- **直连桌面(默认)**:客户用任意 VNC 客户端连 `<服务器公网IP>:5901`,密码是 install.sh 装完打印的那串;桌面里 Chrome 已停在 `claude.com`,直接登录即可。
+- **临时公网登录页**:服务器上跑 **`claude-login-url`** → 输出一条**临时公网登录页 URL**(cloudflared 开个临时公网口);
 2. 把这条 URL 发给客户 → 客户在**自己浏览器**打开 → 看到服务器桌面的 Chrome → 在里面登录 Claude 账号完成授权;
 3. 登录完 **`pkill cloudflared`** 把公网口拆掉。
 
@@ -102,9 +103,9 @@ install.sh 已把 noVNC 桌面必装。让客户完成登录:
 | | 极简 CLI 版(本分支) | 全功能版(main) |
 |---|---|---|
 | 客户端 | `ssh cloud`,零配置;终端内 `cloudgo` 选单可用 | Wave GUI deck(侧栏「会话」=`cloudgo`) |
-| noVNC 登录桌面 | **必装**(登录用) | 必装 |
+| TigerVNC 登录桌面 | **必装**(登录用,公网 :5901) | 必装 |
 | 看板/额度(:8088) | 默认无(`CLOUD_DESKTOP=1` 可开) | 有 |
-| 登录 | noVNC 公网登录页(`claude-login-url`) | noVNC GUI |
+| 登录 | VNC 桌面直连 :5901,或 `claude-login-url` 临时公网页 | VNC GUI |
 | 会话韧性 / 反向隧穿 | **保留** | 保留 |
 
 两者共用同一套 install.sh;极简版靠默认值 + `CLOUD_DESKTOP` 开关裁剪,不是两份代码。

@@ -1,0 +1,14 @@
+#!/bin/sh
+# TigerVNC 会话启动脚本 → 装到 ~/.vnc/xstartup(须 +x)。
+# 目的:客户在自己浏览器连 :5901 看到桌面,里面 Chrome 已经停在 claude.com —— 用【服务器的干净 IP】
+# 完成 Claude 登录(国内 IP 直连 claude.com 登录常被拦)。登录凭据落在服务器,之后免登。
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+export XDG_SESSION_TYPE=x11
+# 上次非正常退出会留 Singleton* 锁,不清则 Chrome 起不来(报 profile in use)
+rm -f /root/.chrome-vnc/Singleton* 2>/dev/null
+CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+[ -n "$CHROME" ] && "$CHROME" --no-sandbox --no-first-run --no-default-browser-check \
+  --password-store=basic --disable-session-crashed-bubble --disable-dev-shm-usage --start-maximized \
+  --user-data-dir=/root/.chrome-vnc "https://claude.com" >/var/log/chrome-vnc.log 2>&1 &
+exec startxfce4

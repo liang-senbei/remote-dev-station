@@ -73,13 +73,13 @@
 - **Windows**:照 [windows/README.md](windows/README.md)。
 
 > **⚠️ 必改的机器专属值**(客户端凡拷 `wave-config/` / `cloudconn` 都要填,否则会连不上你的服务器):
-> - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`(`wave-config` 版还多一个 `HOSTIP=`,探活看守会 nc 它);`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:6080` / `:8088` 两处 URL —— 全填成你自己服务器的 Tailscale IP(占位符 `<SERVER_TAILSCALE_IP>`)。
+> - **服务器 IP**:`cloudconn`(两份:仓根 + `wave-config/`)的 `HOST=`(`wave-config` 版还多一个 `HOSTIP=`,探活看守会 nc 它);`wave-config/{waveterm,waveterm-dev}/widgets.json` 里 `:8088` 那处 URL —— 填成你自己服务器的 Tailscale IP(占位符 `<SERVER_TAILSCALE_IP>`)。桌面层已改 TigerVNC、客户直连公网 `:5901`,不再有 tailnet URL 要填。
 > - **本机用户名 / 家目录**:`widgets.json` 的 `cmd` 里 `<YOUR_HOME>/bin/cloudconn`、`com.wavetheme.ui.plist` 里 `<YOUR_HOME>/…` —— 换成你自己的家目录路径。
-> - 服务器侧的 `bin/novnc-start.sh`(noVNC)与 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改。
+> - 服务器侧的 `bin/cloud-dashboards.sh`(看板 :8088)已改为**自动取本机 Tailscale IP**,无需手改;桌面层(TigerVNC)不含机器专属值。
 
-- 🎛️ **装哪些 Wave widget:每个客户现场让用户选(Windows / Mac 都是)**。用 **AskUserQuestion** 列出可选项让用户勾,别一套照搬:**核心默认必装** = 会话(`cloudgo`)+ 临时会话(`cloudtmp`);**可选** = 服务器文件(需 wsh,首次连接自动装)、项目看板(:8088)、服务器桌面(:6080 noVNC)、主题(Mac 本地 :8799 `wavetheme-server`)、**额度**(5小时滚动窗口用量/余量,:8088/quota.html,由 `cc-quota` + ccusage 生成)。按用户勾选裁剪 `widgets.json` 再铺。
+- 🎛️ **装哪些 Wave widget:每个客户现场让用户选(Windows / Mac 都是)**。用 **AskUserQuestion** 列出可选项让用户勾,别一套照搬:**核心默认必装** = 会话(`cloudgo`)+ 临时会话(`cloudtmp`);**可选** = 服务器文件(需 wsh,首次连接自动装)、项目看板(:8088)、服务器桌面(:5901 TigerVNC)、主题(Mac 本地 :8799 `wavetheme-server`)、**额度**(5小时滚动窗口用量/余量,:8088/quota.html,由 `cc-quota` + ccusage 生成)。按用户勾选裁剪 `widgets.json` 再铺。
 - 🔑 **客户端 SSH 别名(否则用 `root@cloud` 连接的 widget 报 `lookup cloud: no such host`)**:`wave-config` 的 `connections.json`/`widgets.json` 用连接名 `root@cloud`/`root@cloud-pub` → 客户端 `~/.ssh/config` **必须建 `cloud`(→服务器 Tailscale IP)+ `cloud-pub`(→服务器公网 IP)别名**(`User root`、`IdentityFile` 指客户端自己钥匙、`IdentitiesOnly yes`)。并把**客户端公钥 `ssh-copy-id` 进服务器**(免密)。
-- ⚙️ **mosh 要 UTF-8 locale**:`cloudconn` 已在开头 `export LANG/LC_ALL=en_US.UTF-8`(否则 macOS/Wave cmd 块里 mosh 报 `Error: vector`)。**主题** widget 要在 Mac 本地跑 `wavetheme-server`(:8799)+ 铺 `termthemes/*.json`,用 **launchd** 自启;**临时会话**要服务器 `/usr/local/bin/mosh-server-tmout`(install.sh 已装)。**noVNC 已改必装**:客户完成 Claude 无头登录跑 `claude-login-url`(输出临时公网登录页 URL,登录后 `pkill cloudflared` 拆掉)。
+- ⚙️ **mosh 要 UTF-8 locale**:`cloudconn` 已在开头 `export LANG/LC_ALL=en_US.UTF-8`(否则 macOS/Wave cmd 块里 mosh 报 `Error: vector`)。**主题** widget 要在 Mac 本地跑 `wavetheme-server`(:8799)+ 铺 `termthemes/*.json`,用 **launchd** 自启;**临时会话**要服务器 `/usr/local/bin/mosh-server-tmout`(install.sh 已装)。**TigerVNC 登录桌面已改必装**:客户直连 `<公网IP>:5901`(密码见 install.sh 输出)在桌面 Chrome 里登录;或跑 `claude-login-url`(输出临时公网登录页 URL,登录后 `pkill cloudflared` 拆掉)。
 
 ### 可选 · 用魔改版 Wave 客户端(汉化 + 自定义主题)
 
@@ -137,5 +137,5 @@
 - [`docs/tailscale-setup.md`](docs/tailscale-setup.md) —— Tailscale 三设备同 tailnet + 无头授权 + IP/key 过期。
 - [`docs/mac-reverse-channel.md`](docs/mac-reverse-channel.md) —— (选装)服务器 Claude 够到 Mac 取/送文件、取截图。
 - [`docs/windows-reverse-channel.md`](docs/windows-reverse-channel.md) —— (选装)Windows 反向桥:服务器 Claude 够到 Windows 笔电(`laptop` 别名 + `lapget/lapput/lapls/lapimg`)。
-- [`docs/desktop-layer.md`](docs/desktop-layer.md) —— (选装)服务器图形桌面层(noVNC + Chrome→claude.ai/code)安装。
+- [`docs/desktop-layer.md`](docs/desktop-layer.md) —— (必装)服务器图形桌面层(TigerVNC + xfce + Chrome→claude.com)安装与排障。
 - [`docs/agent-notify.md`](docs/agent-notify.md) —— (选装)agent 状态通知:等授权/完成时手机 Moshi 推送 + 可选笔电语音。

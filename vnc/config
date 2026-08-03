@@ -1,0 +1,5 @@
+geometry=1600x900
+depth=24
+localhost=no
+SecurityTypes=VncAuth
+AlwaysShared=1

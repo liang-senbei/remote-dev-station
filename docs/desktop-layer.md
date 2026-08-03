@@ -1,157 +1,113 @@
-# 服务器图形桌面层(noVNC)· 安装 runbook
+# 服务器图形桌面层(TigerVNC)· 安装 runbook
 
-> **这是选装层,`install.sh` 核心层不装它。** 核心只装会话系统 / systemd 自愈 / tmux / 防火墙那套(见 [README](../README.md) §🚀);
-> 图形桌面(Xvfb + xfce + x11vnc + noVNC + Chrome)和它的 `novnc.service` 都得**照本文单独装**。
-> `bash cloud_infra_check.sh` 里 `novnc.service` 显示 `⏭`(可选层未装)就是因为这个,属正常。
+> **这是必装层,`install.sh` 已经把它装好了。** 本文是「它到底装了什么 / 怎么排障 / 怎么手工重建」的说明,
+> 正常部署**不用照着敲**——跑完 `./install.sh` 桌面就已经在 `:5901` 上跑着了。
+> (历史:此层曾是 noVNC + Xvfb + x11vnc + websockify 的 `:6080` tailnet-only 方案,已于 2026-08 全面换成 TigerVNC。
+>  换的原因见 §0。仓库里不再有 `novnc.service` / `novnc-start.sh`。)
 
-装完你会得到:一个跑在服务器上的**图形桌面**,从**电脑/手机浏览器**(或 Wave 侧栏「服务器桌面」widget)打开 `http://<服务器Tailscale-IP>:6080/vnc.html` 就能看到、能点。用途两个:① 在服务器上开 GUI 程序(如 **AdsPower** 指纹浏览器);② 桌面里预先开好一个 Chrome 停在 **claude.ai/code**(网页版 Claude Code,富文本输入 + 贴图,从服务器干净 IP 登录、不碰你 Mac)。
+装完你会得到:一个跑在服务器上的**图形桌面**,客户用任意 VNC 客户端连 `<服务器公网IP>:5901` 就能看到、能点,里面 **Chrome 已经停在 `claude.com`**。
 
----
-
-## 0. 装之前先确认
-
-- **要不要装**:只用命令行跑 Claude Code 的话,**这层不用装**。只有你需要"服务器上的图形界面"(AdsPower / 网页版 Claude / 任何 GUI)才装。
-- **架构**:x86_64(amd64)服务器最省心。**ARM64 服务器有坑**——Google 没出官方 arm64 的 `google-chrome`,得改用 `chromium` 并顺手改一下 `novnc-start.sh`(见 §1 末尾的 ⚠️)。
-- **跨太平洋看图形桌面天生卡**(物理限制,非 bug):打字(mosh 会话)扛得住,但 VNC 画面刷新会顿。能用命令行解决的别开桌面。
+**头号用途 = 让客户完成 Claude 登录**:登录走**服务器自己的干净 IP**(国内 IP 直连 claude.com 登录常被拦),凭据落在服务器上,之后会话免登。其次才是在服务器上跑 GUI 程序(如 AdsPower 指纹浏览器)。
 
 ---
 
-## 1. 装依赖(apt + Chrome)
+## 0. 为什么从 noVNC 换成 TigerVNC
 
-图形桌面那几样在标准 apt 源里,一条装齐;**Chrome 不在 apt 默认源**,单独装。
+| | 旧:noVNC(:6080) | 新:TigerVNC(:5901) |
+|---|---|---|
+| 组件 | Xvfb + xfce + x11vnc + websockify,四个进程串起来 | `vncserver` 一个命令全包 |
+| 客户怎么连 | 浏览器开 `:6080/vnc.html` | 任意 VNC 客户端连 `:5901` |
+| 网络边界 | **只在 tailnet 内可达** | **公网可达**,靠 VncAuth 密码挡 |
+| 致命问题 | **客户 Tailscale 还没配好时根本够不着** —— 而客户第一次要用桌面,恰恰就是为了登录 Claude、还没走到配 Tailscale 那步 | 开箱即连,不依赖 tailnet |
 
-```bash
-# ① 桌面 + VNC + noVNC(标准源,一条装齐)
-apt-get update
-apt-get install -y xvfb xfce4 x11vnc novnc websockify
-
-# 可选但强烈建议:dbus + 中文字体(不装 dbus 部分 xfce 组件会报 dbus 错;不装字体 Chrome/AdsPower 里中文是豆腐块)
-apt-get install -y dbus-x11 fonts-noto-cjk fonts-wqy-zenhei
-```
-
-这几个包分别提供 `novnc-start.sh` 用到的:`Xvfb`、`xfwm4`/`xfdesktop`/`xfce4-panel`(都在 `xfce4` 元包里)、`x11vnc`、`/usr/share/novnc/vnc.html`(`novnc` 包)、`/usr/bin/websockify`(`websockify` 包)。
-
-```bash
-# ② Google Chrome(单独装;下面这个 .deb 会自动把 Google apt 源写进
-#    /etc/apt/sources.list.d/,以后 apt upgrade 就跟着一起更新,不用手工加源)
-wget -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-apt-get install -y /tmp/chrome.deb
-```
-
-> ⚠️ **ARM64 服务器**:上面这个 .deb 是 amd64,装不上。改装 `apt-get install -y chromium`(或 `chromium-browser`),然后把 `bin/novnc-start.sh` 第 20 行的 `google-chrome` 换成 `chromium`(其余 `--no-sandbox` 等参数照旧)。本文其余步骤不变。
-
-验证依赖到位:
-
-```bash
-which Xvfb x11vnc websockify google-chrome xfce4-panel   # 五个都能打印路径 = 齐了
-ls /usr/share/novnc/vnc.html                              # noVNC 网页资源在 = 齐了
-```
+就是最后那行把 noVNC 判了死刑:登录桌面是**交付链条的第一环**,不能依赖一个"要先登录才配得好"的前置条件。
 
 ---
 
-## 2. 部署并 enable `novnc.service`
+## 1. install.sh 装了什么
 
-`novnc.service` 的 `ExecStart` 指向 **`/usr/local/bin/novnc-start.sh`**。核心 `install.sh` 现在**已把 `novnc-start.sh`(和 `cloud-dashboards.sh`)预装到 `/usr/local/bin/`**,脚本路径不用操心;这里只需**部署 `novnc.service` 单元文件本身**(核心层不装它),下面一步做。
-
-```bash
-cd /path/to/remote-dev-station        # 你 clone 仓库的目录(本机是 /root/cloud-setup)
-
-# ① 脚本拷到单元指定的路径(和 cloud-boot.sh 一个套路)
-install -m755 bin/novnc-start.sh /usr/local/bin/
-
-# ② 部署单元 + 开机自启 + 立即拉起
-cp systemd/novnc.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now novnc.service
-```
-
-`novnc-start.sh` 起来后会:清掉旧的 Xvfb/x11vnc/websockify → 起 `Xvfb :1`(1600x900)→ 起 xfce(xfwm4 + xfdesktop + xfce4-panel)→ **自动开 Chrome 到 `https://claude.ai/code`**(用独立 profile `/root/.chrome-vnc`,登录态持久保留)→ 起 `x11vnc`(只绑 localhost)→ 起 `websockify`(绑本机 Tailscale IP:6080)。
-
-**健壮性设计**:脚本最后 `wait` 在 Xvfb 进程上——Xvfb 一死脚本就退出,`Restart=on-failure` 让 systemd 把**整套**重拉。这修掉了旧版"Xvfb 死了、websockify 还活着 = 打开 :6080 是个没桌面的空壳"的毛病。
-
-验证:
+对应 `install.sh` 的 `[+] TigerVNC 图形桌面` 段:
 
 ```bash
-systemctl is-active novnc.service          # active
-ss -ltnp | grep 6080                       # 应显示  100.x.y.z:6080 (你的 Tailscale IP),不是 0.0.0.0:6080
+# ① 包(tigervnc 三件套 + xfce + 中文字体)
+apt-get install -y tigervnc-standalone-server tigervnc-common tigervnc-tools \
+                   xfce4 xfce4-terminal dbus-x11 fonts-noto-cjk
+# ② Chrome(不在 apt 默认源,单独装;登录页要用)
+apt-get install -y /tmp/chrome.deb    # google-chrome-stable_current_amd64.deb
+
+# ③ ~/.vnc/ 三件套(仓库模板,已有则不覆盖)
+cp     vnc/config   ~/.vnc/config     # geometry/depth/localhost=no/SecurityTypes=VncAuth
+install -m755 vnc/xstartup ~/.vnc/xstartup   # 开 xfce + 把 Chrome 停在 claude.com
+vncpasswd -f > ~/.vnc/passwd          # 随机 8 位密码,装完打印在屏幕上
+
+# ④ 单元 + 防火墙
+cp systemd/cloud-vnc.service /etc/systemd/system/ && systemctl enable --now cloud-vnc.service
+ufw allow 5901/tcp comment 'tigervnc public'
 ```
+
+**ARM64 注意**:那个 Chrome `.deb` 是 amd64,ARM 机器装不上。改 `apt-get install -y chromium`,`~/.vnc/xstartup` 里的 `command -v` 链已经会自动挑到 `chromium`,不用改脚本。
+
+---
+
+## 2. `cloud-vnc.service` 里那两行不能少
+
+单元文件见 [`systemd/cloud-vnc.service`](../systemd/cloud-vnc.service)。核心是 `ExecStart=/usr/bin/vncserver :1 -fg`(`-fg` 前台跑,systemd 才管得住),外加这两行:
+
+```ini
+Environment=SHELL=/bin/bash
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+
+**缺了会踩一个极具迷惑性的坑**:VNC 桌面里打开终端,提示符是孤零零一个 `# `,回车只出新 `#`,`claude`/`cloudgo` 全都 command not found —— 但 ssh 进同一台机器却一切正常。
+
+根因:systemd 拉起时环境里没有 `SHELL`,xfce 会话默认落 `SHELL=/bin/sh` → xfce4-terminal 开的是 **dash**,不读 `.bashrc`,PATH 和 shell 函数全都没有。root 在 `/etc/passwd` 里的登录 shell 是 bash,所以只有"桌面里的终端"坏。
+
+改完要 `systemctl daemon-reload && systemctl restart cloud-vnc`(会重启桌面,提前告知客户重连)。
 
 ---
 
 ## 3. 安全边界(必读)
 
-这层**在 tailnet 内不做任何鉴权**——谁在你的 Tailscale 网里,谁打开 `:6080` 就能操作这个桌面。安全完全靠"只有 tailnet 内可达"这一层兜底,所以边界务必守住:
+**`:5901` 是开在公网上的**,和旧的 tailnet-only 方案完全不同,边界靠这几条:
 
-- **websockify 只绑本机 Tailscale IP**:脚本里
-  ```bash
-  TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"; TS_IP="${TS_IP:-127.0.0.1}"
-  websockify --web=/usr/share/novnc "${TS_IP}:6080" localhost:5900 ...
-  ```
-  自动取本机 Tailscale IP 来绑(**不写死、无需手改**),取不到就回落 `127.0.0.1`——即 Tailscale 没起时只有本机能连,**失败朝安全的一侧倒**(fail-closed),不会误绑 `0.0.0.0` 把桌面暴露到公网。
-- **x11vnc 无密码 + 只听 localhost**:`x11vnc -nopw -localhost -rfbport 5900`——VNC 服务本身没密码(`-nopw`),但只绑 `127.0.0.1:5900`,公网/tailnet 都直连不到 5900;**唯一入口是 websockify 那个 tailnet-only 的 :6080**。所以真正的信任边界 = **是否在你的 tailnet 里**。
-- **别给 :6080 开公网防火墙**:核心 `install.sh` 的 ufw 基线已经 `ufw allow in on tailscale0`(整个 tailscale 接口放行),`:6080` 走 tailnet 天然通,**不需要**也**千万别** `ufw allow 6080/tcp`——那会把无密码桌面开到公网上,等于门户大开。
-- **Chrome `--no-sandbox`**:脚本以 root 跑 Chrome,必须带 `--no-sandbox` 才起得来(这是 root 运行的已知要求,不是这里新引入的风险);配合 tailnet-only 的访问边界,可接受。
+- **VncAuth 密码是唯一屏障**:`~/.vnc/passwd`(600)。`install.sh` 无则随机生成 8 位并打印在安装日志里 —— **那行必须记下来发给客户**,已有则沿用不动。忘了就 `vncpasswd` 重设 + `systemctl restart cloud-vnc`。
+- **VNC 协议本身不加密**:VncAuth 是挑战-应答(密码不明文过网),但**桌面画面和键盘输入是明文的**。客户在这个桌面里登录 Claude = 密码明文过公网。要更稳就让客户改用 SSH 隧道(`ssh -L 5901:localhost:5901 root@<IP>` 后连 `localhost:5901`),并把 `~/.vnc/config` 的 `localhost=no` 改回 `localhost=yes` + `ufw delete allow 5901/tcp`。**这是有意的取舍**:优先保证"客户零配置就能登录",登录是一次性动作,之后日常走 SSH/tailnet。
+- **登录完可以关掉**:桌面主要是为登录而存在。客户登录完、日常只用命令行的话,`systemctl disable --now cloud-vnc` + `ufw delete allow 5901/tcp` 把面收掉最干净,要用再起。
+- **Chrome `--no-sandbox`**:root 跑 Chrome 的已知要求,不是这里新引入的风险。
 
-> 一句话:**这个桌面的安全 = 你 tailnet 的安全。** 保证 tailnet 成员可信、别把 6080 漏到公网,就够;反之别装。
+> 一句话:**这个桌面的安全 = 那个 VNC 密码。** 密码要随机、要私下发给客户、别复用。
 
 ---
 
-## 4. 和 Wave 侧栏「服务器桌面」widget + Chrome 自动登 claude.ai/code 怎么串起来
+## 4. 验证 / 排障
 
-三块拼在一起就是"点一下侧栏图标 → 看到服务器桌面、Chrome 已经停在网页版 Claude Code":
+```bash
+systemctl is-active cloud-vnc.service      # active
+ss -ltnp | grep 5901                       # 应有 0.0.0.0:5901 (Xtigervnc)
+ls -l ~/.vnc/*.log                         # 会话日志:<主机名>:1.log
+```
 
-1. **服务器侧(本层)**:`novnc-start.sh` 开机把桌面 + Chrome→claude.ai/code 都摆好,`:6080/vnc.html` 常驻可连。
-2. **Wave 侧栏 widget**:Wave 客户端配置 `wave-config/waveterm/widgets.json` 里有个 `server-vnc` 部件(🟢 图标 `desktop`、标签「服务器桌面」),它就是个 web 视图,URL 写死指向:
-   ```
-   http://<SERVER_TAILSCALE_IP>:6080/vnc.html?autoconnect=true&resize=scale
-   ```
-   点它 = 在 Wave 里内嵌打开这个网页 → `autoconnect` 自动连上桌面 → `resize=scale` 自适应缩放。
-3. **落地即用**:连上看到的桌面里,Chrome 已经开在 `https://claude.ai/code`、且用持久 profile(`/root/.chrome-vnc`)保留登录态——所以你能直接用**网页版 Claude Code**(富文本 + 贴图),登录 IP 是服务器的干净 IP、和你 Mac 环境完全隔离。
+常见情况:
 
-> ⚠️ **客户必改**:`widgets.json`(`waveterm` 和 `waveterm-dev` 两份)里那个 `<SERVER_TAILSCALE_IP>` 是占位符,换成**你自己服务器的** Tailscale IP,否则点了会连不上你的机器。这条已在 [DEPLOY.md](../DEPLOY.md) 阶段二「必改清单」里列了。服务器侧 `novnc-start.sh` 不用改(它自动取本机 IP)。
-> 不用 Wave 也行:任何浏览器直接开 `http://<你的Tailscale-IP>:6080/vnc.html` 一样进。
+- **连上是黑屏 / 灰屏没有桌面** → 看 `~/.vnc/<主机名>:1.log`,多半是 `startxfce4` 没起来(xfce4 包没装全)或 `~/.vnc/xstartup` 没有可执行位(`chmod +x`)。
+- **桌面里终端只有光秃秃 `#`** → 就是 §2 那个坑,单元缺 `SHELL`/`PATH`。
+- **Chrome 没起来** → 看 `/var/log/chrome-vnc.log`;上次非正常退出留了 `Singleton*` 锁的话 `xstartup` 开头那行 `rm -f` 会清掉,清不掉就手动删 `/root/.chrome-vnc/Singleton*`。
+- **桌面里中文是方块** → 补 `apt-get install -y fonts-noto-cjk fonts-wqy-zenhei` 再重启服务。
+- **改了 `~/.vnc/config` 不生效** → 那是 `vncserver` 启动时读的,必须 `systemctl restart cloud-vnc`。
 
 > 🖥️ **别和 `Xvfb :99` 混**:服务器上另有一个 `Xvfb :99` 是给 `chrome-devtools-mcp` 用的**独立显示**,和本层的 `:1` 桌面无关、互不影响。
 
 ---
 
-## 5. 验证 / 排障
+## 5. 顺带:`cloud-dashboards.service`(:8088 项目看板,选装层)
 
-**日志都在 `/var/log/`**(脚本把每个组件单独重定向了):
-
-```bash
-journalctl -u novnc.service -n 50 --no-pager      # 单元级(重启/退出原因)
-ls -l /var/log/{xvfb,x11vnc,websockify,chrome-vnc,xfwm4,xfdesktop,xfce4-panel}.log
-```
-
-常见情况:
-
-- **打开 :6080 连不上 / 空壳没桌面** → 先 `systemctl restart novnc.service`(健壮版会把整套重拉);再看 `xvfb.log` 有没有起来。
-- **`ss -ltnp | grep 6080` 显示的是 `127.0.0.1:6080` 而不是 Tailscale IP** → 多半是**开机时 Tailscale 还没分到 IP**,脚本回落到了 localhost(见 §7 已知限制)。等 `tailscale ip -4` 能出 IP 后 `systemctl restart novnc.service` 即可。
-- **桌面里中文是方块** → 没装字体,补 `apt-get install -y fonts-noto-cjk fonts-wqy-zenhei`,再重启服务。
-- **Chrome 没起来** → 看 `chrome-vnc.log`;root 跑必须 `--no-sandbox`(脚本已带)。ARM64 机器八成是还在用 amd64 的 google-chrome,按 §1 的 ⚠️ 换 chromium。
-
----
-
-## 6. 顺带:`cloud-dashboards.service`(:8088 项目看板,另一个选装层)
-
-和 noVNC 一样,`cloud-dashboards.service` 核心 `install.sh` **也不部署**——它是 Wave 侧栏 🩵「项目看板」那个部件的后端,只在 `:8088` 上用 `python3 -m http.server` **静态服务 `/root/inbox/dashboards` 这一个目录**。要用才装:
+看板**是**选装的(`CLOUD_DESKTOP=1 ./install.sh` 才装),别和必装的桌面层混了。它只在 `:8088` 上用 `python3 -m http.server` **静态服务 `/root/inbox/dashboards` 这一个目录**:
 
 ```bash
 cp systemd/cloud-dashboards.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now cloud-dashboards.service
+systemctl daemon-reload && systemctl enable --now cloud-dashboards.service
 ```
 
-> ✅ **看板 service 现在也自动取本机 IP**:`ExecStart` 已指向 `bin/cloud-dashboards.sh`(wrapper 内 `tailscale ip -4` 自动绑,install.sh 会把它装进 `/usr/local/bin`),跟 `novnc-start.sh` 一样、**无需手改 IP**。安全边界同 noVNC:只绑 tailnet IP、tailnet 内不鉴权。
+`ExecStart` 指向 `bin/cloud-dashboards.sh`(wrapper 内 `tailscale ip -4` 自动绑本机 tailnet IP,**无需手改 IP**)。安全边界是老一套:**只绑 tailnet IP、tailnet 内不鉴权**,别给 `:8088` 开公网防火墙。
 
 它和桌面层没有依赖关系,分开装、按需装即可。
-
----
-
-## 7. 已知限制 / 定位
-
-- **开机时序**:`novnc.service` 是 `After=network-online.target`,**没显式等 `tailscaled`**。若开机时 Tailscale 比它先上不能保证,`novnc-start.sh` 取 IP 会回落 `127.0.0.1`(桌面暂时只有本机能连),需 Tailscale 就绪后 `systemctl restart novnc.service` 恢复。想根治可给单元加 `After=tailscaled.service`(本仓默认没加,保持和现网一致)。
-- **通用核心 vs 私有叠加**:
-  - **通用核心(可给客户照装)**:整套流程 —— apt 依赖、`novnc-start.sh`(已改为自动取本机 IP)、`novnc.service`、安全边界。谁装都一样。
-  - **私有叠加(客户必换成自己的)**:Wave `widgets.json` 里的 `:6080`/`:8088` **URL 里那个 Tailscale IP** —— 占位符,复用照 [DEPLOY.md](../DEPLOY.md) 阶段二「必改清单」换成客户自己的。(服务器侧 noVNC 与看板 service 都已自动取本机 IP、无需改。)

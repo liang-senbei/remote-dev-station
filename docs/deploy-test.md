@@ -121,7 +121,7 @@ selfheal ≈ 3–6 分钟(S1 等登记 ≤60s、发暗号 ≤120s、S5 等拉回
 | 编号·测什么 | 怎么测 | 期望(PASS 判据) | FAIL 怎么判 / 去哪修 |
 |---|---|---|---|
 | **O1** moshi-hook 手机审批链路 | `command -v moshi-hook` 没有 → SKIP;有 → 三证:`timeout 12 moshi-hook status` 显示 paired + `systemctl is-active moshi-hook.service` + `journalctl -u moshi-hook.service -n 3000` 里有 `ws bridge connected` | 已配对 + 守护 active + ws bridge 已连云端 | 装了但链路不通 = 手机收不到审批,照 [phone/README.md](../phone/README.md) §2、§4 排(未配对先 `moshi-hook pair`);自愈兜底 timer 是 H11 |
-| **O4** noVNC 图形桌面(:6080) | `novnc.service` unit 不存在 → SKIP;存在 → service active + `Xvfb`/`x11vnc`/`websockify` 三进程都在 + `curl http://<tailscale-IP>:6080/vnc.html` 返回 200 + `ss -ltn` 确认 6080 **只绑 tailscale 内网 IP**(不对公网) | 全链路健康 | 装了但不健康 = 打开 :6080 是空壳/打不开 → [desktop-layer.md](desktop-layer.md);"空壳无桌面"老毛病已由 wait-在-Xvfb 修掉,再犯 → `systemctl restart novnc` |
+| **O4** TigerVNC 登录桌面(:5901) | `cloud-vnc.service` active + `ss -ltn` 有 `0.0.0.0:5901`(Xtigervnc)+ `~/.vnc/passwd` 存在(公网口必须有 VncAuth)+ 单元含 `Environment=SHELL=/bin/bash`(缺了桌面里的终端会变 dash) | 全链路健康 | 连上黑屏/灰屏 → 看 `~/.vnc/<主机名>:1.log`;桌面终端只有光秃秃 `#` → 单元缺 SHELL/PATH;详见 [desktop-layer.md](desktop-layer.md) |
 | **O5** 项目看板(:8088) | `cloud-dashboards.service` unit 不存在 → SKIP;存在 → service active + `curl http://<tailscale-IP>:8088/` 返回 200 | active + 200 | `systemctl restart cloud-dashboards.service` |
 
 ### 2.4 M · 迁移(传了 `--projects` 才真跑;没传 M1 记 SKIP)
@@ -166,7 +166,7 @@ skills/MCP 清单、红线自查、迁移垃圾密钥这些扩展检查脚本不
 | **H9**(旧 O5)shell 增强 | `command -v fzf`;`command -v starship`;`[ -d ~/.local/share/blesh ]` | **fzf 必须有**;starship/blesh 缺只提示 | fzf 缺按 **FAIL 对待、不是 SKIP**——cloudgo 选择器/新建/分级删除菜单全靠它,没它入口哑火:`apt-get install -y fzf`;其余重跑 install.sh 尾段 |
 | **H10**(旧 O6)反向通道 mac/laptop | `grep -q '^Host mac' ~/.ssh/config` 没配 → 不适用;配了 → `ssh -o BatchMode=yes -o ConnectTimeout=8 mac true`(`laptop` 同理) | 退出 0 | [mac-reverse-channel.md](mac-reverse-channel.md) / [windows-reverse-channel.md](windows-reverse-channel.md) |
 | **H11**(旧 O2)moshi 自愈兜底 | (O1 装了才查)`systemctl is-active moshi-hook-healthcheck.timer` | active | `systemctl enable --now moshi-hook-healthcheck.timer`(A0 基建体检把它列为可选项,会顺带显示) |
-| **H12**(旧 O3/O4 的人工增量)桌面/看板真实打开 | 脚本 O4/O5 已自动做 service/进程/HTTP 探活;人工补充 = 浏览器实开 `http://<tailscale-IP>:6080/vnc.html` 操作一下桌面、`:8088` 看板内容对不对 | 真可用,不止 HTTP 200 | 打不开先回看 O4/O5 的 FAIL 明细;curl 通、浏览器不通多半是客户端没进 tailnet(回 H1) |
+| **H12**(旧 O3/O4 的人工增量)桌面/看板真实打开 | 脚本 O4/O5 已自动做 service/进程/HTTP 探活;人工补充 = VNC 客户端实连 `<公网IP>:5901` 操作一下桌面(Chrome 是否停在 claude.com、桌面里开终端敲 `claude` 有没有反应)、`:8088` 看板内容对不对 | 真可用,不止 HTTP 200 | 打不开先回看 O4/O5 的 FAIL 明细;curl 通、浏览器不通多半是客户端没进 tailnet(回 H1) |
 | **H13**(旧 M2)settings 合并完整 | `grep -q cc-state ~/.claude/settings.json` 且 `grep -o '"/Users/[^"]*"' ~/.claude/settings.json` 为空 | 自愈钩子还在、无旧机死路径 | 钩子被旧 settings 盖掉 → 重新合并 `settings.client.json` 的 hooks;死路径逐条改/删(DEPLOY 阶段四「settings 别整份覆盖」)。A3 只验"已配置 hook 首词可执行"、S1 端到端验钩子链路,整份 settings 的死路径扫描属这里 |
 | **H14**(旧 M3)skills/commands/MCP 到位 | 对着客户点名清单查 `~/.claude/skills/`、`~/.claude/commands/`;`mcpServers.json` 里每个 `command` 都 `command -v` 得到 | 清单齐、MCP 命令可执行 | 缺的:能从市场重装的重装,客户私有的手动迁(DEPLOY 阶段四) |
 | **H15**(旧 M4)红线自查 | 抽查 `~/.claude/CLAUDE.md` 不含**别人的**私有业务规则 / 机器名 / 记忆引用;`git -C <仓目录> remote get-url origin` | CLAUDE.md 是客户自己的;origin 是客户自己的仓 | 命中别人的私有内容 = 违 DEPLOY §7 红线 1/3 → 换成客户自己的 CLAUDE.md / origin |

@@ -1,0 +1,25 @@
+[Unit]
+Description=TigerVNC :1 (public :5901) desktop + Chrome — 给客户做 Claude 网页登录 / 跑 GUI 应用
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+Environment=USER=root
+# ↓ 这两行【必须有】。缺了会踩「VNC 桌面里的终端只有光秃秃 # 提示符」的坑:
+#   systemd 拉起时环境无 SHELL → xfce 落 SHELL=/bin/sh → xfce4-terminal 开的是 dash,
+#   不读 .bashrc、PATH/函数全没有,claude/cloudgo 在桌面里一律 command not found。
+#   ssh 进来却完全正常(root 的 /etc/passwd 登录 shell 是 bash),所以极具迷惑性。
+Environment=SHELL=/bin/bash
+Environment=PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStartPre=-/usr/bin/vncserver -kill :1
+ExecStartPre=-/bin/rm -f /tmp/.X11-unix/X1 /tmp/.X1-lock
+ExecStart=/usr/bin/vncserver :1 -fg
+ExecStop=/usr/bin/vncserver -kill :1
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
