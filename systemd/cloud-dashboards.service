@@ -1,6 +1,11 @@
 [Unit]
 Description=Project dashboards portal — serves ONLY /root/inbox/dashboards on :8088 (项目看板门户)
-After=network-online.target
+After=network-online.target tailscaled.service
+# ↑ 必须等 tailscaled。cloud-dashboards.sh 用 `tailscale ip -4` 决定绑哪个地址,取不到就回落
+#   127.0.0.1 —— 那样客户从自己机器根本连不上 :8088,而服务显示 active、看着一切正常。
+#   开机时这俩只差一两秒,是稳定复现的竞态(现网实测:service 09:55:18 起、tailscaled 09:55:19 起,
+#   于是绑成了 127.0.0.1,直到有人手动 restart 才好,下次重启照旧复发)。
+Wants=tailscaled.service
 
 [Service]
 ExecStart=/usr/local/bin/cloud-dashboards.sh

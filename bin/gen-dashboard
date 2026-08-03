@@ -10,7 +10,22 @@ UP=$(uptime -p 2>/dev/null | sed 's/up //')
 MEM=$(free -h 2>/dev/null | awk '/Mem:/{print $3" / "$2}')
 DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $3" / "$2" ("$5")"}')
 LOAD=$(uptime 2>/dev/null | grep -oE 'load average.*' | cut -d: -f2 | xargs)
-MODEL=$(grep -m1 CLOUD_MODEL ~/.bashrc 2>/dev/null | grep -oE 'claude-[a-z0-9-]+\[?1?m?\]?')
+# 模型有两个来源,按【实际生效的优先级】取:CLOUD_MODEL 非空 = 命令行 --model 钉死(优先级高于
+# settings.json);留空则由座舱配置决定 —— settings.json 的 model 字段,再回落 env.ANTHROPIC_MODEL。
+# (只读 .bashrc 那一处的话,自从模型改由座舱决定、CLOUD_MODEL 默认留空后,这张卡片就一直是空的。)
+MODEL=$(grep -m1 '^CLOUD_MODEL=' ~/.bashrc 2>/dev/null | grep -oE 'claude-[a-z0-9.-]+(\[1m\])?')
+[ -n "$MODEL" ] && MODEL="$MODEL <span class=muted>(已钉死)</span>"
+if [ -z "$MODEL" ]; then
+  MODEL=$(python3 -c "
+import json,os
+try:
+    d=json.load(open(os.path.expanduser('~/.claude/settings.json')))
+    m=d.get('model') or d.get('env',{}).get('ANTHROPIC_MODEL')
+    print(('%s <span class=muted>(座舱配置)</span>'%m) if m else '')
+except Exception: print('')
+" 2>/dev/null)
+fi
+[ -z "$MODEL" ] && MODEL="<span class=muted>未设 · 用账号默认</span>"
 NOW=$(date '+%Y-%m-%d %H:%M:%S')
 SESS=$(tmux ls 2>/dev/null | grep -E '^cc-|^cloud' | awk -F: '{print $1}')
 SESSN=$(echo "$SESS" | grep -c . )
