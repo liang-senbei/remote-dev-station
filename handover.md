@@ -14,8 +14,11 @@
 
 - **已完成**：会话韧性层(tmux+watchdog)、hub 通讯、反向通道(dfhz/mac/lap)、OOM 硬化(earlyoom+swap+swappiness)、cc 座舱扩展(另仓 cc-cockpit)、TigerVNC 桌面层、cli-deploy 极简版、CLAUDE.md 第5章建档纪律、**任务看板自动督促引擎 `cc-autopilot`(bin/ + systemd,配合座舱 v0.4.19 的开关UI)**、**cloudgo 会话选单入仓**(此前只被文档/验收测试引用、实际不发货的"半迁移"坑:`bashrc-cloud-snippet.sh` 补 9 函数 + `bin/` 补 3 helper(cloud-sessmenu/sesspreview/delmenu);install.sh 原有 `install bin/*` + append snippet 自动接上;验收 A1/A2/H8 现可过。见 TROUBLESHOOTING)。
 - **进行中**：无(系统稳定运行)。
-- **待办**：无硬待办。**待站长定夺**:install.sh 是否幂等确保 sshd `PubkeyAuthentication yes`(连续多个客户镜像默认 `no`,害得每客户手改)。
-  (已了结:桌面层「必装还是可选」的自相矛盾 —— 2026-08-03 随 noVNC→TigerVNC 迁移一并统一为**必装**,CLI-DEPLOY 那行矛盾注释已改。)潜在优化另见 TROUBLESHOOTING.md。
+- **待办**：无硬待办。
+  (已了结① 桌面层「必装还是可选」的自相矛盾 —— 2026-08-03 随 noVNC→TigerVNC 迁移一并统一为**必装**,CLI-DEPLOY 那行矛盾注释已改。
+  已了结② sshd `PubkeyAuthentication` —— 2026-08-03 第四个客户(黑盒)实测出厂即 `no`,已固化进 install.sh 幂等开启
+  (只动 Pubkey、不碰 PasswordAuthentication,且带 `sshd -t` 语法闸门,改坏不重启、锁不死)。
+  这个坑的隐蔽之处:公钥推进去了、权限内容全对,登录仍报 "Permission denied (password)",看着像密码错。)潜在优化另见 TROUBLESHOOTING.md。
 
 ### cc-autopilot（任务看板自动督促）速览
 - **引擎**：`bin/cc-autopilot`(Python 守护) + `systemd/cc-autopilot.{service,timer}`(每 5min)。**独立于 VS Code,24h 生效**。

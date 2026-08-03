@@ -65,6 +65,29 @@ else
 fi
 systemctl daemon-reload
 
+echo "[+] sshd 幂等确保公钥认证开着"
+# ⚠️ 连续多个客户镜像出厂就是 PubkeyAuthentication no(2026-08-03 第四个客户实测:sshd -T 明确吐 no)。
+# 后果很隐蔽:部署方把公钥推进 ~/.ssh/authorized_keys、权限内容全对,登录却照样跳过公钥直接要密码,
+# 报的还是 "Permission denied (password)" —— 看着像密码错,实则是公钥认证被服务端禁用。
+# 只开 Pubkey,【不动 PasswordAuthentication】:改坏了还能用密码进,锁不死自己。
+if [ "$(sshd -T 2>/dev/null | awk '/^pubkeyauthentication /{print $2}')" = "no" ]; then
+  cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.bak-$(date +%Y%m%d%H%M%S)"
+  sed -i 's/^[[:space:]]*#\?[[:space:]]*PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+  grep -qi '^PubkeyAuthentication' /etc/ssh/sshd_config || echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+  # sshd_config.d/ 里的云镜像配置会覆盖主文件(OpenSSH 首次匹配生效,Include 通常在主文件开头),一并清掉
+  grep -rlie '^[[:space:]]*PubkeyAuthentication[[:space:]]\+no' /etc/ssh/sshd_config.d/ 2>/dev/null | while read -r f; do
+    sed -i 's/^[[:space:]]*PubkeyAuthentication[[:space:]]\+no/PubkeyAuthentication yes/I' "$f"; echo "  → 同时改了 $f"
+  done
+  if sshd -t 2>/dev/null; then
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+    echo "  → sshd 公钥认证已开启(实际生效值:$(sshd -T 2>/dev/null | awk '/^pubkeyauthentication /{print $2}'))"
+  else
+    echo "  ⚠️ sshd 配置语法检查未过,【未重启】,原配置仍在跑;请手动看 sshd -t 的报错"
+  fi
+else
+  echo "  → sshd 公钥认证本就是开的,跳过"
+fi
+
 echo "[6/7] 防火墙基线（放行必要端口并启用）"
 ufw allow 22/tcp; ufw allow 60000:61000/udp; ufw allow in on tailscale0
 ufw allow 5901/tcp comment 'tigervnc public'   # 登录桌面走公网:客户 Tailscale 还没配好时也够得着(靠 ~/.vnc/passwd 的 VncAuth 挡)
