@@ -1,13 +1,25 @@
 #!/usr/bin/env bash
-# cc-new <名称>  在 /opt/workspace/<名称> 开/续受管 Claude 会话。
+# cc-new [--dir <工作目录>] <名称>   开/续受管 Claude 会话。
+#   不带 --dir → 默认在 /opt/workspace/<名称>(老行为不变);
+#   带 --dir  → 会话就在该目录下开(座舱「频道里直接新建 agent」用它把 agent 放进对应目录)。
 export PATH="$HOME/.local/bin:$PATH"   # ssh 非交互调用时 sshd 只给极简 PATH,claude 在 ~/.local/bin 找不到 → pane 127 秒退
 #   · 已在跑 → attach;有登记 → --resume 接回;全新 → 同步写登记表(不靠异步钩子)+ 钉死 --session-id。
 #   登记进主账本 ~/.cloud-sessions/,cloud-watchdog 自愈、「恢复本页」可一键弹回。
+wantdir=""
+while [ "${1:-}" = "--dir" ] || [ "${1:-}" = "--worktree" ]; do
+  case "$1" in
+    --dir) wantdir="$2"; shift 2 ;;
+    --worktree) shift 2 ;;   # 兼容座舱旧命令 newAgentWorktree 的 --worktree 参数(此脚本不建 worktree,忽略之,仍按 --dir/默认建目录)
+  esac
+done
 name="$*"
-[ -z "$name" ] && { echo "用法: cc-new <名称>"; exit 1; }
-slug=$(printf '%s' "$name" | tr -s '[:space:]' '-' | tr -d '.:`"'"'" | sed 's/^-*//; s/-*$//')
+[ -z "$name" ] && { echo "用法: cc-new [--dir <工作目录>] <名称>"; exit 1; }
+slug=$(printf '%s' "$name" | tr -s '[:space:]' '-' | tr -d '/.:`"'"'" | sed 's/^-*//; s/-*$//')
 [ -z "$slug" ] && slug="s$(date +%m%d%H%M%S)"
-sess="cc-$slug"; dir="/opt/workspace/$slug"; mkdir -p "$dir"
+sess="cc-$slug"
+# 目录:显式 --dir 优先(名字只当会话名);否则老规矩 /opt/workspace/<slug>。
+if [ -n "$wantdir" ]; then dir="$wantdir/$slug"; else dir="/opt/workspace/$slug"; fi
+mkdir -p "$dir"
 python3 - "$dir" <<'PY' 2>/dev/null || true
 import json,os,sys
 p=os.path.expanduser("~/.claude.json")
