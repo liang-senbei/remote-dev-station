@@ -58,3 +58,16 @@
 - **根因**:cli-deploy 分支从全功能版**半迁移**:测试和 CLI-DEPLOY 正文按"cloudgo 是核心"写好了,但 ① 那 9 个函数从没进 `bashrc-cloud-snippet.sh`(它只有 `claude()`/`cloud()`);② 3 个 helper 脚本从没进 `bin/`(`install -m755 bin/*` 只能装已存在的);③ 同时 README 头、CLI-DEPLOY intro、`claude-config/CLAUDE.md` 还留着"本版无 cloudgo"的旧话,和 ①② 互相打架。典型"文档说有、实际没有 + 文档自相矛盾"。
 - **修法**:把 cloudgo 收进仓库当核心发货件——`bashrc-cloud-snippet.sh` 补全 9 函数(去掉站长机专用的 `sergo`、`claude`→`command claude`、新增 `export CLOUD_ROOT`),`bin/` 补 3 个 helper。**install.sh 无需改**(`install -m755 bin/*` + `cat bashrc-cloud-snippet.sh >> ~/.bashrc` 原本就会带上,fzf 尾段也早装好)。再把 6 处"无/移除 cloudgo"的矛盾文档改成"保留·服务器侧·两版都有"。
 - **怎么避开**:验收测试(deploy-test.md)是"契约"——**测试查的工具/函数必须有对应发货件**。加/删一条能力要三头对齐:发货件(bin//bashrc 片段)+ install 接线 + 测试,别只动一头留下空引用。纯 SSH 下 cloudgo 靠 `WAVETERM_BLOCKID` 为空自动降级成"每次弹菜单",极简版照样能用,不必担心"只能 Wave 用"。
+
+## cc 座舱把站长自己 `/root` 下的项目也列出来 —— 它默认调的是**裸 cc-agents**
+
+- **症状**:座舱(cc-cockpit)的 agent 列表 / 频道里冒出**不该给客户看的东西** —— `/root/src` 下站长自己的开发项目、`/root`、`/tmp` 的临时会话、连笔记本信箱 `cc-local` 都在。客户机上这等于把别人的活儿摊给客户看。
+- **根因**:`ccCockpit.ccAgentsPath` 默认值是裸 `cc-agents`,而 `cc-agents` 的设计就是**全量**——注册表(`~/.cloud-sessions/*.json`)里没 ended 的 + 活 tmux 里的裸会话,一个不落。座舱本身**没有任何按路径过滤的配置项**(0.8.0 确认:只有 ccAgentsPath / repoRoot / host / pollIntervalMs / notifyOn / local*),所以过滤只能加在**供数这一侧**。
+- **修法**:`bin/cc-agents-filtered`(整对象透传 + 重算 summary,只放行 `ROOTS = ["/opt/workspace"]`),`install.sh` 把 `ccCockpit.ccAgentsPath` 指向它并写进 `~/.vscode-server/data/Machine/settings.json`。**Machine settings 优先级高于客户本地(Windows/Mac)的用户设置**,客户那边怎么配都盖不掉。终端 `cc-agents`、`cc-autopilot`、通知**不受影响**,仍是全量——只有座舱这一路被滤。
+- **易漏 / 验证**:
+  ① **频道不用另外治**:座舱的频道是按当前 agent 的 `dir` 现算分组的(`classifyDir`),列表里没有 `/root/src` 的 agent,频道就不会出现。扩展包里硬编码的 `DIR_ROOTS`(含 `/root/src/workplace/browser` 等)只是个分类表,**不是扫描源**,不用为这事重打 vsix。
+  ② **Worktrees 视图是第二个口子**:它走 `ccCockpit.repoRoot`,和 agent 列表**不共用过滤**。repoRoot 留在 `/root/src/...` 就还是会把 /root 下的仓露出来 —— 一并设成 `/opt/workspace`。(默认值 `/opt/workspace/HACKING/...` 不存在时扩展会回落到 `os.homedir()` = `/root`,更要显式设。)
+  ③ **过滤脚本必须在仓里**:2026-08-13 前它只以手写脚本的形式躺在机器上、`install.sh` 不发货 —— 重装 = 座舱悄悄恢复成"什么都显示",而且没人会注意到。已入仓,由 `install -m755 bin/*` 带上。
+  ④ **别把两台机器的规则搞混**:站长机(ser4420027323)上那份 `cc-agents-filtered` 是**反过来的**(只留 `/root`,给站长自己看开发项目用)。同名脚本、相反规则,改之前先 `head -3` 看清楚是哪台。
+  ⑤ **验证**:`cc-agents-filtered --json | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['agents']), all(a['dir'].startswith('/opt/workspace') for a in d['agents']))"`,并对比 `cc-agents --json` 仍是全量。座舱侧改完**不用 reload**,下一轮轮询(3s)自动生效。
+  ⑥ **`/opt/workspace` 是空的时候座舱就是空的**——这是对的,不是坏了。客户的项目本来就该开在 `/opt/workspace` 下(`cloud-enter`/`cloudgo` 默认落这儿)。

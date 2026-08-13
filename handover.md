@@ -12,7 +12,7 @@
 
 ## 2. 进度
 
-- **已完成**：会话韧性层(tmux+watchdog)、hub 通讯、反向通道(dfhz/mac/lap)、OOM 硬化(earlyoom+swap+swappiness)、cc 座舱扩展(另仓 cc-cockpit)、TigerVNC 桌面层、cli-deploy 极简版、CLAUDE.md 第5章建档纪律、**任务看板自动督促引擎 `cc-autopilot`(bin/ + systemd,配合座舱 v0.4.19 的开关UI)**、**cloudgo 会话选单入仓**(此前只被文档/验收测试引用、实际不发货的"半迁移"坑:`bashrc-cloud-snippet.sh` 补 9 函数 + `bin/` 补 3 helper(cloud-sessmenu/sesspreview/delmenu);install.sh 原有 `install bin/*` + append snippet 自动接上;验收 A1/A2/H8 现可过。见 TROUBLESHOOTING)。
+- **已完成**：会话韧性层(tmux+watchdog)、hub 通讯、反向通道(dfhz/mac/lap)、OOM 硬化(earlyoom+swap+swappiness)、cc 座舱扩展(另仓 cc-cockpit)、TigerVNC 桌面层、cli-deploy 极简版、CLAUDE.md 第5章建档纪律、**任务看板自动督促引擎 `cc-autopilot`(bin/ + systemd,配合座舱 v0.4.19 的开关UI)**、**cloudgo 会话选单入仓**(此前只被文档/验收测试引用、实际不发货的"半迁移"坑:`bashrc-cloud-snippet.sh` 补 9 函数 + `bin/` 补 3 helper(cloud-sessmenu/sesspreview/delmenu);install.sh 原有 `install bin/*` + append snippet 自动接上;验收 A1/A2/H8 现可过。见 TROUBLESHOOTING)、**座舱作用域收口**(`bin/cc-agents-filtered` 入仓 + install.sh 写 Machine settings:座舱只列 `/opt/workspace` 的 agent,`/root` 下站长自己的项目不进座舱;终端 cc-agents 仍全量。见 TROUBLESHOOTING)。
 - **进行中**：无(系统稳定运行)。
 - **待办**：无硬待办。
   (已了结① 桌面层「必装还是可选」的自相矛盾 —— 2026-08-03 随 noVNC→TigerVNC 迁移一并统一为**必装**,CLI-DEPLOY 那行矛盾注释已改。

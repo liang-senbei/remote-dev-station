@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""cc-agents wrapper: 只保留 dir 落在 ROOTS 里的 agent，其余过滤掉。
+供本机 cc 座舱(cc-cockpit)消费 —— Machine settings 的 ccCockpit.ccAgentsPath 指向本脚本。
+原始 cc-agents 不动：终端里 `cc-agents`、cc-autopilot、通知，看到的仍是全部会话。
+
+规则(2026-08-13 定)：座舱只扫 /opt/workspace 里的 agent，
+/root/src 下的项目(站长自己的第二工作区)一律不进座舱。
+座舱的「频道」是按 agent 的 dir 现算分组的，列表里没有 /root/src 的 agent，
+频道里也就不会冒出 /root/src 的项目。
+"""
+import sys, json, subprocess
+
+ROOTS = ["/opt/workspace"]          # 只有这些根下面(含根本身)的 agent 才进座舱
+
+def keep(a):
+    d = a.get("dir", "") or ""
+    return any(d == r or d.startswith(r + "/") for r in ROOTS)
+
+result = subprocess.run(
+    ["/root/.local/bin/cc-agents", "--json"],
+    capture_output=True, text=True, timeout=15,
+)
+if result.returncode != 0:
+    sys.exit(result.returncode)
+
+data = json.loads(result.stdout)
+kept = [a for a in data["agents"] if keep(a)]
+data["agents"] = kept
+data["summary"]["total"] = len(kept)
+data["summary"]["waiting"] = sum(1 for a in kept if a.get("attention") == "input")
+data["summary"]["working"] = sum(1 for a in kept if a.get("attention") in ("work", "stalled"))
+data["summary"]["done"] = sum(1 for a in kept if a.get("attention") == "done")
+data["summary"]["idle"] = sum(1 for a in kept if a.get("attention") in ("idle", "ended"))
+data["summary"]["tokens_today"] = sum(a.get("tokens_today", 0) for a in kept)
+data["summary"]["cost_today_usd"] = round(sum(a.get("cost_today_usd", 0) for a in kept), 2)
+
+print(json.dumps(data, ensure_ascii=False, indent=2))
