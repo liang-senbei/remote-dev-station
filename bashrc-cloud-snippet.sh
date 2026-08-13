@@ -164,6 +164,12 @@ cloudnewat() {
     esac
   done
 }
+# sergo：跟 cloudgo 是同一套逻辑（同一份会话列表、同样的标签自学习 / 预览 / Ctrl-X 删除），
+# 唯一区别是「➕ 新建会话」和「⟳ 恢复历史」的目录起点是 /root/src，不是 /opt/workspace。
+# 两个入口的会话是互通的：在哪边建的，另一边都看得到。
+# ⚠️ 站长机专用：前提是本机存在 /root/src 这个第二工作区；极简客户版没有它，
+#    所以 main 分支刻意不发货 sergo（见 TROUBLESHOOTING.md「cloudgo 半迁移」条）。
+sergo() { CLOUD_ROOT=/root/src cloudgo "$@"; }
 
 # ssh 登录默认落到工作区根 → 客户可 cd 到不同项目目录、各自敲 claude(每个目录一个对话,像本地)。
 if [[ $- == *i* ]] && shopt -q login_shell 2>/dev/null && [ "$PWD" = "$HOME" ]; then cd "$CLOUD_ROOT" 2>/dev/null || true; fi
