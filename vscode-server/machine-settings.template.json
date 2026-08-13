@@ -1,7 +1,8 @@
 {
-  "__doc__": "VS Code Remote-SSH 服务器侧 Machine settings 模板 → ~/.vscode-server/data/Machine/settings.json。核心目的:防 exthost(扩展宿主)内存膨胀被 OOM。见 ../docs/vscode-remote-oom.md。ccCockpit.* 是本部署的座舱扩展配置,按机器改;没装座舱可删。",
+  "__doc__": "VS Code Remote-SSH 服务器侧 Machine settings 模板 → ~/.vscode-server/data/Machine/settings.json。核心目的:防 exthost(扩展宿主)内存膨胀被 OOM。见 ../docs/vscode-remote-oom.md。ccCockpit.* 是本部署的座舱扩展配置,按机器改(host 换成本机 hostname);没装座舱可删。ccAgentsPath 指的是过滤版 cc-agents-filtered —— 座舱只看 /opt/workspace,别改回裸 cc-agents(那会把 /root 下站长自己的项目也列进座舱)。install.sh 会自动把这三行 ccCockpit.* 合并进上面那个路径,整份模板(含 OOM 那套)要不要铺是另一回事、手动决定。",
 
-  "ccCockpit.ccAgentsPath": "cc-agents",
+  "ccCockpit.ccAgentsPath": "/root/.local/bin/cc-agents-filtered",
+  "ccCockpit.repoRoot": "/opt/workspace",
   "ccCockpit.pollIntervalMs": 3000,
   "security.workspace.trust.enabled": false,
 

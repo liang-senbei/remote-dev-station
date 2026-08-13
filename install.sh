@@ -37,6 +37,23 @@ install -m755 bin/cc-quota /usr/local/bin/                           # 「5小�
 install -m755 hub/hub.sh ~/.local/bin/hub            # 多 cc 会话协同(hub ls/peek/say/iam)
 # (极简 CLI 版已移除 Wave「按标签页恢复终端」的服务器助手 windows/server-side/*——纯终端不需要)
 
+# ---- cc 座舱:只让它看见 /opt/workspace ----------------------------------
+# 座舱默认调裸 cc-agents = 机器上【所有】会话都进座舱,包括 /root 下站长自己的项目。
+# 客户机上这等于把非客户的东西摊给客户看。改由 cc-agents-filtered 供数(上面 bin/* 已装),
+# 并把路径写进 Machine settings —— 它优先级【高于】客户本地(Windows/Mac)的用户设置,
+# 客户那边怎么配都盖不掉。终端里的 cc-agents / cc-autopilot / 通知不受影响,仍是全量。
+echo "[+] cc 座舱:写 Machine settings(座舱只扫 /opt/workspace)"
+mkdir -p ~/.vscode-server/data/Machine
+python3 - "$HOME/.vscode-server/data/Machine/settings.json" "$HOME/.local/bin/cc-agents-filtered" "$(hostname)" <<'PY' || echo "  → 跳过:现有 settings.json 解析不了(可能带注释/手改过),没敢覆盖 —— 手动加 ccCockpit.ccAgentsPath 即可"
+import json, os, sys
+p, binpath, host = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}   # 解析失败=抛异常,走上面的 || 分支,绝不覆盖客户已有配置
+cfg.update({"ccCockpit.ccAgentsPath": binpath,
+            "ccCockpit.repoRoot": "/opt/workspace",   # Worktrees 视图的根,别让它伸进 /root
+            "ccCockpit.host": host})
+json.dump(cfg, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+PY
+
 echo "[4/7] 部署 tmux 配置 + .bashrc 函数块"
 cp tmux.conf ~/.tmux.conf
 grep -q "Moshi-CloudCode setup" ~/.bashrc || cat bashrc-cloud-snippet.sh >> ~/.bashrc
