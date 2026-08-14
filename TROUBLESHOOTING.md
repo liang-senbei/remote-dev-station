@@ -69,5 +69,14 @@
   ② **Worktrees 视图是第二个口子**:它走 `ccCockpit.repoRoot`,和 agent 列表**不共用过滤**。repoRoot 留在 `/root/src/...` 就还是会把 /root 下的仓露出来 —— 一并设成 `/opt/workspace`。(默认值 `/opt/workspace/HACKING/...` 不存在时扩展会回落到 `os.homedir()` = `/root`,更要显式设。)
   ③ **过滤脚本必须在仓里**:2026-08-13 前它只以手写脚本的形式躺在机器上、`install.sh` 不发货 —— 重装 = 座舱悄悄恢复成"什么都显示",而且没人会注意到。已入仓,由 `install -m755 bin/*` 带上。
   ④ **别把两台机器的规则搞混**:站长机(ser4420027323)上那份 `cc-agents-filtered` 是**反过来的**(只留 `/root`,给站长自己看开发项目用)。同名脚本、相反规则,改之前先 `head -3` 看清楚是哪台。
-  ⑤ **验证**:`cc-agents-filtered --json | python3 -c "import sys,json;d=json.load(sys.stdin);print(len(d['agents']), all(a['dir'].startswith('/opt/workspace') for a in d['agents']))"`,并对比 `cc-agents --json` 仍是全量。座舱侧改完**不用 reload**,下一轮轮询(3s)自动生效。
+  ⑤ **验证**(照 ⑦,要按**注册表**的 dir 验,别按输出里的 dir):
+  ```bash
+  cc-agents-filtered --json | python3 -c "
+  import sys,json,glob
+  reg={json.load(open(p))['name']: json.load(open(p)).get('dir','') for p in glob.glob('/root/.cloud-sessions/*.json')}
+  d=json.load(sys.stdin)
+  for a in d['agents']: print(a['name'], '| 注册表 dir:', reg.get(a['name'],'(裸会话)'))"
+  ```
+  每行的注册表 dir 都该在 `/opt/workspace` 下;再对比 `cc-agents --json` 仍是全量。座舱侧改完**不用 reload**,下一轮轮询(3s)自动生效。
   ⑥ **`/opt/workspace` 是空的时候座舱就是空的**——这是对的,不是坏了。客户的项目本来就该开在 `/opt/workspace` 下(`cloud-enter`/`cloudgo` 默认落这儿)。
+  ⑦ **别按 `cc-agents` 输出里的 `dir` 过滤(第一版就栽在这)**:那个 dir 是**反推**出来的——`realdir = decode_dir(dirname(jsonl_by_uuid(uuid)))`,即"这会话的 jsonl 躺在哪个 project 目录"。而**座舱自己会把同一份 jsonl 软链进别的 project 目录**(`ensureSessionLinks`,「打开」能 resume 全靠它),`jsonl_by_uuid` 用 `glob(...)[0]` 取首个命中,**可能先命中那条软链** → 一个跑在 `/root` 的会话就顶着 `/opt/workspace/xxx` 的 dir **混过过滤**。192.220.36.19 上实测:`cc-root` 注册表写着 `/root`,却因为 `~/.claude/projects/-opt-workspace-Phy-LargeN/<uuid>.jsonl → ../-root/<uuid>.jsonl` 这条软链,被 cc-agents 报成 `/opt/workspace/Phy/LargeN`、堂而皇之进了座舱。**修法**:过滤读 `~/.cloud-sessions/<name>.json` 里的 `dir`(会话创建时写死的启动目录,不受软链影响),没有注册表条目的裸会话才回落到报的 dir(通常为空 → 直接滤掉)。**这个坑会随座舱用得越久越严重**:软链是座舱正常工作的产物,越用越多。
