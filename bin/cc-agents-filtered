@@ -8,12 +8,34 @@
 座舱的「频道」是按 agent 的 dir 现算分组的，列表里没有 /root/src 的 agent，
 频道里也就不会冒出 /root/src 的项目。
 """
-import sys, json, subprocess
+import sys, os, json, glob, subprocess
 
 ROOTS = ["/opt/workspace"]          # 只有这些根下面(含根本身)的 agent 才进座舱
+REG   = os.path.expanduser("~/.cloud-sessions")   # 会话注册表:登记着每个会话【真正的启动目录】
+
+def reg_dirs():
+    """name -> 注册表登记的启动目录。
+
+    ⚠️ 不能直接信 cc-agents 输出里的 dir:那个是【jsonl 落在哪个 project 目录】反推出来的
+    (`decode_dir(dirname(jsonl))`),而座舱自己会把同一份 jsonl 软链进别的 project 目录
+    (ensureSessionLinks,「打开」能 resume 就靠它)。软链一建,glob 可能先命中软链,
+    一个 /root 的会话就会顶着 /opt/workspace/xxx 的 dir 混过过滤 —— 实测中过。
+    注册表的 dir 是会话创建时写死的,不受软链影响,所以以它为准;
+    没有注册表条目的裸会话再回落到 cc-agents 报的 dir(通常为空 → 直接滤掉)。"""
+    out = {}
+    for p in glob.glob(os.path.join(REG, "*.json")):
+        try:
+            r = json.load(open(p, encoding="utf-8"))
+            if isinstance(r, dict) and r.get("name"):
+                out[r["name"]] = r.get("dir", "") or ""
+        except Exception:
+            pass
+    return out
+
+REGD = reg_dirs()
 
 def keep(a):
-    d = a.get("dir", "") or ""
+    d = REGD.get(a.get("name", ""), a.get("dir", "") or "")
     return any(d == r or d.startswith(r + "/") for r in ROOTS)
 
 result = subprocess.run(
