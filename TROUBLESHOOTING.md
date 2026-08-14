@@ -80,3 +80,14 @@
   每行的注册表 dir 都该在 `/opt/workspace` 下;再对比 `cc-agents --json` 仍是全量。座舱侧改完**不用 reload**,下一轮轮询(3s)自动生效。
   ⑥ **`/opt/workspace` 是空的时候座舱就是空的**——这是对的,不是坏了。客户的项目本来就该开在 `/opt/workspace` 下(`cloud-enter`/`cloudgo` 默认落这儿)。
   ⑦ **别按 `cc-agents` 输出里的 `dir` 过滤(第一版就栽在这)**:那个 dir 是**反推**出来的——`realdir = decode_dir(dirname(jsonl_by_uuid(uuid)))`,即"这会话的 jsonl 躺在哪个 project 目录"。而**座舱自己会把同一份 jsonl 软链进别的 project 目录**(`ensureSessionLinks`,「打开」能 resume 全靠它),`jsonl_by_uuid` 用 `glob(...)[0]` 取首个命中,**可能先命中那条软链** → 一个跑在 `/root` 的会话就顶着 `/opt/workspace/xxx` 的 dir **混过过滤**。192.220.36.19 上实测:`cc-root` 注册表写着 `/root`,却因为 `~/.claude/projects/-opt-workspace-Phy-LargeN/<uuid>.jsonl → ../-root/<uuid>.jsonl` 这条软链,被 cc-agents 报成 `/opt/workspace/Phy/LargeN`、堂而皇之进了座舱。**修法**:过滤读 `~/.cloud-sessions/<name>.json` 里的 `dir`(会话创建时写死的启动目录,不受软链影响),没有注册表条目的裸会话才回落到报的 dir(通常为空 → 直接滤掉)。**这个坑会随座舱用得越久越严重**:软链是座舱正常工作的产物,越用越多。
+
+## `sergo` 和 `cloudgo` 看到同一份 tmux 列表 —— 活会话那半从没按 CLOUD_ROOT 过滤过
+
+- **症状**:`cloudgo`(根 `/opt/workspace`)和 `sergo`(根 `/root/src`)本该各管各的工作区,菜单里却**列出一模一样的会话**。
+- **根因**:`cloud-sessmenu` 的菜单由两半拼成——**活会话**(`cloud-sesslist`,读 tmux)+ **离线可恢复**(`cc-sessions recoverable`)。只有**后半**按 `$CLOUD_ROOT` 过滤了 dir,`cloud-sesslist` 从头到尾只 `tmux list-sessions` 拿全量、连 CLOUD_ROOT 都没读。而 `cloud-sessmenu` 顶上的注释白纸黑字写着"活的+可恢复的都过滤"——**文档说有、实际只做了一半**。更绕的是 `.bashrc` 里 sergo 的注释又写着"两个入口的会话是互通的",两处自相矛盾,照哪句都说不清该是什么行为。
+- **修法**:`cloud-sesslist` 读 `$CLOUD_ROOT`,按会话的启动目录过滤;目录取自**注册表** `~/.cloud-sessions/<name>.json` 的 `dir`(一次 python3 读成 map,不是每会话一次),没登记的裸会话(`cc-tmp-*`/手搓 tmux)回落到 tmux 的 `#{session_path}`。`CLOUD_ROOT` 为空 = 不过滤,保留全量用法。
+- **易漏 / 验证**:
+  ① **别用 `cc-agents` 报的 dir**(理由同上一条第 ⑦ 点:座舱的软链会把它带偏)。注册表的 dir 才是会话创建时写死的。
+  ② **前缀要卡到目录边界**:`[[ "$dir" != "$ROOT"* ]]` 会让 `/root/srcfoo` 混进 `/root/src`。要 `[ "$d" = "$root" ] || [[ "$d" == "$root"/* ]]`。离线那半原本就是宽的前缀匹配,一并收紧了。
+  ③ **过滤是"看不见"不是"进不去"**:根之外的会话(比如在 `/tmp` 起的)两个菜单都不列 —— 逃生口是 `tmux ls` 看全量、`cloudattach <名字>` 直接进,都不受过滤影响。
+  ④ **验证**:`CLOUD_ROOT=/opt/workspace cloud-sessmenu | cut -f1` 与 `CLOUD_ROOT=/root/src cloud-sessmenu | cut -f1` 两份名单应**无交集**,并集应等于 `tmux ls`(减去根外的)。

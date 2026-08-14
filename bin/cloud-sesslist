@@ -1,10 +1,39 @@
 #!/bin/bash
 # 输出 tmux 会话：名字 + 最近活动相对时间，按最近排序；可选 $1=ERE 过滤名字
+#
+# CLOUD_ROOT 非空时，【只列工作目录在它下面的会话】——两个入口靠这条各管各的、互不串台：
+#   cloudgo → /opt/workspace(客户工作区)   sergo → /root/src(站长第二工作区)
+# 空 CLOUD_ROOT = 不过滤(全量)，给别处复用留的口子。
 pat="${1:-.}"
 now=$(date +%s)
-tmux list-sessions -F '#{session_activity}|#{session_name}' 2>/dev/null | sort -rn | \
-while IFS='|' read -r act sn; do
+root="${CLOUD_ROOT:-}"
+
+# 会话名 → 启动目录，取自注册表 ~/.cloud-sessions/*.json(会话创建时写死的 dir)。
+# ⚠️ 别改用 cc-agents 报的 dir：那个是从「jsonl 落在哪个 project 目录」反推的，会被座舱
+#    建的软链带偏(见 TROUBLESHOOTING「座舱把 /root 下的项目也列出来」第 ⑦ 条)。
+declare -A REGDIR
+if [ -n "$root" ]; then
+  while IFS=$'\t' read -r n d; do [ -n "$n" ] && REGDIR["$n"]="$d"; done < <(
+    python3 - <<'PY' 2>/dev/null
+import glob, json, os
+for p in glob.glob(os.path.expanduser("~/.cloud-sessions/*.json")):
+    try:
+        r = json.load(open(p, encoding="utf-8"))
+        if isinstance(r, dict) and r.get("name"):
+            print("%s\t%s" % (r["name"], r.get("dir", "") or ""))
+    except Exception:
+        pass
+PY
+  )
+fi
+
+tmux list-sessions -F '#{session_activity}|#{session_name}|#{session_path}' 2>/dev/null | sort -rn | \
+while IFS='|' read -r act sn spath; do
   [[ "$sn" =~ $pat ]] || continue
+  if [ -n "$root" ]; then
+    sdir="${REGDIR[$sn]:-$spath}"       # 没登记的裸会话(cc-tmp-* / 手搓 tmux)回落到 tmux 里的会话目录
+    [ "$sdir" = "$root" ] || [[ "$sdir" == "$root"/* ]] || continue
+  fi
   d=$((now - act)); [ "$d" -lt 0 ] && d=0
   if   [ "$d" -lt 60 ];    then t="刚刚"
   elif [ "$d" -lt 3600 ];  then t="$((d/60))分前"

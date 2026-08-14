@@ -164,9 +164,11 @@ cloudnewat() {
     esac
   done
 }
-# sergo：跟 cloudgo 是同一套逻辑（同一份会话列表、同样的标签自学习 / 预览 / Ctrl-X 删除），
-# 唯一区别是「➕ 新建会话」和「⟳ 恢复历史」的目录起点是 /root/src，不是 /opt/workspace。
-# 两个入口的会话是互通的：在哪边建的，另一边都看得到。
+# sergo：跟 cloudgo 是同一套机制（标签自学习 / 预览 / Ctrl-X 分级删除都一样），
+# 区别是 CLOUD_ROOT 换成 /root/src —— 而 CLOUD_ROOT 决定的不只是「新建/恢复的目录起点」，
+# 也决定【列出哪些会话】：两个入口各自只列自己根下面的，互不串台。
+#   cloudgo → /opt/workspace 的会话    sergo → /root/src 的会话
+# 想看全量不受根限制:`tmux ls`;想直接进某个已知会话:`cloudattach <名字>`(不受过滤影响)。
 # ⚠️ 站长机专用：前提是本机存在 /root/src 这个第二工作区；极简客户版没有它，
 #    所以 main 分支刻意不发货 sergo（见 TROUBLESHOOTING.md「cloudgo 半迁移」条）。
 sergo() { CLOUD_ROOT=/root/src cloudgo "$@"; }

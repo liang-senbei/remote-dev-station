@@ -1,7 +1,9 @@
 #!/bin/bash
 # cloudgo 菜单。每行输出: <真实会话名>\t<给人看的显示>
 # cloudgo 用 fzf --with-nth=2 只显示第 2 列(去掉 cc- 前缀的干净名),选中时取第 1 列(真名)做 cloudattach。
-# 当 CLOUD_ROOT 有值时，只列出工作目录在 $CLOUD_ROOT 下的会话（活的+可恢复的都过滤）。
+# 当 CLOUD_ROOT 有值时，只列出工作目录在 $CLOUD_ROOT 下的会话（活的+可恢复的都过滤）——
+# 活的那半由 cloud-sesslist 按注册表 dir 过滤，离线那半在下面按 recoverable 输出的 dir 过滤。
+# 靠这条 cloudgo(/opt/workspace) 与 sergo(/root/src) 各管各的、互不串台。
 printf '%s\t%s\n' "➕" "➕ 新建会话(选目录)…"
 printf '%s\t%s\n' "⟳" "⟳ 原生选择器恢复(未登记的老对话)…"
 printf '%s\t%s\n' "🔓" "🔓 忘记本标签的会话绑定(改绑/重选)"
@@ -13,7 +15,8 @@ done
 # 离线但可恢复:真名 \t 去cc-显示 ⏸
 # recoverable 输出格式: name\tdir\tuuid\treltime
 cc-sessions recoverable 2>/dev/null | while IFS=$'\t' read -r name dir uuid reltime; do
-  [ -n "$CLOUD_ROOT" ] && [[ "$dir" != "$CLOUD_ROOT"* ]] && continue
+  # 前缀要卡到目录边界:纯 "$CLOUD_ROOT"* 会让 /root/srcfoo 混进 /root/src
+  [ -n "$CLOUD_ROOT" ] && [ "$dir" != "$CLOUD_ROOT" ] && [[ "$dir" != "$CLOUD_ROOT"/* ]] && continue
   local_name="${name#cc-}"
   printf '%s\t%s  ⏸离线·点我接回原对话 (%s)\n' "$name" "$local_name" "$reltime"
 done
