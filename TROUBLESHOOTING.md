@@ -91,3 +91,18 @@
   ② **前缀要卡到目录边界**:`[[ "$dir" != "$ROOT"* ]]` 会让 `/root/srcfoo` 混进 `/root/src`。要 `[ "$d" = "$root" ] || [[ "$d" == "$root"/* ]]`。离线那半原本就是宽的前缀匹配,一并收紧了。
   ③ **过滤是"看不见"不是"进不去"**:根之外的会话(比如在 `/tmp` 起的)两个菜单都不列 —— 逃生口是 `tmux ls` 看全量、`cloudattach <名字>` 直接进,都不受过滤影响。
   ④ **验证**:`CLOUD_ROOT=/opt/workspace cloud-sessmenu | cut -f1` 与 `CLOUD_ROOT=/root/src cloud-sessmenu | cut -f1` 两份名单应**无交集**,并集应等于 `tmux ls`(减去根外的)。
+
+## tmux 的 `-t <名字>` 是**前缀匹配**不是精确匹配 —— 会话名互为前缀时全线出错
+
+- **症状**:`cc-atf翻译-r` 明明没在跑,watchdog 却死活不拉它(日志里连尝试都没有);`cloudattach cc-foo` 进去发现是 `cc-foo-2` 的屏幕;`cloud-forget cc-foo` 把还活着的 `cc-foo-2` 杀了。现象各不相同,根子是同一个。
+- **根因**:tmux 的 target-session 解析顺序是 **精确 → 前缀 → fnmatch**。所以只要存在 `cc-foo-2`,`tmux has-session -t cc-foo` 就返回 0(命中)。这套部署的会话命名恰恰全是后缀派生(`-2`/`-3`/`-r`/`-r-2`/`-<自定义名>`),**每个正名都是其派生名的前缀** —— 中招是必然的:
+  - `cloud-watchdog`:临起前那句 `has-session -t name` 误判"已存在"→ `continue` → **该会话永远拉不回来**(实测 `cc-atf翻译-r` 被 `cc-atf翻译-r-2` 挡住;`cc-atf翻译` 更是被 `-2/-3/-r/-r-2` 任意一个挡住)。
+  - `cc-autopilot`:`tmux_alive` 误判已死会话为活着;更糟的是 `send-keys -t name` 会把督促**打进另一个 agent 的输入框**。
+  - `cloud-forget`:`kill-session -t name` **杀错会话**(最危险)。
+  - `cloud-enter`/`cc-new`/`cloudattach`:误 attach 进别人的会话。
+  - `cloudnew`/`cloud_resume` 里"找空闲编号"的 while 循环:白白多跳几个序号。
+- **修法**:所有 tmux 目标一律加 `=` 前缀强制精确匹配 —— `-t "=$name"`。已全仓改完(7 个文件 10 处)。
+- **易漏 / 验证**:
+  ① **`capture-pane` 例外**:它的 `-t` 是【pane 目标】,只写 `-t "=$name"` 会报 `can't find pane`,必须写成 **`-t "=$name:"`**(带冒号)。`has-session`/`attach`/`send-keys`/`kill-session` 写 `=$name` 即可。
+  ② **复现只要两条命令**:`tmux new-session -d -s zz-a-2 'sleep 60'; tmux has-session -t zz-a && echo 命中` —— 会打印"命中"。加 `=` 后不命中。
+  ③ 这坑**只在有派生名会话时才发作**,单会话机器上永远看不到 —— 所以它能潜伏很久。客户机上一旦同项目开了第二个会话就开始发作。

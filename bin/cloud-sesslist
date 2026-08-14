@@ -1,8 +1,8 @@
 #!/bin/bash
 # 输出 tmux 会话：名字 + 最近活动相对时间，按最近排序；可选 $1=ERE 过滤名字
 #
-# CLOUD_ROOT 非空时，【只列工作目录在它下面的会话】——两个入口靠这条各管各的、互不串台：
-#   cloudgo → /opt/workspace(客户工作区)   sergo → /root/src(站长第二工作区)
+# CLOUD_ROOT 非空时，【只列工作目录在它下面的会话】—— cloudgo 的菜单因此只出现本工作区
+# (默认 /opt/workspace)的会话，别处开的不串进来。想换根:CLOUD_ROOT=/some/dir cloudgo。
 # 空 CLOUD_ROOT = 不过滤(全量)，给别处复用留的口子。
 pat="${1:-.}"
 now=$(date +%s)

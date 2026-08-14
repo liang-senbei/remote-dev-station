@@ -130,7 +130,10 @@ for k in list(st.keys()):
 pretrust(sorted({d for _, d, _ in to_start}))
 for name, realdir, uuid in to_start:
     # 临起前再确认这名字没被抢先建(用户手动恢复 / boot 并发)→ 防同名或"同对话双开"冲突
-    if subprocess.run(["tmux", "has-session", "-t", name],
+    # "=" 前缀 = 精确匹配。裸名字会被 tmux 当【前缀/通配】解析:cc-atf翻译-r 会命中
+    # 已在跑的 cc-atf翻译-r-2 → 这里误判"已存在"直接 continue → 该会话【永远拉不回来】。
+    # 名字互为前缀的会话(-2/-3/-r 这种后缀命名)全中招,实测坑过。
+    if subprocess.run(["tmux", "has-session", "-t", "=" + name],
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
         continue
     # 不加 "|| exec bash":claude 失败就让会话彻底结束 → 下轮重试(退避兜底)。否则崩溃会剩个

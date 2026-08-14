@@ -29,7 +29,8 @@ if isinstance(d,dict):
     d.setdefault("projects",{}).setdefault(sys.argv[1],{})["hasTrustDialogAccepted"]=True
     json.dump(d,open(p,"w"))
 PY
-tmux has-session -t "$sess" 2>/dev/null && exec tmux attach -t "$sess"
+# "=" = 精确匹配;裸名字是前缀匹配 → 新建 cc-foo 时若 cc-foo-2 在跑,会误接进 cc-foo-2
+tmux has-session -t "=$sess" 2>/dev/null && exec tmux attach -t "=$sess"
 CLOUD_MODEL=""; CLOUD_OPTS=""
 eval "$(grep -m1 '^CLOUD_MODEL=' "$HOME/.bashrc" 2>/dev/null)"
 # CLOUD_MODEL 为空 = 不传 --model,交给 ~/.claude/settings.json 的 ANTHROPIC_MODEL(座舱配置页管的那个)。
