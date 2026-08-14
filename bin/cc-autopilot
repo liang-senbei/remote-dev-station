@@ -24,11 +24,13 @@ def save(p, o):
     except Exception: pass
 
 def tmux_alive(name):
-    return subprocess.run(["tmux", "has-session", "-t", name], capture_output=True).returncode == 0
+    # "=" = 精确匹配。裸名字是前缀匹配:cc-foo 死了但 cc-foo-2 活着,这里会误判 cc-foo 活着
+    return subprocess.run(["tmux", "has-session", "-t", "=" + name], capture_output=True).returncode == 0
 
 def send(name, text):
     # 模拟"用户输入"发督促;前缀标明是自动督促,agent 不会误当真人对话
-    subprocess.run(["tmux", "send-keys", "-t", name, text, "Enter"], capture_output=True)
+    # "=" 同上 —— 这里发错目标 = 把督促打进【别的 agent】的输入框,后果比误判严重
+    subprocess.run(["tmux", "send-keys", "-t", "=" + name, text, "Enter"], capture_output=True)
 
 def channel_pending(agent_dir, todos):
     """找这个 agent 频道的【未完成】待办文本。todos 按频道名(≈项目名/目录叶子)存;

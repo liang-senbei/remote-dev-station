@@ -2,9 +2,11 @@
 # cloudgo 预览:活会话→tmux 截屏;离线可恢复会话→读其对话 .jsonl 末尾几条消息(看清是哪个对话)。
 name="${1:-}"
 case "$name" in ""|"➕"*|"⟳"*) echo "(菜单项 / 选具体会话看预览)"; exit 0;; esac
-if tmux has-session -t "$name" 2>/dev/null; then
+# "=" = 精确匹配(裸名字是前缀匹配,会预览到别的会话的屏幕)。
+# ⚠️ capture-pane 的 -t 是【pane 目标】,只写 "=$name" 会报 can't find pane,要带冒号 "=$name:"
+if tmux has-session -t "=$name" 2>/dev/null; then
   echo "🟢 在跑 · 当前屏幕:"; echo "────────────────────────"
-  tmux capture-pane -ep -t "$name" 2>/dev/null | tail -n 60
+  tmux capture-pane -ep -t "=$name:" 2>/dev/null | tail -n 60
   exit 0
 fi
 # 离线 → 解析 dir+uuid,读 jsonl 末尾

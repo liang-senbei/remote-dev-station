@@ -2,5 +2,7 @@
 # 从自动恢复名单移除一个会话 + 杀其 tmux 会话;但【绝不删】底层 ~/.claude 对话存档(日后仍可 resume)。
 name="${1:?用法: cloud-forget <会话名>}"
 cc-sessions forget "$name" >/dev/null 2>&1
-tmux kill-session -t "$name" 2>/dev/null
+# ⚠️ 必须用 "=" 精确匹配:裸名字是【前缀/通配】匹配 —— cc-foo 已经不在了的话,
+# `cloud-forget cc-foo` 会一刀砍在还活着的 cc-foo-2 上(杀错会话,最危险的一处)。
+tmux kill-session -t "=$name" 2>/dev/null
 echo "已删除 $name(移出自动恢复;对话存档保留)"
