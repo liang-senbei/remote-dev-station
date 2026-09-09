@@ -6,6 +6,9 @@
   "ccCockpit.pollIntervalMs": 3000,
   "security.workspace.trust.enabled": false,
 
+  "__navigator__": "必开。VS Code 新版(server Stable-520fb30b 起)把 navigator 变成 nodejs 全局,默认给扩展宿主装了个【一访问就抛 PendingMigrationError】的 getter;anthropic.claude-code 在模块加载阶段就会撞上 → 整个扩展起不来、活动栏图标消失,而且不报任何用户可见的错。开关见 server-main.js 的 getValue('extensions.supportNodeGlobalNavigator') → 传 --supportGlobalNavigator 给扩展宿主。",
+  "extensions.supportNodeGlobalNavigator": true,
+
   "__watch__": "关键:不监视/索引重目录。exthost 盯着 node_modules/.venv/.git 几G内容会膨胀到撑爆 Node 堆(实测单 exthost 2h 涨到 4.6G 后崩,报 window terminated oom)。",
   "files.watcherExclude": {
     "**/.git/objects/**": true,

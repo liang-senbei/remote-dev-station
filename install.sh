@@ -50,7 +50,11 @@ p, binpath, host = sys.argv[1], sys.argv[2], sys.argv[3]
 cfg = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}   # 解析失败=抛异常,走上面的 || 分支,绝不覆盖客户已有配置
 cfg.update({"ccCockpit.ccAgentsPath": binpath,
             "ccCockpit.repoRoot": "/opt/workspace",   # Worktrees 视图的根,别让它伸进 /root
-            "ccCockpit.host": host})
+            "ccCockpit.host": host,
+            # 必开。新版 VS Code 把 navigator 变成 nodejs 全局,默认给扩展宿主装了个一访问就抛
+            # PendingMigrationError 的 getter;anthropic.claude-code 在模块加载阶段就撞上 →
+            # 整个扩展起不来、活动栏图标消失,且不报任何用户可见的错。见 TROUBLESHOOTING。
+            "extensions.supportNodeGlobalNavigator": True})
 json.dump(cfg, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 PY
 

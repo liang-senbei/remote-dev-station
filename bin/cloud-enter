@@ -13,8 +13,17 @@ CLOUD_MODEL="${CLOUD_MODEL:-}"   # 留空 = 不传 --model,交给 settings.json 
 MODEL_ARG=""; [ -n "$CLOUD_MODEL" ] && MODEL_ARG="--model '$CLOUD_MODEL'"   # 命令行 --model 优先级高于 settings.json,所以为空时必须【整个参数都不出现】
 CLOUD_OPTS="${CLOUD_OPTS:---effort max}"
 
-# 已在 tmux 里 → 直接起 claude,不嵌套
-if [ -n "$TMUX" ]; then cd "$dir" 2>/dev/null || cd "$HOME" || true; export IS_SANDBOX=1; exec "$(type -P claude)" ${CLOUD_MODEL:+--model "$CLOUD_MODEL"} $CLOUD_OPTS --dangerously-skip-permissions; fi
+# 已在 tmux 里 → 直接起 claude,不嵌套。
+#   ⚠️ 这里也要接回:当前 tmux 会话名有登记且对话存档还在 → --resume。Yxi 手机端「拉起」一个歇掉的会话
+#   = 新建同名 tmux 再往里敲 claude,走的就是这条;以前不带 --resume,起的是全新对话——对话页还显示旧转录、
+#   终端却是空白新会话(Yxi TROUBLESHOOTING #218)。ended=True(主动退出)的登记 resolve 也给,和 tmux 外那条分支一致。
+if [ -n "$TMUX" ]; then
+  cd "$dir" 2>/dev/null || cd "$HOME" || true; export IS_SANDBOX=1
+  cur="$(tmux display-message -p '#{session_name}' 2>/dev/null)"
+  res=$(cc-sessions resolve "${cur:-$name}" 2>/dev/null); uuid="${res##*$'\t'}"; RESUME=()
+  [ -n "$uuid" ] && [ "$uuid" != "$res" ] && RESUME=(--resume "$uuid")
+  exec "$(type -P claude)" ${CLOUD_MODEL:+--model "$CLOUD_MODEL"} $CLOUD_OPTS "${RESUME[@]}" --dangerously-skip-permissions
+fi
 
 # 在跑 → attach
 # "=" = 精确匹配;裸名字是前缀匹配 → 想进 cc-foo 却被接进 cc-foo-2
